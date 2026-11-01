@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{H as t,U as n}from"./iframe-BvkfYrxy.js";import{n as r,t as i}from"./BranchSwitcher-vNRu7YgU.js";var a,o,s;function c(){return(c=e((()=>{r(),t(),a={title:`Components/BranchSwitcher`,component:i,args:{project:n,onSwitch:async()=>{}}},o={},s=[`Default`]})))()}c();export{o as Default,s as __namedExportsOrder,a as default};

@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{w as t}from"./chunk-NGNAAXSQ-WvQ3FOUt.js";import{c as n,l as r}from"./mermaid-parser.core-BIFBammC.js";function i(){return(i=e((()=>{r(),t()})))()}i();export{n as createTreemapServices};

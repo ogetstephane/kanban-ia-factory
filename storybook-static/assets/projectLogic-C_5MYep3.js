@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";var t;function n(){return(n=e((()=>{t=[`#6366f1`,`#8b5cf6`,`#ec4899`,`#f59e0b`,`#10b981`,`#06b6d4`,`#3b82f6`,`#f43f5e`]})))()}export{n,t};

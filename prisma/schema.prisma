@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Board {
+  id       String @id
+  revision Int    @default(0)
+}
+
+model ActivityEvent {
+  id          String @id
+  projectId   String?
+  projectName String
+  entityType  String
+  entityId    String
+  entityTitle String
+  action      String
+  summary     String
+  actor       String
+  changes     Json
+  createdAt   String
+
+  @@index([projectId, createdAt])
+  @@index([entityType, entityId, createdAt])
+}
+
+model Project {
+  id          String    @id
+  revision    Int       @default(0)
+  name        String
+  description String
+  color       String
+  icon        String?
+  category    String?
+  createdAt   String
+  updatedAt   String
+  position    Int
+  repositoryUrl    String?
+  repositoryBranch String?
+  repositoryCommit String?
+  docsPath         String?
+  features    Feature[]
+  tasks       Task[]
+  releases    Release[]
+  finishes    BranchFinish[]
+}
+
+model Release {
+  id            String @id
+  projectId     String
+  project       Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version       String
+  status        String @default("upcoming")
+  revision      Int @default(0)
+  publishing    Boolean @default(false)
+  targetBranch  String?
+  targetCommit  String?
+  remoteUrl     String?
+  tagHash       String?
+  error         String @default("")
+  createdAt     String
+  updatedAt     String
+  publishedAt   String?
+  tasks         Task[]
+
+  @@unique([projectId, version])
+}
+
+model Feature {
+  id          String   @id
+  revision    Int      @default(0)
+  title       String
+  description String
+  category    String
+  status      String   @default("Backlog")
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  targetDate  String?
+  color       String
+  createdAt   String
+  position    Int
+  tasks       Task[]
+
+  @@index([projectId])
+}
+
+model Task {
+  id                 String    @id
+  revision           Int       @default(0)
+  title              String
+  description        String
+  status             String
+  priority           String
+  projectId          String?
+  project            Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  featureId          String?
+  feature            Feature?  @relation(fields: [featureId], references: [id], onDelete: SetNull)
+  storyPoints        Float
+  tags               Json
+  acceptanceCriteria Json
+  suggestedWorkflow  String?
+  blockedReason      String @default("")
+  order              Int
+  createdAt          String
+  updatedAt          String
+  position           Int
+  subtasks           Subtask[]
+  agentSession       AgentSession?
+  releaseId          String?
+  release            Release? @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, status, order])
+  @@index([featureId])
+  @@index([releaseId])
+}
+
+model AgentSession {
+  id                String @id
+  taskId            String @unique
+  task              Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  provider          String
+  status            String
+  autoExecute       Boolean @default(false)
+  resumeStatus      String?
+  context           Json
+  taskRevision      Int
+  workspace         String?
+  branch            String?
+  baseCommit        String?
+  providerSessionId String?
+  plan              String @default("")
+  output            String @default("")
+  error             String @default("")
+  attempt           Int @default(1)
+  feedback          String @default("")
+  reviewStatus      String @default("pending")
+  reviewToken       String @default("")
+  createdAt         String
+  updatedAt         String
+  questions         AgentQuestion[]
+  attempts          AgentAttempt[]
+  checks            AgentCheck[]
+  deliveries        AgentDelivery[]
+  publications      ReviewPublication[]
+}
+
+model ReviewPublication {
+  id          String @id
+  sessionId   String
+  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attempt     Int
+  projectId   String
+  scopeId     String
+  branch      String
+  remoteUrl   String
+  reviewToken String
+  tree        String
+  ticketHead  String
+  commitHash  String
+  status      String
+  error       String @default("")
+  createdAt   String
+  updatedAt   String
+  finishId    String?
+  finish      BranchFinish? @relation(fields: [finishId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, attempt])
+  @@index([projectId, scopeId])
+}
+
+model BranchFinish {
+  id           String @id
+  projectId    String
+  project      Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scopeId      String
+  branch       String
+  targetBranch String
+  origin       String
+  featureHead  String
+  targetHead   String
+  mergeHash    String?
+  releaseId    String
+  status       String
+  error        String @default("")
+  createdAt    String
+  updatedAt    String
+  publications ReviewPublication[]
+
+  @@unique([projectId, scopeId])
+}
+
+model AgentDelivery {
+  id                 String @id
+  sessionId          String
+  session            AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attempt            Int
+  status             String
+  targetBranch       String
+  targetHead         String
+  ticketHead         String
+  tree               String
+  reviewToken        String
+  message            String
+  acknowledgeChecks  Boolean
+  commitHash         String?
+  mergeHash          String?
+  error              String @default("")
+  createdAt          String
+  updatedAt          String
+
+  @@unique([sessionId, attempt])
+}
+
+model AgentAttempt {
+  id        String @id
+  sessionId String
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  number    Int
+  snapshot  Json
+  createdAt String
+
+  @@unique([sessionId, number])
+}
+
+model AgentCheck {
+  id         String @id
+  sessionId  String
+  session    AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  attempt    Int
+  script     String
+  passed     Boolean
+  output     String
+  createdAt  String
+
+  @@index([sessionId, attempt])
+}
+
+model AgentQuestion {
+  id            String @id
+  sessionId     String
+  session       AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  question      String
+  choices       Json
+  allowFreeform Boolean
+  answer        String?
+  createdAt     String
+  answeredAt    String?
+
+  @@index([sessionId])
+}
+
+model Subtask {
+  id        String
+  taskId    String
+  task      Task    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  text      String
+  completed Boolean
+  position  Int
+
+  @@id([taskId, id])
+}

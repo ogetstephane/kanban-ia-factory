@@ -1,0 +1,1 @@
+import{n as e}from"./rolldown-runtime-sJBDdmOt.js";import{H as t,U as n}from"./iframe-BvkfYrxy.js";import{r,t as i}from"./ProjectHealth-CGRZCxE3.js";var a,o,s;function c(){return(c=e((()=>{r(),t(),a={title:`Components/ProjectHealth`,component:i,args:{projectId:n.id}},o={},s=[`HealthSummary`]})))()}c();export{o as HealthSummary,s as __namedExportsOrder,a as default};
