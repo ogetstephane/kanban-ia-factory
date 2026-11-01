@@ -47,7 +47,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   const hasGitRepository = projects.some((project) => (activeProjectId === ALL_PROJECTS || project.id === activeProjectId) && project.repositoryUrl);
   return (
     <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo, Brand & Project Switcher */}
           <div className="flex items-center gap-3">
@@ -188,7 +188,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       <div aria-label="Board filters and actions"
         className={`${['releases', 'git', 'cockpit', 'delivery-history', 'activity', 'wiki'].includes(viewMode) ? 'hidden sm:block' : 'block'} border-t border-slate-800/70 bg-slate-950/35 shadow-inner shadow-black/10`}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
+        <div className="flex w-full min-w-0 flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
           {['board', 'analytics'].includes(viewMode) && <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 md:flex md:items-center">
             <div className="relative col-span-2 min-w-0 md:flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />

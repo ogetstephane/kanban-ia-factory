@@ -198,7 +198,7 @@ export function ActivityView({ scopeId, projects }: { scopeId: string; projects:
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   return (
-    <section className="mx-auto max-w-5xl space-y-6">
+    <section className="w-full min-w-0 space-y-6">
       <header className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-indigo-500/10 via-slate-900 to-slate-900 p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">

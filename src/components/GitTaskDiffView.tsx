@@ -54,7 +54,7 @@ export default function GitTaskDiffView({ taskId, title, status, onBack }: {
   }, [taskId, selected, review]);
 
   const files = review?.files ?? [];
-  return <section aria-label={`Git diff for ${title}`} className="mx-auto max-w-7xl space-y-4">
+  return <section aria-label={`Git diff for ${title}`} className="w-full min-w-0 space-y-4">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-start gap-3">
         <button type="button" onClick={onBack} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Back to Git inventory">

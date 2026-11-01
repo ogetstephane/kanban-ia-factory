@@ -144,7 +144,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       style={glowStyle}
-      className={`flex flex-col min-w-[280px] sm:min-w-[310px] max-w-[340px] flex-1 bg-slate-900/70 border border-slate-800 rounded-2xl p-3 transition-[box-shadow,background-color,opacity] duration-200 ${
+      className={`flex flex-col min-w-[280px] sm:min-w-[310px] flex-1 bg-slate-900/70 border border-slate-800 rounded-2xl p-3 transition-[box-shadow,background-color,opacity] duration-200 ${
         config.borderTop
       } border-t-2 ${
         dropState === 'forbidden' ? 'opacity-40 cursor-not-allowed shadow-lg' : `hover:shadow-[0_0_24px_var(--column-glow)] ${

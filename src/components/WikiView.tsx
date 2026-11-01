@@ -171,7 +171,7 @@ export function WikiView({ project }: { project: Project }) {
   const modes: Array<[Mode, string, typeof Pencil]> = [['edit', 'Edit', Pencil], ['split', 'Split', Columns2], ['preview', 'Preview', Eye]];
 
   return (
-    <section className="mx-auto max-w-7xl space-y-4">
+    <section className="w-full min-w-0 space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-900 p-5">
         <div className="flex items-center gap-3">
           <span className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-2.5 text-emerald-200"><BookOpen className="h-5 w-5" /></span>

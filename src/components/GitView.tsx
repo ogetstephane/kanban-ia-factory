@@ -38,7 +38,7 @@ export default function GitView({ projectId, onOpenTask, openingTicket, ticketEr
       ...project.worktrees.flatMap((worktree) => [worktree.path, worktree.branch, worktree.task?.title, worktree.task?.id])]
       .concat((published[project.id] ?? []).flatMap((work) => [work.title, work.branch, ...work.tasks.flatMap((task) => [task.title, task.releaseVersion ?? ''])]))
       .some((value) => value?.toLowerCase().includes(query))) ?? [];
-  return <section aria-label="Git repositories" className="mx-auto max-w-7xl space-y-5">
+  return <section aria-label="Git repositories" className="w-full min-w-0 space-y-5">
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">Git repositories & worktrees</h1>
         <p className="text-sm text-slate-400">Git inventory for {projectId === ALL_PROJECTS ? 'all projects' : 'the selected project'}. Finish published work with an explicit merge, push and feature-branch closure.</p></div>

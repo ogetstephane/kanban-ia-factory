@@ -28,7 +28,7 @@ export const FeatureBar: React.FC<FeatureBarProps> = ({
 
   return (
     <section className="bg-slate-900 border-b border-slate-800/80 px-4 sm:px-6 lg:px-8 py-3">
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full min-w-0">
         <div className="flex items-center justify-between mb-2">
           <button
             onClick={() => setIsExpanded(!isExpanded)}

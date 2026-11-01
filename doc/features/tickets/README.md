@@ -59,3 +59,7 @@ Exact schemas, revision conflicts and workflow transitions are in the
 
 [Board](../board/README.md) · [Features and epics](../features/README.md) ·
 [Copilot](../copilot/README.md) · [Releases](../releases/README.md)
+
+## Ticket pages
+
+- [All views take 100% width](i-want-all-views-to-take-100-witdth-task-179.md)

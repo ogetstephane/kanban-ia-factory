@@ -153,7 +153,7 @@ export default function ReleasesView({ projectId, projects, onOpenTask, refreshK
     });
     return () => controller.abort();
   }, [selectedProjectId, selected, attempt, refreshKey]);
-  return <section aria-label="Project releases" className="mx-auto max-w-7xl space-y-5 text-slate-200">
+  return <section aria-label="Project releases" className="w-full min-w-0 space-y-5 text-slate-200">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-2xl font-bold">Releases</h1><p className="text-sm text-slate-400">Project versions, ticket scope and Git tag publication.</p></div>
       <button type="button" className={buttonClass} onClick={refresh}>Refresh releases</button>

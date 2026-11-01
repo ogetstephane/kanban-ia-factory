@@ -237,12 +237,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <div
-      className={presentation === 'page' ? 'mx-auto w-full max-w-6xl' : 'fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto'}
+      className={presentation === 'page' ? 'w-full min-w-0' : 'fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto'}
       role={presentation === 'page' ? 'region' : 'dialog'}
       aria-modal={presentation === 'modal' ? true : undefined}
       aria-labelledby="modal-task-title"
     >
-      <div className={`relative w-full ${presentation === 'modal' ? 'max-w-6xl' : ''} bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 text-slate-100 my-auto`}>
+      <div className={`relative w-full ${presentation === 'modal' ? 'max-w-6xl' : 'min-w-0'} bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 text-slate-100 my-auto`}>
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2">

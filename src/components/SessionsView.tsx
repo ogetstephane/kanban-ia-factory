@@ -46,7 +46,7 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
 
   const selectedRow = data?.items.find((item) => item.taskId === selected) ?? data?.items[0];
   return (
-    <section className="mx-auto w-full max-w-[1700px] min-w-0 space-y-4 text-slate-100" aria-label="Agent sessions">
+    <section className="w-full min-w-0 space-y-4 text-slate-100" aria-label="Agent sessions">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-4">
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-300">Workspace</p>

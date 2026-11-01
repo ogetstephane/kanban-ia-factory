@@ -58,7 +58,7 @@ export default function KanbanBoard({ tasks, features, projects, filters, onMove
   return (
     <>
       {operation.error && <p role="alert" className="text-rose-300 mb-3">{operation.error}</p>}
-      <div aria-busy={operation.pending} className={`max-w-[1700px] mx-auto min-h-[calc(100vh-230px)] flex gap-4 sm:gap-6 pb-6 ${operation.pending ? 'pointer-events-none opacity-70' : ''}`}>
+      <div aria-busy={operation.pending} className={`w-full min-w-0 min-h-[calc(100vh-230px)] flex gap-4 sm:gap-6 pb-6 ${operation.pending ? 'pointer-events-none opacity-70' : ''}`}>
         {KANBAN_STATUSES.map((status) => (
           <KanbanColumn
             key={status} status={status}

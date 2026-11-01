@@ -35,8 +35,8 @@ export default function TaskPage() {
     : query.has('action') && !action.success ? 'Unknown session action in the URL.'
     : board.ready && query.has('featureId') && !board.features.some((item) => item.id === query.get('featureId'))
       ? 'This feature does not exist in this project.' : '';
-  return <main className="min-h-screen bg-slate-950 p-4 text-slate-100">
-    <header className="mx-auto mb-4 flex max-w-6xl items-center justify-between gap-4">
+  return <main className="min-h-screen min-w-0 bg-slate-950 p-4 text-slate-100">
+    <header className="mb-4 flex w-full min-w-0 items-center justify-between gap-4">
       <span>{project?.name ?? 'Task editor'}</span>
       <Link to={returnPath} replace className="text-indigo-300 underline">Back to workspace</Link>
     </header>
