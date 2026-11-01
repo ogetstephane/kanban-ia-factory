@@ -105,6 +105,7 @@ model Task {
   acceptanceCriteria Json
   suggestedWorkflow  String?
   blockedReason      String @default("")
+  contextFiles       Json @default("[]")
   order              Int
   createdAt          String
   updatedAt          String

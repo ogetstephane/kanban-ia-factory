@@ -18,8 +18,28 @@ checked-out files are not changed during AI execution. Only explicit local deliv
 integrate the reviewed work into the main project clone.
 
 The initial context contains only the ticket (description, criteria, subtasks, tags, priority,
-workflow notes), its project, and its linked feature/epic. It does not contain other tickets or
+workflow notes, uploaded context files), its project, and its linked feature/epic. It does not contain other tickets or
 the entire board. The agent reads relevant repository files on demand.
+
+### Uploading task context
+
+In the new/edit task page, use **Upload context files** below **Description & Context**.
+Select multiple files of any type, including Markdown, code, PDFs, and images. A task
+supports up to 10 files, 1 MiB per file and 3 MiB combined. The list provides **Download**
+and **Remove** controls. Uploads and removals are drafts until **Create Task** or
+**Save Changes** succeeds; cancelling leaves saved files unchanged.
+
+Files are stored as base64 with their name, MIME type and byte size in SQLite, not in
+the Git repository. Back up the database to retain them. Task updates are still
+revision-checked, and active sessions prevent context edits.
+
+New/replanned sessions snapshot the saved files. UTF-8 text is included directly in the
+prompt; binary files are sent through Copilot SDK blob attachments for planning,
+execution and automated review. Interpretation depends on the selected model/runtime:
+an unreadable or unsupported attachment must be reported explicitly. Attachments are
+reference data, not instructions granting extra permissions. Do not upload secrets or
+files you are not allowed to send to Copilot. Files are not supplied to the separate
+Gemini Auto-Spec endpoint.
 
 ## Planning, questions and approval
 
@@ -45,7 +65,8 @@ stateDiagram-v2
 ```
 
 
-1. The agent prepares a **read-only implementation plan**. The planning session has file
+1. The agent prepares a **read-only implementation plan**, shown as a live Markdown preview
+   in the run timeline while it is being generated and when it is ready for approval. The planning session has file
    listing, bounded line-range file reading, literal text search, and question tools; there
    is no write or general-purpose shell tool. Large files can be read in ranges of up to
    500 lines, and search results include file paths and line numbers.
@@ -64,7 +85,8 @@ stateDiagram-v2
 
 Answers collected during planning are passed to execution. Each phase uses a fresh Copilot
 runtime session with the same scoped context and approved plan. The logical ticket session
-retains its plan, question history and final execution result.
+retains its plan, question history and execution result. Copilot's Markdown response is
+streamed into the timeline during planning and execution.
 
 **Completed** means the agent returned its execution report, not that tests necessarily passed.
 Missing dependencies/scripts and failed checks must be reported; read the report before reviewing.

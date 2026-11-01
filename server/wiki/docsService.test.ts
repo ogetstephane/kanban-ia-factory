@@ -9,6 +9,9 @@ import { EntityStore } from '../db/entityStore';
 import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
 import { DocsService } from './docsService';
+import express from 'express';
+import { createWikiRouter } from '../routes/wiki';
+import type { WikiGenerator } from './wikiAssistant';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', cwd.endsWith('.git') ? ['--git-dir', cwd, ...args] : args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 const ssh = `node ${path.resolve('server/git/testSsh.cjs')}`;
@@ -48,6 +51,46 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
   const docs = new DocsService(db, repositories);
 
   assert.deepEqual((await docs.list('project-wiki')).files, []);
+
+  await t.test('wiki assistant validates project and path and never saves proposals', async () => {
+    const calls: string[] = [];
+    const generator: WikiGenerator = {
+      async generate(input, signal) {
+        assert.equal(signal.aborted, false);
+        calls.push(input.content);
+        return { content: '# Proposal\n', summary: 'Created an introduction' };
+      },
+    };
+    const app = express();
+    app.use(express.json());
+    app.use('/api/board', createWikiRouter(docs, generator));
+    const server = app.listen(0, '127.0.0.1');
+    await new Promise<void>((resolve) => server.once('listening', resolve));
+    try {
+      const address = server.address();
+      assert.ok(address && typeof address !== 'string');
+      const base = `http://127.0.0.1:${address.port}/api/board/projects`;
+      const post = (project: string, body: unknown) => fetch(`${base}/${project}/wiki/assistant`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      const input = { path: 'new.md', content: '# Unsaved draft\n', prompt: 'Improve this', files: [] };
+      const response = await post('project-wiki', input);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), { content: '# Proposal\n', summary: 'Created an introduction' });
+      assert.deepEqual(calls, [input.content]);
+      assert.deepEqual((await docs.list('project-wiki')).files, []);
+      assert.equal((await post('missing-project', input)).status, 404);
+      assert.equal((await post('project-wiki', { ...input, path: '../outside.md' })).status, 400);
+      assert.equal((await post('project-wiki', { ...input, prompt: ' ' })).status, 400);
+      const oversized = await post('project-wiki', { ...input, content: 'a'.repeat(100000) });
+      assert.equal(oversized.status, 400);
+      assert.match((await oversized.json()).error, /context is too large/);
+      assert.deepEqual(calls, [input.content], 'Invalid requests must not reach Copilot');
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    }
+  });
 
   const created = await docs.save('project-wiki', 'guides/start.md', '# Start\n', null);
   assert.equal(created.unchanged, false);

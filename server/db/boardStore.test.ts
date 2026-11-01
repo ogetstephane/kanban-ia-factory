@@ -1,6 +1,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,7 +9,7 @@ import type { Server } from 'node:http';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../src/data/initialData';
-import { boardDataSchema } from '../../src/types/board';
+import { boardDataSchema, taskSchema } from '../../src/types/board';
 import { createBoardRouter } from '../routes/board';
 import { BoardStore } from './boardStore';
 import { EntityStore } from './entityStore';
@@ -104,6 +105,47 @@ test('task updates are atomic and guarded by revision conflicts', async () => {
     body: JSON.stringify({ ...firstTask, title: 'Stale write should fail' }),
   });
   assert.equal(stale.status, 409);
+});
+
+test('uploaded context files persist through task API, snapshots, conflict checks, session snapshots and removal', async () => {
+  const files = [
+    { id: randomUUID(), name: 'context.md', mimeType: 'text/markdown', size: 4, data: 'dGVzdA==' },
+    { id: randomUUID(), name: 'design.pdf', mimeType: 'application/pdf', size: 3, data: 'AP8K' },
+  ];
+  const draft = taskSchema.parse({
+    ...demo.tasks[0], id: 'task-context-upload', status: 'To Do', featureId: undefined,
+    contextFiles: files,
+  });
+  const send = (method: string, body: unknown, route = `/tasks/${draft.id}`) => fetch(`${url}${route}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const created = await send('POST', draft, '/tasks');
+  assert.equal(created.status, 200);
+  const saved = taskSchema.parse(await created.json());
+  assert.deepEqual(saved.contextFiles, files);
+  const entities = new EntityStore(db);
+  assert.deepEqual((await entities.board(draft.projectId)).tasks.find((task) => task.id === draft.id)!.contextFiles, files);
+  const invalid = await send('PUT', { ...saved, contextFiles: [{ ...files[0], size: 99 }] });
+  assert.equal(invalid.status, 400);
+  const removed = await send('PUT', { ...saved, contextFiles: [files[1]] });
+  assert.equal(removed.status, 200);
+  const updated = taskSchema.parse(await removed.json());
+  const stale = await send('PUT', { ...saved, contextFiles: [] });
+  assert.equal(stale.status, 409);
+  assert.deepEqual((await db.task.findUniqueOrThrow({ where: { id: draft.id } })).contextFiles, [files[1]]);
+  const moved = await send('POST', { revision: updated.revision, status: 'In Progress' }, `/tasks/${draft.id}/move`);
+  assert.equal(moved.status, 200);
+  const session = await db.agentSession.findUniqueOrThrow({ where: { taskId: draft.id } });
+  const context = JSON.parse(JSON.stringify(session.context));
+  assert.deepEqual(context.task.contextFiles, [files[1]]);
+  const running = taskSchema.parse((await entities.board(draft.projectId)).tasks.find((task) => task.id === draft.id));
+  assert.equal((await send('PUT', { ...running, contextFiles: [] })).status, 409);
+  await db.agentSession.update({ where: { id: session.id }, data: { status: 'cancelled' } });
+  const cleared = await send('PUT', { ...running, contextFiles: [] });
+  assert.equal(cleared.status, 200);
+  const final = taskSchema.parse(await cleared.json());
+  assert.deepEqual(final.contextFiles, []);
+  assert.equal((await send('DELETE', { revision: final.revision })).status, 204);
 });
 
 test('deleting a feature detaches linked tasks without deleting them', async () => {

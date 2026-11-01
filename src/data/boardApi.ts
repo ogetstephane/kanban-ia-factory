@@ -9,7 +9,7 @@ import { agentSessionSchema, agentListSchema, reviewSchema, aiReviewResultSchema
 import { releaseSchema, releaseDetailSchema, releasePreviewSchema, releasePublishSchema, releaseEditSchema, releaseUpdateSchema } from '../types/release';
 import { gitInventorySchema, publishedWorkListSchema, finishPreviewSchema, type FinishRequest } from '../types/git';
 import { activityListSchema, type ActivityQuery } from '../types/activity';
-import { docListSchema, docContentSchema, docSaveResultSchema, docStatusSchema, docSyncResultSchema } from '../types/wiki';
+import { docListSchema, docContentSchema, docSaveResultSchema, docStatusSchema, docSyncResultSchema, wikiAssistantInputSchema, wikiAssistantResultSchema, type WikiAssistantInput } from '../types/wiki';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 
 export class BoardApiError extends Error {
@@ -76,6 +76,13 @@ export async function loadProjects(signal?: AbortSignal) {
 
 const entityPath = (kind: string, id: string) => `/${kind}/${encodeURIComponent(id)}`;
 export const boardApi = {
+  async assistWiki(projectId: string, input: WikiAssistantInput, signal?: AbortSignal) {
+    const parsed = wikiAssistantInputSchema.safeParse(input);
+    if (!parsed.success) throw new BoardApiError(parsed.error.issues.map((issue) => issue.message).join(' '), 400);
+    return wikiAssistantResultSchema.parse(await request(
+      `/projects/${encodeURIComponent(projectId)}/wiki/assistant`, 'POST', parsed.data, signal,
+    ));
+  },
   async activityEvents(filters: ActivityQuery, signal?: AbortSignal) {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) {

@@ -125,6 +125,11 @@ draft open. No popup or separate browser window is used. Directly opened editor
 URLs also work and return to the owning project board.
 On wider screens, title and description occupy the left column and the remaining
 fields occupy the right column. Small screens stack content above details.
+Below **Description & Context**, **Upload context files** accepts any file type,
+including PDFs and images (10 files maximum, 1 MiB each, 3 MiB combined).
+Files can be downloaded or removed and are persisted when the task is saved.
+Saved files are included in subsequent Copilot session context; see
+[uploading task context](doc/agent-sessions.md#uploading-task-context).
 
 Each project/feature/task row has its own optimistic revision. Updates, deletes,
 and moves check that revision so stale clients fail with 409 instead of overwriting

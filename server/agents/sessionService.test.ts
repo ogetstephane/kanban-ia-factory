@@ -56,6 +56,7 @@ const provider: AgentProvider = {
         await request.recordCheck?.({ script: 'test', passed: false, output: 'One assertion failed' });
         await request.recordCheck?.({ script: 'lint', passed: true, output: 'Lint passed' });
       }
+      await request.onContent?.('Copilot is working on the approved plan.');
       if (waitExecution) await new Promise<void>((_resolve, reject) => {
         request.signal?.addEventListener('abort', () => reject(new Error('Execution cancelled')), { once: true });
         request.signal?.throwIfAborted();
@@ -124,6 +125,7 @@ test('transition queues exactly one durable session and planning cannot execute 
   await sessions.tick();
   const plan = (await sessions.get(task.id))!;
   assert.equal(plan.status, 'awaiting_approval');
+  assert.equal(plan.plan, 'Read relevant files, implement the ticket, run tests.');
   assert.equal(plan.providerSessionId, 'fake-session');
   assert.equal(calls.length, 1);
   assert.equal(calls[0].phase, 'plan');
@@ -559,12 +561,11 @@ test('cancelling execution preserves partial files and does not report completio
   const job = sessions.tick();
   for (let attempt = 0; attempt < 100; attempt++) {
     row = (await sessions.get(task.id))!;
-    if (row.status === 'executing' && row.workspace) {
-      try { if (await readFile(path.join(row.workspace, 'result.txt'), 'utf8') === 'implemented') break; }
-      catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
-    }
+    if (row.status === 'executing' && row.output) break;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  assert.equal(row.output, 'Copilot is working on the approved plan.');
+  assert.equal(await readFile(path.join(row.workspace!, 'result.txt'), 'utf8'), 'implemented');
   await sessions.cancel(task.id, row.id);
   await job;
   waitExecution = false;

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import path from 'path';
+import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import { BoardStore } from './server/db/boardStore';
@@ -17,6 +18,7 @@ import { ActivityService } from './server/db/activityService';
 import { createActivityRouter } from './server/routes/activity';
 import { createWikiRouter } from './server/routes/wiki';
 import { DocsService } from './server/wiki/docsService';
+import { WikiAssistant } from './server/wiki/wikiAssistant';
 
 dotenv.config();
 
@@ -40,7 +42,7 @@ app.use('/api/board', createAgentRouter(sessions));
 const releases = new ReleaseService(db, repositories);
 app.use('/api/board', createReleaseRouter(releases));
 app.use('/api/board', createActivityRouter(new ActivityService(db)));
-app.use('/api/board', createWikiRouter(new DocsService(db, repositories)));
+app.use('/api/board', createWikiRouter(new DocsService(db, repositories), new WikiAssistant()));
 
 // Initialize Gemini SDK with User-Agent header as required
 const apiKey = process.env.GEMINI_API_KEY;
@@ -495,11 +497,15 @@ app.use('/api', (req: Request, res: Response) => {
 // Vite Middleware for development, or static build for production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
+  const listener = createHttpServer(app);
 
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        ws: process.env.DISABLE_HMR === 'true' ? false : { server: listener },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -511,10 +517,10 @@ async function startServer() {
   }
 
   await repositories.init();
-  const listener = app.listen(PORT);
   await new Promise<void>((resolve, reject) => {
     listener.once('listening', resolve);
     listener.once('error', reject);
+    listener.listen(PORT);
   });
   try {
     await releases.recover();

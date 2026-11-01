@@ -15,6 +15,8 @@ import { Task, Feature, KanbanStatus, TaskPriority, Subtask } from '../types/kan
 import { CREATION_STATUSES, TASK_PRIORITIES, canCreateTaskIn, reachableStatuses } from '../utils/kanbanLogic';
 import type { SessionActionFocus } from '../types/agent';
 import { useOperation } from '../data/useOperation';
+import { ContextFiles } from './ContextFiles';
+import type { ContextFile } from '../types/contextFile';
 
 const TaskAgentSession = lazy(() => import('./TaskAgentSession'));
 const ReleaseSelect = lazy(() => import('./ReleaseSelect'));
@@ -51,6 +53,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   error = '',
 }) => {
   const save = useOperation();
+  const upload = useOperation();
+  const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<KanbanStatus>(defaultStatus);
@@ -69,7 +73,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [copilotFeedback, setCopilotFeedback] = useState<string | null>(null);
 
   useEffect(() => {
+    upload.clearError();
     if (task) {
+      setContextFiles(task.contextFiles ?? []);
       setTitle(task.title);
       setDescription(task.description);
       setStatus(task.status);
@@ -84,6 +90,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setBlockedReason(task.blockedReason || '');
       setCopilotFeedback(null);
     } else {
+      setContextFiles([]);
       setTitle('');
       setDescription('');
       setPriority('Medium');
@@ -194,7 +201,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || upload.pending) return;
 
     const parsedTags = tagsInput
       .split(',')
@@ -216,6 +223,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       acceptanceCriteria,
       suggestedWorkflow: suggestedWorkflow.trim() || undefined,
       blockedReason: blockedReason.trim(),
+      contextFiles,
       order: task ? task.order : 0,
       createdAt: task ? task.createdAt : new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -247,7 +255,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            disabled={pending || save.pending}
+            disabled={pending || save.pending || upload.pending}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label={presentation === 'page' ? 'Return to workspace' : 'Close dialog'}
           >
@@ -323,6 +331,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans"
             />
           </div>
+          <ContextFiles files={contextFiles} onChange={setContextFiles} operation={upload} />
           </section>
 
           <section aria-label="Task details" className="min-w-0 space-y-4">
@@ -559,14 +568,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={pending || save.pending}
+              disabled={pending || save.pending || upload.pending}
               className="px-4 py-2 text-xs font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={pending || save.pending}
+              disabled={pending || save.pending || upload.pending}
               className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/20 active:scale-95 cursor-pointer"
             >
               {pending || save.pending ? 'Saving...' : task ? 'Save Changes' : 'Create Task'}

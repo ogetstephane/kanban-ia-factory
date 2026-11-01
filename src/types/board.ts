@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { Project, Feature, Task } from './kanban';
 import { releaseRecordSchema } from './release';
+import { contextFilesSchema } from './contextFile';
 
 const id = z.string().min(1);
 const timestamp = z.string().datetime({ offset: true });
@@ -53,6 +54,7 @@ export const taskSchema = z.object({
   subtasks: z.array(z.object({ id, text: z.string(), completed: z.boolean() })),
   acceptanceCriteria: z.array(z.string()), suggestedWorkflow: z.string().optional(),
   blockedReason: z.string().trim().max(2000).default(''),
+  contextFiles: contextFilesSchema.default([]),
   order: z.number().int(), createdAt: timestamp, updatedAt: timestamp,
 }).refine((task) => new Set(task.subtasks.map((subtask) => subtask.id)).size === task.subtasks.length, {
   message: 'Subtask IDs must be unique within a task',

@@ -49,6 +49,7 @@ async function writeBoard(tx: Prisma.TransactionClient, data: BoardData) {
     const values = {
       ...fields, position, projectId: task.projectId ?? null, featureId: task.featureId ?? null,
       suggestedWorkflow: task.suggestedWorkflow ?? null,
+      contextFiles: task.contextFiles ?? [],
     };
     await tx.task.upsert({ where: { id: task.id }, create: values, update: values });
     await tx.subtask.deleteMany({ where: { taskId: task.id } });

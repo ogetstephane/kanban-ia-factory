@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookOpen, CheckCircle2, CloudUpload, Columns2, Eye, ChevronDown, ChevronRight, FilePlus2, FileText, Folder, FolderPlus, GitCommitHorizontal,
-  Loader2, Pencil, Save, Search,
+  Loader2, Pencil, Save, Search, Sparkles,
 } from 'lucide-react';
 import type { Project } from '../types/kanban';
 import type { DocFile, DocStatus, DocSyncResult } from '../types/wiki';
 import { boardApi } from '../data/boardApi';
 import { MarkdownPreview } from './MarkdownPreview';
+import { AgentAssistant } from './AgentAssistant';
 
 type Mode = 'edit' | 'split' | 'preview';
 interface OpenDocument { path: string; content: string; sha: string | null }
@@ -22,7 +23,8 @@ export function WikiView({ project }: { project: Project }) {
   const [filter, setFilter] = useState('');
   const [current, setCurrent] = useState<OpenDocument | null>(null);
   const [draft, setDraft] = useState('');
-  const [mode, setMode] = useState<Mode>('split');
+  const [mode, setMode] = useState<Mode>('preview');
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -52,6 +54,10 @@ export function WikiView({ project }: { project: Project }) {
     void loadFiles(controller.signal);
     return () => controller.abort();
   }, [loadFiles]);
+
+  useEffect(() => {
+    setAssistantOpen(false);
+  }, [project.id, current?.path]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -279,6 +285,11 @@ export function WikiView({ project }: { project: Project }) {
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     {saving ? 'Saving…' : 'Save'}
                   </button>
+                  <button type="button" onClick={() => setAssistantOpen((open) => !open)}
+                    aria-expanded={assistantOpen} aria-controls="wiki-ai-assistant"
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-semibold ${assistantOpen ? 'border-indigo-400/40 bg-indigo-400/15 text-indigo-100' : 'border-slate-700 text-indigo-200 hover:bg-indigo-400/10'}`}>
+                    <Sparkles className="h-3.5 w-3.5" />AI assistant
+                  </button>
                 </div>
               </div>
 
@@ -295,6 +306,12 @@ export function WikiView({ project }: { project: Project }) {
                   </span>
                 </div>
               )}
+
+              <div id="wiki-ai-assistant" hidden={!assistantOpen} className="p-3">
+                <AgentAssistant key={`${project.id}:${current.path}`} content={draft} disabled={saving || syncing}
+                  onGenerate={(input, signal) => boardApi.assistWiki(project.id, { ...input, path: current.path, content: draft }, signal)}
+                  onApply={(content) => { setDraft(content); setMode('split'); setError(''); setResult(null); }} />
+              </div>
 
               <div className={`grid min-h-[50vh] ${mode === 'split' ? 'xl:grid-cols-2 xl:divide-x xl:divide-slate-800' : ''}`}>
                 {mode !== 'preview' && (

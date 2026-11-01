@@ -1,4 +1,28 @@
 import { z } from 'zod';
+import { contextFilesSchema } from './contextFile';
+
+export const MAX_WIKI_ASSISTANT_CONTEXT_BYTES = 100_000;
+export const WIKI_ASSISTANT_CONTEXT_ERROR =
+  'Wiki AI context is too large. Keep the page draft, prompt and attached files within 100,000 bytes combined. Remove large attachments or shorten the draft and retry. No content has been truncated.';
+
+export function wikiAssistantContextBytes(input: { path: string; content: string; prompt: string; files: { size: number }[] }) {
+  const encoder = new TextEncoder();
+  return encoder.encode(input.path).length + encoder.encode(input.content).length +
+    encoder.encode(input.prompt).length + input.files.reduce((total, file) => total + file.size, 0);
+}
+
+export const wikiAssistantInputSchema = z.object({
+  path: z.string().min(1).max(300),
+  content: z.string().max(1024 * 1024),
+  prompt: z.string().trim().min(1).max(10000),
+  files: contextFilesSchema.default([]),
+}).refine((input) => wikiAssistantContextBytes(input) <= MAX_WIKI_ASSISTANT_CONTEXT_BYTES, WIKI_ASSISTANT_CONTEXT_ERROR);
+export const wikiAssistantResultSchema = z.object({
+  content: z.string().min(1).max(1024 * 1024),
+  summary: z.string().min(1).max(10000),
+});
+export type WikiAssistantInput = z.infer<typeof wikiAssistantInputSchema>;
+export type WikiAssistantResult = z.infer<typeof wikiAssistantResultSchema>;
 
 export const docFileSchema = z.object({ path: z.string(), size: z.number().int().nonnegative(), modifiedAt: z.string() });
 export const docListSchema = z.object({

@@ -7,6 +7,13 @@ import {
 import { canCreateTaskIn, canMoveTask, CREATION_STATUSES, moveTask, transitionError } from '../../src/utils/kanbanLogic';
 import { enqueueTicket } from '../agents/queue';
 import { activityChanges, recordActivity } from './activityLog';
+import { contextFilesSchema } from '../../src/types/contextFile';
+
+function contextFileChanges(before: unknown, after: unknown) {
+  if (JSON.stringify(before ?? []) === JSON.stringify(after ?? [])) return [];
+  const names = (value: unknown) => contextFilesSchema.parse(value ?? []).map((file) => file.name).join(', ') || null;
+  return [{ field: 'Context files', before: names(before), after: names(after) }];
+}
 
 type Project = z.infer<typeof projectSchema>;
 type Feature = z.infer<typeof featureSchema>;
@@ -178,7 +185,7 @@ async function createTask(tx: Prisma.TransactionClient, task: Task, provider: st
     action: 'created', summary: 'Ticket created', changes: activityChanges(null, created, [
       { key: 'title', label: 'Title' }, { key: 'status', label: 'Status' },
       { key: 'priority', label: 'Priority' }, { key: 'storyPoints', label: 'Story points' },
-    ]),
+    ]).concat(contextFileChanges([], created.contextFiles)),
   });
   if (feature?.status === 'In Progress') await queueExecution(tx, '', created, provider, true);
   return created;
@@ -476,7 +483,7 @@ export class EntityStore {
         { key: 'title', label: 'Title' }, { key: 'status', label: 'Status' },
         { key: 'priority', label: 'Priority' }, { key: 'featureId', label: 'Feature' },
         { key: 'releaseId', label: 'Release' }, { key: 'storyPoints', label: 'Story points' },
-      ]);
+      ]).concat(contextFileChanges(existing!.contextFiles, saved.contextFiles));
       if (changes.length) await recordActivity(tx, {
         projectId: saved.projectId, entityType: 'task', entityId: saved.id, entityTitle: saved.title,
         action: existing!.status !== saved.status ? 'status_changed' : 'updated',

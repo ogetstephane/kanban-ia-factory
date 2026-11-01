@@ -5,6 +5,7 @@ export interface AgentRequest {
   workspace: string;
   phase: 'plan' | 'execute' | 'review';
   plan: string;
+  onContent?: (content: string) => Promise<void>;
   onSession: (id: string) => Promise<void>;
   ask: (question: AgentQuestionInput) => Promise<string>;
   answers: { question: string; answer: string }[];

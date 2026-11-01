@@ -1,3 +1,5 @@
+import type { ContextFile } from './contextFile';
+
 export type KanbanStatus = 'Backlog' | 'To Do' | 'In Progress' | 'Review' | 'Done';
 
 export type TaskPriority = 'Critical' | 'High' | 'Medium' | 'Low';
@@ -60,6 +62,7 @@ export interface Task {
   acceptanceCriteria: string[];
   suggestedWorkflow?: string;
   blockedReason?: string;
+  contextFiles?: ContextFile[];
   order: number;
   createdAt: string;
   updatedAt: string;

@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { boardApi } from '../data/boardApi';
 import type { AgentSession } from '../types/agent';
+import { MarkdownPreview } from './MarkdownPreview';
 
 type Attempt = AgentSession['attempts'][number];
 type Snapshot = Attempt['snapshot'];
@@ -57,11 +58,15 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions }: {
     </header>
 
     <ol className="relative ml-1 border-l border-slate-700">
-      <TimelineEvent title="Plan" state={snapshot.plan ? 'Prepared' : current && ['queued', 'planning'].includes(snapshot.status) ? 'In progress' : 'Not available'} current={current && ['queued', 'planning', 'awaiting_approval'].includes(snapshot.status)}>
+      <TimelineEvent title="Plan" state={current && ['queued', 'planning'].includes(snapshot.status)
+        ? snapshot.plan ? 'Streaming preview' : 'In progress'
+        : snapshot.plan ? 'Prepared' : 'Not available'} current={current && ['queued', 'planning', 'awaiting_approval'].includes(snapshot.status)}>
         {snapshot.feedback && <p className="text-xs text-amber-200">Correction request: {snapshot.feedback}</p>}
-        {snapshot.plan && <details>
-          <summary className="cursor-pointer text-xs text-indigo-200">View implementation plan</summary>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950/70 p-3 text-xs">{snapshot.plan}</pre>
+        {(snapshot.plan || current && ['queued', 'planning'].includes(snapshot.status)) && <details open={current && ['queued', 'planning', 'awaiting_input', 'awaiting_approval'].includes(snapshot.status)}>
+          <summary className="cursor-pointer text-xs text-indigo-200">Preview implementation plan</summary>
+          <div className="mt-2 max-h-96 overflow-auto rounded-lg bg-slate-950/70 p-3">
+            {snapshot.plan ? <MarkdownPreview source={snapshot.plan} /> : <p className="text-xs text-slate-500">Waiting for the plan…</p>}
+          </div>
         </details>}
       </TimelineEvent>
 
@@ -75,10 +80,14 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions }: {
         {question.answer && <p className="whitespace-pre-wrap text-xs text-emerald-200">Answer: {question.answer}</p>}
       </TimelineEvent>)}
 
-      <TimelineEvent title="Execution" state={snapshot.output ? 'Result available' : snapshot.error ? 'Stopped with an error' : ['execution_queued', 'executing'].includes(snapshot.status) ? 'In progress' : 'Not started'} current={current && ['execution_queued', 'executing', 'completed', 'failed', 'cancelled'].includes(snapshot.status)}>
-        {snapshot.output && <details>
-          <summary className="cursor-pointer text-xs text-indigo-200">View execution report</summary>
-          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-950/70 p-3 text-xs">{snapshot.output}</pre>
+      <TimelineEvent title="Execution" state={['execution_queued', 'executing'].includes(snapshot.status)
+        ? snapshot.output ? 'Streaming agent content' : 'In progress'
+        : snapshot.output ? 'Result available' : snapshot.error ? 'Stopped with an error' : 'Not started'} current={current && ['execution_queued', 'executing', 'completed', 'failed', 'cancelled'].includes(snapshot.status)}>
+        {(snapshot.output || current && ['execution_queued', 'executing'].includes(snapshot.status)) && <details open={current && ['execution_queued', 'executing'].includes(snapshot.status)}>
+          <summary className="cursor-pointer text-xs text-indigo-200">View Copilot agent content</summary>
+          <div className="mt-2 max-h-96 overflow-auto rounded-lg bg-slate-950/70 p-3">
+            {snapshot.output ? <MarkdownPreview source={snapshot.output} /> : <p className="text-xs text-slate-500">Waiting for Copilot…</p>}
+          </div>
         </details>}
         {snapshot.error && <p role="alert" className="whitespace-pre-wrap text-xs text-rose-300">{snapshot.error}</p>}
         {snapshot.checks.length > 0 && <details>

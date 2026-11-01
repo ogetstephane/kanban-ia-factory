@@ -569,6 +569,13 @@ export class SessionService {
       const output = await this.provider.run({
         context, workspace, phase, plan: row.plan,
         signal, feedback: row.feedback,
+        onContent: async (content) => {
+          signal.throwIfAborted();
+          await this.db.agentSession.updateMany({
+            where: { id: row.id, status: activeStatus, attempt: row.attempt },
+            data: { [phase === 'plan' ? 'plan' : 'output']: content, updatedAt: new Date().toISOString() },
+          });
+        },
         recordCheck: async (result) => {
           signal.throwIfAborted();
           await this.db.agentCheck.create({ data: {
