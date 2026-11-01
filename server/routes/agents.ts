@@ -31,6 +31,12 @@ export function createAgentRouter(sessions: SessionService) {
   router.get('/agent-sessions', async (req, res, next) => {
     try { res.json(await sessions.list(agentListQuerySchema.parse(req.query))); } catch (error) { next(error); }
   });
+  router.get('/agent-workflows', async (req, res, next) => {
+    try {
+      const { projectId } = z.object({ projectId: z.string().min(1).optional() }).parse(req.query);
+      res.json(await sessions.workflows(projectId));
+    } catch (error) { next(error); }
+  });
   router.get('/delivery-history', async (req, res, next) => {
     try { res.json(await sessions.deliveryHistory(deliveryHistoryQuerySchema.parse(req.query))); } catch (error) { next(error); }
   });

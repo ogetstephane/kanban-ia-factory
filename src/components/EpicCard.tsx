@@ -3,10 +3,14 @@ import { CheckCircle2, ChevronDown, ChevronRight, Layers, Plus, Trash2 } from 'l
 import type { Feature, KanbanStatus, Task } from '../types/kanban';
 import { reachableStatuses } from '../utils/kanbanLogic';
 import ReviewActions from './ReviewActions';
+import WorkflowTimeline from './WorkflowTimeline';
+import { getAgentWorkflow } from '../utils/agentWorkflow';
+import type { AgentWorkflow } from '../types/workflow';
 
 interface EpicCardProps {
   feature: Feature;
   tasks: Task[];
+  workflows?: Record<string, AgentWorkflow>;
   projectName?: string;
   onMoveStatus: (id: string, status: KanbanStatus) => void;
   onDragStatus: (status: KanbanStatus | null) => void;
@@ -26,7 +30,7 @@ const STATUS_STYLES: Record<KanbanStatus, string> = {
 };
 
 export const EpicCard: React.FC<EpicCardProps> = ({
-  feature, tasks, projectName, onMoveStatus, onDragStatus, onOpenTask, onDeleteTask, onAddTask, onReviewFeature, onReviewTask,
+  feature, tasks, workflows, projectName, onMoveStatus, onDragStatus, onOpenTask, onDeleteTask, onAddTask, onReviewFeature, onReviewTask,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const done = tasks.filter((task) => task.status === 'Done').length;
@@ -49,13 +53,13 @@ export const EpicCard: React.FC<EpicCardProps> = ({
       <div className="flex items-start gap-2">
         <Layers className="mt-0.5 h-4 w-4 shrink-0" style={{ color: feature.color || '#6366f1' }} />
         <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 text-sm font-semibold text-slate-100">{feature.title}</h3>
-          {feature.description && <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-slate-400">{feature.description}</p>}
+          <h3 className="line-clamp-2 break-words text-sm font-semibold text-slate-100">{feature.title}</h3>
+          {feature.description && <p className="mt-1 line-clamp-2 break-words text-xs leading-relaxed text-slate-400">{feature.description}</p>}
         </div>
       </div>
 
       {feature.status === 'Review' && <ReviewActions title={feature.title} onReview={(ai) => onReviewFeature(feature, ai)} />}
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <label className={`rounded-full px-2 py-1 text-[10px] font-semibold ${STATUS_STYLES[feature.status]}`}>
           <span className="sr-only">Epic status: </span>
           <select
@@ -83,9 +87,9 @@ export const EpicCard: React.FC<EpicCardProps> = ({
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
         aria-label={`${expanded ? 'Hide' : 'Show'} tickets for epic ${feature.title}`}
-        className="mt-3 flex w-full items-center justify-between rounded-lg border border-slate-700/70 bg-slate-900/50 px-2.5 py-2 text-left text-xs text-slate-300 transition hover:border-slate-600 hover:text-white"
+        className="mt-3 flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-700/70 bg-slate-900/50 px-2.5 py-2 text-left text-xs text-slate-300 transition hover:border-slate-600 hover:text-white"
       >
-        <span className="flex items-center gap-1.5">
+        <span className="flex flex-wrap items-center gap-1.5">
           {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           <span>{tasks.length} {tasks.length === 1 ? 'ticket' : 'tickets'}</span>
           <span className="text-slate-500">·</span>
@@ -125,6 +129,9 @@ export const EpicCard: React.FC<EpicCardProps> = ({
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
+              <div className="w-full">
+                <WorkflowTimeline workflow={workflows?.[task.id] ?? getAgentWorkflow()} compact label={`Agent workflow for ${task.title}`} />
+              </div>
               {task.status === 'Review' && <div className="w-full"><ReviewActions title={task.title} onReview={(ai) => onReviewTask(task, ai)} /></div>}
             </div>
           ))}

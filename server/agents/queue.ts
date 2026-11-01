@@ -10,7 +10,7 @@ export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSessi
   await tx.agentAttempt.create({ data: {
     id: randomUUID(), sessionId: row.id, number: row.attempt, createdAt: now,
     snapshot: JSON.parse(JSON.stringify({
-      status: row.status, plan: row.plan, output: row.output, error: row.error,
+      status: row.status, resumeStatus: row.resumeStatus, plan: row.plan, output: row.output, error: row.error,
       feedback: row.feedback, reviewStatus: row.reviewStatus, reviewToken: row.reviewToken,
       context: row.context, questions, checks,
       delivery: await tx.agentDelivery.findUnique({ where: { sessionId_attempt: { sessionId: row.id, attempt: row.attempt } } }),

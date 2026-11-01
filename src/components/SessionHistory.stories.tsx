@@ -16,3 +16,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const CompletedSession: Story = {};
+export const Planning: Story = {
+  args: { session: { ...agentSession, status: 'planning', output: '', plan: '# Implementation plan\n\n1. Inspect the code\n2. Add tests' } },
+};
+export const AwaitingApproval: Story = {
+  args: { session: { ...agentSession, status: 'awaiting_approval', output: '' } },
+};
+export const Executing: Story = {
+  args: { session: { ...agentSession, status: 'executing', resumeStatus: 'executing' } },
+};

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { taskSchema, projectSchema, featureSchema } from './board';
+import { agentPhaseSchema, agentWorkflowSchema } from './workflow';
 
 export const agentContextSchema = z.object({
   task: taskSchema,
@@ -81,6 +82,7 @@ export const checkResultSchema = z.object({
 });
 export const attemptSnapshotSchema = z.object({
   status: agentStatusSchema, plan: z.string(), output: z.string(), error: z.string(),
+  resumeStatus: agentPhaseSchema,
   feedback: z.string().default(''), reviewStatus: z.string().default('pending'),
   reviewToken: z.string().default(''), context: agentContextSchema.optional(),
   questions: z.array(agentQuestionSchema), checks: z.array(checkResultSchema),
@@ -95,6 +97,7 @@ export const agentSessionSchema = z.object({
   releaseId: z.string().nullable().default(null),
   provider: z.string(),
   status: agentStatusSchema,
+  resumeStatus: agentPhaseSchema,
   autoExecute: z.boolean().default(false),
   taskRevision: z.number(),
   workspace: z.string().nullable(),
@@ -131,6 +134,7 @@ export const agentSummarySchema = agentSessionSchema.omit({ plan: true, output: 
   projectId: z.string().nullable(), projectName: z.string().nullable(),
   featureId: z.string().nullable(), featureTitle: z.string().nullable(),
   deliveryStatus: z.string().nullable().default(null),
+  workflow: agentWorkflowSchema.optional(),
 });
 
 export const reviewSchema = z.object({

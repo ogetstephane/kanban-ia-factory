@@ -107,6 +107,26 @@ questions and answers, execution report, checks, review state and delivery when 
 Actions such as answering, approving, retrying, reviewing and delivery appear on the current
 run only when they are relevant. The same timeline is available inside the task editor.
 
+The shared **workflow summary** shows five icon-labelled steps: **Plan → Approval →
+Execution → Review → Delivery**. The session list and board tickets use a compact version
+of the same component and state mapping. Completed steps are green, the active step is
+highlighted, steps waiting for your input are amber, and upcoming steps stay grey. Failures
+are red and stopped phases remain marked as stopped. A completed execution does not complete
+the Review or Delivery steps; those still require their explicit human actions.
+
+Each run is divided into separate step panels. The Plan panel renders the Markdown plan
+and clarifications; Approval contains the approval action; Execution shows live Copilot
+content and check results; Review shows a compact modified-files summary in the Sessions
+view, with **Open diff in full screen** to inspect all files, run an advisory **AI review**,
+and accept the human review. Closing the full-screen view returns to the workflow; the
+separate Changes / Session details sidebar is no longer shown. Delivery contains
+local delivery or review-publication progress. Correction requests, retry and cancellation
+remain current-run controls. Previous attempts retain their own progress and content.
+
+The server retains the last planning/approval/execution phase so a failed or cancelled run
+does not present a partial streamed plan as a completed plan. Older interrupted runs without
+phase metadata are shown conservatively unless execution output proves execution started.
+
 ### Action inbox
 
 The **Action inbox** subview lists questions, plans awaiting approval, failed sessions, and

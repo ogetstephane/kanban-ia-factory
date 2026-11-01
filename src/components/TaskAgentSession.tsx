@@ -3,6 +3,8 @@ import { boardApi } from '../data/boardApi';
 import { useOperation } from '../data/useOperation';
 import type { AgentSession, SessionActionFocus } from '../types/agent';
 import AgentQuestionForm from './AgentQuestionForm';
+import WorkflowTimeline from './WorkflowTimeline';
+import { getAgentWorkflow } from '../utils/agentWorkflow';
 const TicketReview = lazy(() => import('./TicketReview'));
 const SessionTimeline = lazy(() => import('./SessionHistory'));
 const TicketDelivery = lazy(() => import('./TicketDelivery'));
@@ -28,7 +30,6 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
   const [showReview, setShowReview] = useState(initialAction === 'review');
   const [showDelivery, setShowDelivery] = useState(initialAction === 'deliver');
   const [feedback, setFeedback] = useState('');
-  const [workspacePanel, setWorkspacePanel] = useState<'changes' | 'session'>('changes');
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -52,9 +53,15 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
   });
 
   const canReview = !!session?.workspace && ['completed', 'failed', 'cancelled', 'awaiting_approval'].includes(session.status);
+  const workflow = getAgentWorkflow(session);
+  const questionForm = session?.status === 'awaiting_input' && session.questions.filter((question) => question.answer === null).slice(-1).map((question) =>
+    <AgentQuestionForm key={question.id} question={question} pending={operation.pending}
+      onAnswer={(answer) => operation.run(async () => {
+        setSession(await boardApi.answerAgent(taskId, session.id, question.id, answer));
+      })} />);
   return (
     <section aria-label="AI ticket session" className={workspaceLayout
-      ? 'grid min-h-[calc(100vh-250px)] min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(24rem,42%)]'
+      ? 'min-h-[calc(100vh-250px)] min-w-0'
       : 'rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-3'}>
       <div className={workspaceLayout ? 'min-w-0 space-y-3 text-xs' : 'space-y-3 text-xs'}>
       <h3 className="font-semibold text-indigo-300">AI ticket session</h3>
@@ -62,6 +69,10 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
       {(error || operation.error || session?.error) && <p role="alert" className="text-rose-300 whitespace-pre-wrap">{error || operation.error || session?.error}</p>}
       {session && <>
         <p role="status">{SESSION_LABELS[session.status]} · {session.provider} · Attempt {session.attempt}</p>
+        <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3">
+          <h4 className="mb-3 text-xs font-semibold text-slate-300">Workflow summary</h4>
+          <WorkflowTimeline workflow={workflow} />
+        </div>
         {session.branch && <p className="text-slate-400 break-all">Branch: {session.branch} · Base: {session.baseCommit?.slice(0, 7)}</p>}
         {session.workspace && <p className="text-slate-500 break-all">Worktree: {session.workspace}</p>}
         {session.publication?.status === 'pushed' && !session.workspace && <p role="status" className="text-emerald-300">
@@ -73,17 +84,22 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
             setSession(await boardApi.agentSession(taskId)); onTaskChange?.();
           }} />
         </Suspense>}
-        <SessionTimeline key={session.attempt} taskId={taskId} session={session} actions={<div className="space-y-3">
-          {session.status === 'awaiting_input' && session.questions.filter((question) => question.answer === null).slice(-1).map((question) =>
-            <AgentQuestionForm key={question.id} question={question} pending={operation.pending}
-              onAnswer={(answer) => operation.run(async () => {
-                setSession(await boardApi.answerAgent(taskId, session.id, question.id, answer));
-              })} />)}
-          {session.status === 'awaiting_approval' && <div className="space-y-2">
+        <SessionTimeline key={session.attempt} taskId={taskId} session={session} stepActions={{
+          plan: workflow.execution === 'pending' && questionForm,
+          execution: workflow.execution !== 'pending' && questionForm,
+          approval: session.status === 'awaiting_approval' && <div className="space-y-2">
             <p className="text-amber-200">Approval allows file changes and the repository's npm test/lint scripts in this worktree. Scripts are not sandboxed. No automatic commit or push.</p>
             <button type="button" disabled={operation.pending} onClick={() => { void act('approve'); }}
               className="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50">Approve plan & execute</button>
-          </div>}
+          </div>,
+          review: canReview && (workspaceLayout
+            ? <Suspense fallback={<p>Loading modified files…</p>}>
+              <TicketReview key={`${session.id}-${session.attempt}`} session={session} onChange={setSession} onValidated={onTaskChange} summaryOnly />
+            </Suspense>
+            : <button type="button" className="px-3 py-2 rounded bg-slate-700" onClick={() => setShowReview((value) => !value)}>{showReview ? 'Hide' : 'Open'} code review</button>),
+          delivery: session.workspace && session.publication?.status !== 'pushed' && session.reviewStatus === 'accepted' && ['completed', 'delivering'].includes(session.status) &&
+            <button type="button" className="px-3 py-2 rounded bg-emerald-800" onClick={() => setShowDelivery((value) => !value)}>{showDelivery ? 'Hide' : 'Open'} local delivery</button>,
+        }} actions={<div className="space-y-3">
           {['failed', 'cancelled', 'awaiting_approval'].includes(session.status) &&
             <button type="button" disabled={operation.pending} onClick={() => { void act('retry'); }}
               className="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50">Regenerate plan</button>}
@@ -91,10 +107,6 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
             <button type="button" disabled={operation.pending} onClick={() => {
               if (window.confirm('Stop this session? Partial changes will be kept for inspection. Running repository scripts may have external side effects.')) void act('cancel');
             }} className="px-3 py-2 rounded bg-rose-900 disabled:opacity-40">Cancel session</button>}
-          {!workspaceLayout && session.workspace && ['completed', 'failed', 'cancelled', 'awaiting_approval'].includes(session.status) &&
-            <button type="button" className="px-3 py-2 rounded bg-slate-700" onClick={() => setShowReview((value) => !value)}>{showReview ? 'Hide' : 'Open'} code review</button>}
-          {session.workspace && session.publication?.status !== 'pushed' && session.reviewStatus === 'accepted' && ['completed', 'delivering'].includes(session.status) &&
-            <button type="button" className="px-3 py-2 rounded bg-emerald-800" onClick={() => setShowDelivery((value) => !value)}>{showDelivery ? 'Hide' : 'Open'} local delivery</button>}
           {session.delivery?.status !== 'delivered' && session.publication?.status !== 'pushed' && ['completed', 'failed', 'cancelled', 'awaiting_approval'].includes(session.status) &&
             <div className="space-y-2 rounded-lg border border-slate-700 p-3">
               <label htmlFor={`feedback-${taskId}`} className="block font-medium">Request corrections</label>
@@ -115,30 +127,6 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
         </>}
       </>}
       </div>
-      {workspaceLayout && <aside aria-label="Session workspace" className="min-w-0 overflow-y-auto rounded-lg border border-slate-800 bg-slate-900/50 p-3">
-        <div className="mb-3 flex items-center gap-4 border-b border-slate-800 pb-2 text-xs">
-          <button type="button" aria-pressed={workspacePanel === 'changes'}
-            className={`border-b-2 pb-2 ${workspacePanel === 'changes' ? 'border-indigo-400 font-medium text-slate-100' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-            onClick={() => setWorkspacePanel('changes')}>Changes</button>
-          <button type="button" aria-pressed={workspacePanel === 'session'}
-            className={`border-b-2 pb-2 ${workspacePanel === 'session' ? 'border-indigo-400 font-medium text-slate-100' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
-            onClick={() => setWorkspacePanel('session')}>Session details</button>
-        </div>
-        {workspacePanel === 'changes' && session && canReview
-          ? <Suspense fallback={<p className="text-sm text-slate-400">Loading changes…</p>}>
-            <TicketReview key={`${session.id}-${session.attempt}`} session={session} onChange={setSession} onValidated={onTaskChange} />
-          </Suspense>
-          : workspacePanel === 'session' && session
-            ? <dl className="space-y-3 break-all text-xs">
-              <div><dt className="text-slate-500">Status</dt><dd className="mt-1 text-slate-200">{SESSION_LABELS[session.status]}</dd></div>
-              <div><dt className="text-slate-500">Provider</dt><dd className="mt-1 text-slate-200">{session.provider}</dd></div>
-              <div><dt className="text-slate-500">Branch</dt><dd className="mt-1 font-mono text-slate-300">{session.branch ?? 'Not created'}</dd></div>
-              <div><dt className="text-slate-500">Workspace</dt><dd className="mt-1 font-mono text-slate-300">{session.workspace ?? 'Not created'}</dd></div>
-              <div><dt className="text-slate-500">Base commit</dt><dd className="mt-1 font-mono text-slate-300">{session.baseCommit?.slice(0, 7) ?? 'Unavailable'}</dd></div>
-              <div><dt className="text-slate-500">Attempt</dt><dd className="mt-1 text-slate-200">{session.attempt}</dd></div>
-            </dl>
-            : <p className="text-sm text-slate-400">{session ? 'Code changes will be available when this run is ready for review.' : 'Session details will appear here when the run starts.'}</p>}
-      </aside>}
     </section>
   );
 }

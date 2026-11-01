@@ -17,6 +17,10 @@ type Story = StoryObj<typeof meta>;
 
 export const ManualReview: Story = {};
 
+export const SessionStepSummary: Story = {
+  args: { summaryOnly: true },
+};
+
 export const EpicReview: Story = {
   args: { epicReview: true },
 };

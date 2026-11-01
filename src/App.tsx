@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { Project, Feature, Task, KanbanFilters, KanbanStatus } from './types/kanban';
@@ -130,8 +130,22 @@ function Workspace() {
     }
   }, [activeProjectId, board.ready, currentProjectTasks, currentProjectFeatures, projects, updateStats]);
 
-  const persistenceStatus = projectOps.pending || boardOps.pending ? 'Saving changes...' : 'All changes saved';
+  const saving = projectOps.pending || boardOps.pending;
   const persistenceError = projectOps.error || boardOps.error || projectsState.error || board.error;
+  const wasSaving = useRef(false);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  useEffect(() => {
+    const finishedSaving = wasSaving.current && !saving;
+    wasSaving.current = saving;
+    if (saving || persistenceError) {
+      setShowSavedToast(false);
+      return;
+    }
+    if (!finishedSaving) return;
+    setShowSavedToast(true);
+    const timer = setTimeout(() => setShowSavedToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [saving, persistenceError]);
 
   const handleSelectProject = (projectId: string) => {
     setGitOpenError('');
@@ -306,7 +320,13 @@ function Workspace() {
   const activeProjectTasks = currentProjectTasks;
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-      <p role="status" className="px-4 py-1 text-xs text-slate-400">{persistenceStatus}</p>
+      {(saving || showSavedToast) && <div className="fixed bottom-4 right-4 z-[60] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-xl">
+        <p role="status">{saving ? 'Saving changes...' : 'All changes saved'}</p>
+        {!saving && <button type="button" onClick={() => setShowSavedToast(false)}
+          aria-label="Dismiss save notification" className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <X className="h-4 w-4" />
+        </button>}
+      </div>}
       <Navbar
         projects={projects}
         activeProjectId={activeProjectId}
@@ -380,6 +400,7 @@ function Workspace() {
         ) : viewMode === 'board' ? (
           <Suspense fallback={<p role="status">Loading board view...</p>}>
             <KanbanBoard
+              projectId={activeProjectId}
               tasks={activeProjectTasks}
               features={activeProjectFeatures}
               projects={allProjects ? projects : undefined}

@@ -4,6 +4,7 @@ import { agentListSchema, agentListQuerySchema, agentStatusSchema, type AgentLis
 import { boardApi } from '../data/boardApi';
 import TaskAgentSession, { SESSION_LABELS } from './TaskAgentSession';
 import { ALL_PROJECTS } from '../utils/projectLogic';
+import WorkflowTimeline from './WorkflowTimeline';
 const ProjectHealth = lazy(() => import('./ProjectHealth'));
 
 const fieldClass = 'min-w-0 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-400';
@@ -117,6 +118,7 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
                 </span>
                 <span className="mt-1.5 block truncate pl-4 text-xs text-slate-400">{item.projectName ?? 'No project'}{item.featureTitle ? ` · ${item.featureTitle}` : ''}</span>
                 <span className="mt-1 block pl-4 text-[11px] text-slate-500">{SESSION_LABELS[item.status]} · {new Date(item.updatedAt).toLocaleDateString()}</span>
+                {item.workflow && <div className="mt-3"><WorkflowTimeline workflow={item.workflow} compact label={`Agent workflow for ${item.taskTitle}`} /></div>}
               </button>;
             })}
           </div>

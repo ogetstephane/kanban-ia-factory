@@ -5,6 +5,9 @@
 The Board is the project's Kanban workspace. It groups epics and standalone tickets into
 Backlog, To Do, In Progress, Review and Done columns. Tickets that belong to an epic are
 nested inside its card instead of appearing as separate cards in the columns.
+The five columns share the available width on desktop (1024 px and above), with no horizontal
+scrolling. On smaller screens they wrap into two columns (640–1023 px), then a single column
+on mobile. Page margins remain visible on both sides, including after Done.
 
 ## How to open
 
@@ -20,6 +23,12 @@ Choose **Board** or **Kanban Board** in the top navigation. Select a project fir
   their own cards; add standalone tickets to an eligible column.
 - Search ticket titles, descriptions and tags, and filter by priority or feature.
 - Review each column's epic and standalone-ticket count.
+- Each ticket shows the shared agent workflow timeline: Plan, Approval, Execution, Review
+  and Delivery. This also appears on tickets inside expanded epics. Completed steps are green,
+  active steps are highlighted, steps waiting for you are amber, and upcoming steps are grey.
+  Hover an icon for its step and state; the same labels are available to screen readers.
+  Tickets without an agent run keep all five steps grey, regardless of their Kanban stage.
+  Workflow summaries refresh every two seconds in one scoped request, not one request per card.
 
 In **Show all**, new tickets still need an owning project, so the app asks you to choose one.
 The board data is loaded lazily when Board or Analytics is needed. A transition of a ticket
@@ -30,6 +39,7 @@ repository or an empty clone can leave that session failed; see the
 ## API
 
 - `GET /api/board/projects/:id/board` or `GET /api/board/board`
+- `GET /api/board/agent-workflows?projectId=:id` (omit the project for Show all)
 - `POST /api/board/features`; `PUT|DELETE /api/board/features/:id`
 - `POST /api/board/tasks`
 - `PUT|DELETE /api/board/tasks/:id`; `POST /api/board/tasks/:id/move`
@@ -43,6 +53,7 @@ Moves are validated against workflow rules and entity revisions; see the
 - [KanbanColumn.tsx](../../../src/components/KanbanColumn.tsx)
 - [KanbanCard.tsx](../../../src/components/KanbanCard.tsx)
 - [EpicCard.tsx](../../../src/components/EpicCard.tsx)
+- [WorkflowTimeline.tsx](../../../src/components/WorkflowTimeline.tsx)
 - [App.tsx](../../../src/App.tsx)
 - [board.ts route](../../../server/routes/board.ts)
 - [kanban.ts types](../../../src/types/kanban.ts)

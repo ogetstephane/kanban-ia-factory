@@ -4,6 +4,7 @@ import { KanbanStatus, Task, Feature, Project } from '../types/kanban';
 import { KanbanCard } from './KanbanCard';
 import { EpicCard } from './EpicCard';
 import { canCreateTaskIn } from '../utils/kanbanLogic';
+import type { AgentWorkflow } from '../types/workflow';
 
 interface KanbanColumnProps {
   status: KanbanStatus;
@@ -12,6 +13,7 @@ interface KanbanColumnProps {
   featureTasks: Map<string, Task[]>;
   featuresMap: Map<string, Feature>;
   projects?: Project[];
+  workflows?: Record<string, AgentWorkflow>;
   onMoveTask: (taskId: string, targetStatus: KanbanStatus, targetIndex?: number) => void;
   onMoveFeature: (featureId: string, targetStatus: KanbanStatus) => void;
   onEditTask: (task: Task) => void;
@@ -91,6 +93,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   featureTasks,
   featuresMap,
   projects,
+  workflows,
   onMoveTask,
   onMoveFeature,
   onEditTask,
@@ -144,7 +147,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       style={glowStyle}
-      className={`flex flex-col min-w-[280px] sm:min-w-[310px] flex-1 bg-slate-900/70 border border-slate-800 rounded-2xl p-3 transition-[box-shadow,background-color,opacity] duration-200 ${
+      className={`flex min-w-0 flex-col bg-slate-900/70 border border-slate-800 rounded-2xl p-3 transition-[box-shadow,background-color,opacity] duration-200 ${
         config.borderTop
       } border-t-2 ${
         dropState === 'forbidden' ? 'opacity-40 cursor-not-allowed shadow-lg' : `hover:shadow-[0_0_24px_var(--column-glow)] ${
@@ -155,8 +158,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       }`}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between gap-2 mb-3 px-1">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-1">
+        <div className="flex flex-wrap items-center gap-2">
           <IconComponent className={`w-4 h-4 ${config.headerColor}`} />
           <h2 className="text-sm font-semibold text-slate-100 tracking-tight">
             {status}
@@ -199,6 +202,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
               feature={feature}
               tasks={featureTasks.get(feature.id) ?? []}
               projectName={projects ? projects.find((project) => project.id === feature.projectId)?.name ?? 'No project' : undefined}
+              workflows={workflows}
               onMoveStatus={onMoveFeature}
               onDragStatus={onDragTask}
               onOpenTask={onEditTask}
@@ -212,6 +216,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             <KanbanCard
               key={task.id}
               task={task}
+              workflow={workflows?.[task.id]}
               projectName={projects ? projects.find((project) => project.id === task.projectId)?.name ?? 'No project' : undefined}
               feature={task.featureId ? featuresMap.get(task.featureId) : undefined}
               onEdit={onEditTask}

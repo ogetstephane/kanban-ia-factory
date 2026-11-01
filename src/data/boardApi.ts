@@ -4,6 +4,7 @@ import {
   featureSchema, taskSchema, breakdownSchema, remoteBranchesSchema, localRepositoriesSchema, workspaceBranchesSchema, type BoardData, type RepositoryInput,
 } from '../types/board';
 import type { Project, Feature, Task, KanbanStatus } from '../types/kanban';
+import { agentWorkflowsSchema } from '../types/workflow';
 import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from './initialData';
 import { agentSessionSchema, agentListSchema, reviewSchema, aiReviewResultSchema, projectHealthSchema, deliveryPreviewSchema, deliveryHistorySchema, publicationPreviewSchema, type PublicationRequest, type DeliveryRequest, type AgentListQuery } from '../types/agent';
 import { releaseSchema, releaseDetailSchema, releasePreviewSchema, releasePublishSchema, releaseEditSchema, releaseUpdateSchema } from '../types/release';
@@ -158,6 +159,10 @@ export const boardApi = {
   },
   async agentHistory(taskId: string, signal?: AbortSignal) {
     return agentSessionSchema.shape.attempts.parse(await request(`${entityPath('tasks', taskId)}/session/history`, 'GET', undefined, signal));
+  },
+  async agentWorkflows(projectId: string, signal?: AbortSignal) {
+    const query = projectId === ALL_PROJECTS ? '' : `?${new URLSearchParams({ projectId })}`;
+    return agentWorkflowsSchema.parse(await request(`/agent-workflows${query}`, 'GET', undefined, signal));
   },
   async projectHealth(projectId: string, signal?: AbortSignal) {
     return projectHealthSchema.parse(await request(`${entityPath('projects', projectId)}/health`, 'GET', undefined, signal));

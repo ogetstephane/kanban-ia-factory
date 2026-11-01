@@ -16,6 +16,7 @@ import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
 import { createAgentRouter } from '../routes/agents';
 import { requiredTicketDocumentationPath } from './ticketDocumentation';
+import { agentWorkflowsSchema } from '../../src/types/workflow';
 
 let directory: string;
 let db: PrismaClient;
@@ -125,6 +126,7 @@ test('transition queues exactly one durable session and planning cannot execute 
   await sessions.tick();
   const plan = (await sessions.get(task.id))!;
   assert.equal(plan.status, 'awaiting_approval');
+  assert.equal(plan.resumeStatus, 'awaiting_approval');
   assert.equal(plan.plan, 'Read relevant files, implement the ticket, run tests.');
   assert.equal(plan.providerSessionId, 'fake-session');
   assert.equal(calls.length, 1);
@@ -143,6 +145,7 @@ test('transition queues exactly one durable session and planning cannot execute 
   await sessions.tick();
   const done = (await sessions.get(task.id))!;
   assert.equal(done.status, 'completed');
+  assert.equal(done.resumeStatus, 'executing');
   assert.equal(calls[1].phase, 'execute');
   assert.equal(calls[1].plan, plan.plan);
   assert.equal(await readFile(path.join(done.workspace!, 'result.txt'), 'utf8'), 'implemented');
@@ -652,4 +655,49 @@ test('cleanup refuses ticket changes and only removes stopped unchanged worktree
   assert.equal(replanned.baseCommit, row.baseCommit);
   assert.equal(replanned.attempt, 2);
   assert.equal((await sessions.history(task.id)).length, 1);
+});
+
+test('board workflow summaries are scoped, compact, complete and match session progress', async () => {
+  const tasks = [];
+  for (let index = 0; index < 26; index++) tasks.push(await startTicket(`workflow-${index}`));
+  const scopedResponse = await fetch(`${api}/agent-workflows?projectId=project-agent`);
+  assert.equal(scopedResponse.status, 200);
+  const scoped = agentWorkflowsSchema.parse(await scopedResponse.json());
+  for (const task of tasks) {
+    assert.deepEqual(scoped[task.id], {
+      plan: 'active', approval: 'pending', execution: 'pending', review: 'pending', delivery: 'pending',
+    });
+    assert.deepEqual(Object.keys(scoped[task.id]), ['plan', 'approval', 'execution', 'review', 'delivery']);
+  }
+  assert.ok(Object.keys(scoped).length >= 26, 'board summaries are not limited to one sessions page');
+  assert.deepEqual(await sessions.workflows(), scoped);
+  const now = new Date().toISOString();
+  await entities.createProject({
+    id: 'workflow-other-project', revision: 0, name: 'Other project', description: '', color: '#6366f1',
+    createdAt: now, updatedAt: now,
+  });
+  const otherTask = await entities.createTask(taskSchema.parse({
+    ...tasks[0], id: 'workflow-other-task', revision: 0, projectId: 'workflow-other-project', status: 'To Do',
+  }));
+  await entities.moveTask(otherTask.id, { revision: otherTask.revision, status: 'In Progress' });
+  const otherWorkflows = await sessions.workflows('workflow-other-project');
+  assert.ok(otherWorkflows[otherTask.id]);
+  assert.ok(tasks.every((task) => !(task.id in otherWorkflows)));
+  assert.ok(!(otherTask.id in await sessions.workflows('project-agent')));
+  assert.ok(otherTask.id in await sessions.workflows());
+  assert.equal((await fetch(`${api}/agent-workflows?projectId=missing`)).status, 404);
+  assert.equal((await fetch(`${api}/agent-workflows?projectId=`)).status, 400);
+  const task = tasks[0];
+  await db.agentSession.update({ where: { taskId: task.id }, data: {
+    status: 'executing', resumeStatus: 'executing', plan: 'Private implementation plan', output: 'Private agent output',
+  } });
+  const executing = (await sessions.workflows('project-agent'))[task.id];
+  assert.deepEqual(executing, {
+    plan: 'completed', approval: 'completed', execution: 'active', review: 'pending', delivery: 'pending',
+  });
+  const listed = (await sessions.list({ search: task.id })).items.find((item) => item.taskId === task.id);
+  assert.deepEqual(listed?.workflow, executing);
+  assert.ok(!JSON.stringify(executing).includes('Private'));
+  await db.agentSession.updateMany({ where: { taskId: { in: tasks.map((item) => item.id) } }, data: { status: 'cancelled' } });
+  await db.agentSession.update({ where: { taskId: otherTask.id }, data: { status: 'cancelled' } });
 });

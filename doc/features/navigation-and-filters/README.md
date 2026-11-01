@@ -20,6 +20,9 @@ The feature bar is shown only on Board and Analytics. The filter/action sub-head
 completely on mobile for Releases, Git, Cockpit, Deliveries, Activity and Wiki; at larger widths,
 its filter fields remain absent there and action controls are shown. Sessions has its own filters.
 The top navigation is a horizontal desktop switcher and a second scrollable row on smaller screens.
+Workspace save feedback appears in a bottom-right toast instead of a status strip above the
+header. The success message disappears after three seconds and can also be dismissed.
+No save notification is shown on initial page load; save failures keep their existing error UI.
 
 ## API
 

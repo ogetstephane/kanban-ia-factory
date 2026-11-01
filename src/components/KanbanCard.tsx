@@ -13,9 +13,13 @@ import {
 import { Task, Feature, KanbanStatus, TaskPriority } from '../types/kanban';
 import { KANBAN_STATUSES, canMoveTask, reachableStatuses } from '../utils/kanbanLogic';
 import ReviewActions from './ReviewActions';
+import WorkflowTimeline from './WorkflowTimeline';
+import { getAgentWorkflow } from '../utils/agentWorkflow';
+import type { AgentWorkflow } from '../types/workflow';
 
 interface KanbanCardProps {
   task: Task;
+  workflow?: AgentWorkflow;
   feature?: Feature;
   projectName?: string;
   onEdit: (task: Task) => void;
@@ -35,6 +39,7 @@ const PRIORITY_STYLES: Record<TaskPriority, { bg: string; text: string; border: 
 
 export const KanbanCard: React.FC<KanbanCardProps> = ({
   task,
+  workflow,
   feature,
   projectName,
   onEdit,
@@ -105,6 +110,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       </div>
 
       {task.blockedReason && <p title={task.blockedReason} className="text-xs text-rose-300 bg-rose-500/10 rounded p-2 mb-2">Blocked: {task.blockedReason}</p>}
+      <div className="mb-3">
+        <WorkflowTimeline workflow={workflow ?? getAgentWorkflow()} compact label={`Agent workflow for ${task.title}`} />
+      </div>
 
       {/* Task Title (click to open detail modal) */}
       <button
@@ -153,7 +161,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
       )}
 
       {/* Action / Stage Progression Bar */}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-700/40 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700/40 text-xs">
         <div className="flex items-center gap-1">
           {prevStatus && (
             <button

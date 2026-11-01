@@ -70,6 +70,7 @@ position in the column; omit it to append. Status changes must follow the
 | Method | Path | Body / query | Response |
 |--------|------|--------------|----------|
 | `GET` | `/agent-sessions` | `projectId?`, `featureId?`, `status?`, `priority?`, `search?`, `page?`, `actionable=true|cockpit?` | `{ items, total, actionCount, page, pageSize, projects, features }` (metadata only) |
+| `GET` | `/agent-workflows` | `projectId?` | Object keyed by ticket ID with `plan`, `approval`, `execution`, `review`, `delivery` states; all scoped runs, without plans, agent output, paths or context |
 | `GET` | `/delivery-history` | `projectId?`, `status?`, `search?`, `page?` | `{ items, total, page, pageSize }`, newest delivery attempts first |
 | `GET` | `/tasks/:id/session` | — | Session with plan, questions, current-attempt checks, review state, output and errors, or `null` |
 | `POST` | `/tasks/:id/session/approve` | `{ sessionId, updatedAt }` (version of the plan read) | Session queued for approved execution |
@@ -90,6 +91,10 @@ position in the column; omit it to append. Status changes must follow the
 Entering In Progress queues a session in the task's own transaction. An already answered
 question, stale plan, duplicate approval or mutation of an active session's context returns
 `409`. See [agent sessions](./agent-sessions.md) for states, trust boundaries and runtime limits.
+Workflow states are `pending`, `active`, `waiting`, `completed`, `failed` or `stopped`.
+Session-list metadata includes the same `workflow` object. The board polls the compact
+workflow endpoint every two seconds; omitted tickets have no agent run and display pending
+steps. Project-scoped results include unassigned tickets, like the project board.
 The lazy Cockpit uses `actionable=cockpit` to list waiting questions, plan approvals, failed
 sessions, pending human reviews, and accepted reviews awaiting local delivery; its summaries
 include only the current delivery status, never plans, reports or question contents.
