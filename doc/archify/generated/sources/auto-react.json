@@ -1,0 +1,2298 @@
+{
+  "schema_version": 1,
+  "diagram_type": "tree",
+  "meta": {
+    "title": "React — composition des composants",
+    "locale": "fr",
+    "translations": {
+      "page.title": "Diagramme {title}",
+      "diagram.description.architecture": "Un diagramme d'architecture généré par Archify.",
+      "diagram.description.workflow": "Un diagramme de workflow généré par Archify.",
+      "diagram.description.sequence": "Un diagramme de séquence généré par Archify.",
+      "diagram.description.dataflow": "Un diagramme de flux de données généré par Archify.",
+      "diagram.description.lifecycle": "Un diagramme de cycle de vie généré par Archify.",
+      "node.focus": "Centrer sur {label}",
+      "node.focus.detail": "Centrer sur {label}, {detail}",
+      "node.context.architecture": "Composant d'architecture",
+      "node.context.workflow": "Nœud de workflow",
+      "node.context.sequence": "Participant de séquence",
+      "node.context.dataflow": "Nœud de flux de données",
+      "node.context.lifecycle": "État de cycle de vie",
+      "legend.title": "Légende",
+      "legend.architecture.frontend": "Frontend",
+      "legend.architecture.backend": "Backend",
+      "legend.architecture.database": "Base de données",
+      "legend.architecture.cloud": "Cloud",
+      "legend.architecture.security": "Sécurité",
+      "legend.architecture.messagebus": "Bus de messages",
+      "legend.architecture.external": "Externe",
+      "legend.workflow.frontend": "Interface utilisateur",
+      "legend.workflow.backend": "Logique de l'agent",
+      "legend.workflow.security": "Politique",
+      "legend.workflow.messagebus": "Action d'outil",
+      "legend.workflow.database": "Contexte / trace",
+      "legend.workflow.cloud": "Service cloud",
+      "legend.workflow.external": "Système externe",
+      "legend.sequence.emphasis": "requête principale",
+      "legend.sequence.return": "retour",
+      "legend.sequence.security": "sécurité",
+      "legend.sequence.dashed": "trace asynchrone",
+      "legend.sequence.default": "message",
+      "legend.dataflow.emphasis": "donnée principale",
+      "legend.dataflow.security": "politique / PII",
+      "legend.dataflow.dashed": "lot asynchrone",
+      "legend.dataflow.database": "entrepôt de données",
+      "legend.dataflow.default": "flux de données",
+      "legend.lifecycle.start": "état initial",
+      "legend.lifecycle.active": "actif",
+      "legend.lifecycle.waiting": "attente",
+      "legend.lifecycle.decision": "décision",
+      "legend.lifecycle.success": "succès",
+      "legend.lifecycle.failure": "échec / sortie",
+      "legend.lifecycle.neutral": "neutre",
+      "legend.lifecycle.external": "externe",
+      "legend.lifecycle.final": "état final",
+      "viewer.kind.frontend": "Frontend",
+      "viewer.kind.backend": "Backend",
+      "viewer.kind.database": "Base de données",
+      "viewer.kind.cloud": "Cloud",
+      "viewer.kind.security": "Sécurité",
+      "viewer.kind.messagebus": "Bus de messages",
+      "viewer.kind.external": "Externe",
+      "viewer.kind.neutral": "Neutre",
+      "viewer.kind.node": "Nœud",
+      "viewer.kind.start": "Début",
+      "viewer.kind.active": "Actif",
+      "viewer.kind.waiting": "En attente",
+      "viewer.kind.decision": "Décision",
+      "viewer.kind.success": "Succès",
+      "viewer.kind.failure": "Échec",
+      "viewer.toolbar.actions": "Actions du diagramme",
+      "viewer.theme.toggle.title": "Changer de thème (T)",
+      "viewer.theme.toggle": "Changer le thème de couleur",
+      "viewer.theme.dark": "Sombre",
+      "viewer.theme.light": "Clair",
+      "viewer.preset.choose.title": "Choisir le style visuel (S pour changer)",
+      "viewer.preset.choose": "Choisir le style visuel",
+      "viewer.preset.style": "Style",
+      "viewer.preset.menu": "Style visuel",
+      "viewer.preset.identity": "Identité visuelle",
+      "viewer.preset.cycles": "S pour changer",
+      "viewer.preset.classic": "Classic",
+      "viewer.preset.classic.short": "Classic",
+      "viewer.preset.classic.hint": "Style technique stable par défaut",
+      "viewer.preset.flow": "Flux de signal",
+      "viewer.preset.flow.short": "Flux",
+      "viewer.preset.flow.hint": "Présentation animée et dynamique",
+      "viewer.preset.blueprint": "Plan",
+      "viewer.preset.blueprint.hint": "Revue technique",
+      "viewer.preset.editorial": "Éditorial",
+      "viewer.preset.editorial.hint": "Notes de publication et de lancement",
+      "viewer.preset.badge.signalFlow": "FLUX DE SIGNAL",
+      "viewer.preset.badge.blueprint": "PLAN / RÉV. 01",
+      "viewer.preset.badge.editorial": "ÉDITORIAL / NOTE DE TERRAIN",
+      "viewer.preset.badge.editorialPlate": "ARCHIFY / PLANCHE 04",
+      "viewer.preset.current": "Style visuel : {style}. Choisir le style visuel",
+      "viewer.motion.live": "Animé",
+      "viewer.motion.still": "Statique",
+      "viewer.motion.pause": "Mettre l'animation en pause",
+      "viewer.motion.resume": "Reprendre l'animation",
+      "viewer.motion.reduced": "Animation suspendue en raison de la préférence de mouvement réduit",
+      "viewer.motion.hidden": "Animation suspendue pendant que la page est masquée",
+      "viewer.motion.yielding": "Mettre l'animation en pause ; cède actuellement la place à {owner}",
+      "viewer.motion.yielding.title": "Aperçu en direct activé · cède la place à {owner}",
+      "viewer.owner.route": "Sonde d'itinéraire",
+      "viewer.owner.lens": "Lentille sémantique",
+      "viewer.owner.relationship": "Aperçu de relation",
+      "viewer.owner.intent": "Trace d'intention",
+      "viewer.owner.focus": "le focus sémantique",
+      "viewer.owner.legend": "l'aperçu de la légende",
+      "viewer.owner.reader": "l'interaction du lecteur",
+      "viewer.present.enter": "Entrer en mode présentation",
+      "viewer.present.enter.title": "Mode présentation (F)",
+      "viewer.present.exit": "Quitter le mode présentation",
+      "viewer.present.exit.title": "Quitter le mode présentation (F ou Échap)",
+      "viewer.present.present": "Présenter",
+      "viewer.present.exit.label": "Quitter",
+      "viewer.export.button": "Exporter",
+      "viewer.export.button.title": "Exporter le diagramme (E)",
+      "viewer.export.diagram": "Exporter le diagramme",
+      "viewer.export.menu": "Exporter",
+      "viewer.export.subtitle": "Des exports portables et soignés",
+      "viewer.export.share": "Partager",
+      "viewer.export.shareCard": "Carte de partage",
+      "viewer.export.routeShareCard": "Carte de partage d'itinéraire",
+      "viewer.export.reachShareCard": "Carte de partage de portée",
+      "viewer.export.copyDiagram": "Copier le diagramme",
+      "viewer.export.clipboardPng": "PNG vers le presse-papiers",
+      "viewer.export.raster": "Images matricielles",
+      "viewer.export.image": "Image",
+      "viewer.export.lossless": "Image sans perte",
+      "viewer.export.compact": "Image compacte",
+      "viewer.export.modern": "Image au format moderne",
+      "viewer.export.vectorMotion": "Vecteur et animation",
+      "viewer.export.vectorMotion.heading": "Vecteur et animation",
+      "viewer.export.editable": "Vecteur modifiable",
+      "viewer.export.motion6s": "Animation de 6 s",
+      "viewer.export.unsupported": "Non pris en charge par ce navigateur",
+      "viewer.export.clipboardUnsupported": "L'écriture d'image dans le presse-papiers n'est pas prise en charge par ce navigateur",
+      "viewer.export.clipboardUnsupported.short": "L'écriture d'image dans le presse-papiers n'est pas prise en charge par ce navigateur.",
+      "viewer.export.motionUnavailable": "Capture d'animation indisponible dans ce navigateur",
+      "viewer.export.webmUnavailable": "WebM indisponible dans ce navigateur",
+      "viewer.export.failed": "Échec de l'export : {message}",
+      "viewer.export.unknownVariant": "Variante de carte de partage inconnue : {variant}",
+      "viewer.export.routeRequired": "Tracez un itinéraire avant d'exporter une carte de partage d'itinéraire",
+      "viewer.export.reachRequired": "Tracez une portée éditée avant d'exporter une carte de partage de portée",
+      "viewer.export.unknown": "inconnu",
+      "viewer.export.routeFailed": "Échec de l'export de la carte de partage d'itinéraire : {message}",
+      "viewer.export.reachFailed": "Échec de l'export de la carte de partage de portée : {message}",
+      "viewer.export.copyFailed": "Échec de la copie : {message}",
+      "viewer.export.copiedPng": "PNG copié dans le presse-papiers",
+      "viewer.export.downloadedRoute": "Carte de partage d'itinéraire téléchargée",
+      "viewer.export.downloadedReach": "Carte de partage de portée téléchargée",
+      "viewer.export.downloadedWebm": "WebM téléchargé",
+      "viewer.export.recording": "Enregistrement de 6 secondes d'animation…",
+      "viewer.export.card.routeSummary.one": "Itinéraire : {source} → {target} · {count} saut orienté",
+      "viewer.export.card.routeSummary.other": "Itinéraire : {source} → {target} · {count} sauts orientés",
+      "viewer.export.card.reachSummary": "Portée {direction} éditée depuis {origin} · {nodes} · {links} · max {hops}",
+      "viewer.export.card.node.one": "{count} nœud",
+      "viewer.export.card.node.other": "{count} nœuds",
+      "viewer.export.card.link.one": "{count} lien",
+      "viewer.export.card.link.other": "{count} liens",
+      "viewer.export.card.hop.one": "{count} saut",
+      "viewer.export.card.hop.other": "{count} sauts",
+      "viewer.export.card.routeBadge": "ARCHIFY · ITINÉRAIRE · {hops}",
+      "viewer.export.card.reachBadge": "ARCHIFY · PORTÉE {direction}",
+      "viewer.export.direction.upstream": "Amont",
+      "viewer.export.direction.downstream": "Aval",
+      "viewer.export.error.canvasUnavailable": "Canevas indisponible pour {label}",
+      "viewer.export.error.contextUnavailable": "Contexte de canevas 2D indisponible pour {label}",
+      "viewer.export.error.toBlobUnavailable": "canvas.toBlob indisponible pour {label}",
+      "viewer.export.error.toBlobNull": "canvas.toBlob n'a renvoyé aucune donnée pour {label}",
+      "viewer.export.error.variantsCombined": "Les variantes de carte de partage ne peuvent pas être combinées",
+      "viewer.export.error.viewerState": "L'export de la carte de partage n'a pas pu supprimer l'état temporaire du visualiseur",
+      "viewer.export.error.routeState": "L'export de la carte d'itinéraire n'a pas pu préserver l'itinéraire résolu en toute sécurité",
+      "viewer.export.error.reachState": "L'export de la carte de portée n'a pas pu préserver la portée éditée en toute sécurité",
+      "viewer.export.error.webmRequirements": "L'export d'animation WebM nécessite une animation de trace et la prise en charge de MediaRecorder par le navigateur",
+      "viewer.export.error.mediaRecorder": "Échec de MediaRecorder",
+      "viewer.export.error.emptyWebm": "MediaRecorder a produit un fichier WebM vide",
+      "viewer.export.error.webmBackground": "L'arrière-plan SVG n'a pas pu être chargé pour l'export WebM",
+      "viewer.guide.eyebrow": "Guide du diagramme",
+      "viewer.guide.close": "Fermer le guide du diagramme",
+      "viewer.guide.inspecting": "Inspection de la sémantique compilée",
+      "viewer.guide.actions": "Actions d'exploration du diagramme",
+      "viewer.guide.find": "Trouver un nœud",
+      "viewer.guide.find.hint": "Rechercher par libellés, responsabilités, types et identifiants stables.",
+      "viewer.guide.route": "Tracer un itinéraire",
+      "viewer.guide.route.aria": "Tracer un itinéraire orienté",
+      "viewer.guide.route.hint": "Découvrez comment deux nœuds sémantiques sont reliés dans le sens édité.",
+      "viewer.guide.map": "Voir tout le système",
+      "viewer.guide.map.hint": "Ouvrir le radar sémantique avec un viewport en direct et des nœuds stables.",
+      "viewer.guide.lens": "Comparer les types sémantiques",
+      "viewer.guide.lens.hint": "Comptez les rôles, révélez leur trafic et comparez les liens édités directs.",
+      "viewer.guide.present": "Entrer en mode présentation",
+      "viewer.guide.present.hint": "Donnez tout le viewport au diagramme en direct sans modifier l'export.",
+      "viewer.guide.shortcuts": "Raccourcis clavier supplémentaires",
+      "viewer.guide.shortcut.export": "Exporter",
+      "viewer.guide.shortcut.theme": "Thème",
+      "viewer.guide.shortcut.style": "Style",
+      "viewer.guide.shortcut.reset": "Réinitialiser",
+      "viewer.guide.shortcut.zoomIn": "Zoom avant",
+      "viewer.guide.shortcut.zoomOut": "Zoom arrière",
+      "viewer.guide.shortcut.close": "Fermer",
+      "viewer.guide.facts": "{nodes} · {relationships}",
+      "viewer.guide.fact.node.one": "{count} nœud sémantique",
+      "viewer.guide.fact.node.other": "{count} nœuds sémantiques",
+      "viewer.guide.fact.relationship.one": "{count} relation",
+      "viewer.guide.fact.relationship.other": "{count} relations",
+      "viewer.guide.open": "Ouvrir le guide du diagramme",
+      "viewer.finder.title": "Trouver un nœud",
+      "viewer.finder.close": "Fermer le chercheur de nœuds",
+      "viewer.finder.placeholder": "Rechercher par libellé ou identifiant",
+      "viewer.finder.search": "Rechercher les nœuds du diagramme",
+      "viewer.finder.results": "Nœuds du diagramme",
+      "viewer.finder.empty": "Aucun nœud correspondant",
+      "viewer.finder.result.focus": "Centrer sur {label}",
+      "viewer.finder.result.routeStart": "Choisir {label} comme point de départ de l'itinéraire",
+      "viewer.finder.result.routeTarget": "Choisir {label} comme destination de l'itinéraire, {links}",
+      "viewer.finder.status.empty": "Aucun nœud correspondant",
+      "viewer.finder.status.count.one": "{count} nœud correspondant",
+      "viewer.finder.status.count.other": "{count} nœuds correspondants",
+      "viewer.finder.noun.nodes": "nœuds",
+      "viewer.finder.link.one": "{count} lien",
+      "viewer.finder.link.other": "{count} liens",
+      "viewer.finder.result.focus.one": "Centrer sur {label}, {count} connexion associée",
+      "viewer.finder.result.focus.other": "Centrer sur {label}, {count} connexions associées",
+      "viewer.finder.status.filtered": "{visible} sur {available} {noun}",
+      "viewer.finder.status.all": "{available} {noun}",
+      "viewer.passport.eyebrow": "Passeport sémantique",
+      "viewer.passport.metadata": "Métadonnées du nœud",
+      "viewer.passport.evidence": "Preuve de source vérifiée",
+      "viewer.passport.verified": "Source vérifiée",
+      "viewer.passport.verificationScope": "Vérifié par rapport au Git local à la révision épinglée. L'accès distant n'a pas été vérifié.",
+      "viewer.passport.reach": "Portée éditée",
+      "viewer.passport.reach.trace": "Tracer l'accessibilité éditée",
+      "viewer.passport.upstream": "Amont",
+      "viewer.passport.downstream": "Aval",
+      "viewer.passport.upstream.trace": "Tracer l'accessibilité éditée en amont",
+      "viewer.passport.downstream.trace": "Tracer l'accessibilité éditée en aval",
+      "viewer.passport.close": "Fermer le passeport sémantique",
+      "viewer.passport.copy": "Copier le lien",
+      "viewer.passport.copy.focus": "Copier le lien du nœud centré",
+      "viewer.passport.relations": "Relations",
+      "viewer.passport.relations.show": "Afficher les relations connectées",
+      "viewer.passport.relations.hide": "Masquer les relations connectées",
+      "viewer.passport.relations.list": "Relations connectées",
+      "viewer.passport.copyRelation": "Copier la relation",
+      "viewer.passport.copyNode": "Copier le nœud",
+      "viewer.passport.copyPinned": "Copier le lien de la relation épinglée",
+      "viewer.passport.copySource": "Copier le lien du nœud source",
+      "viewer.passport.copy.focused.success": "Lien du nœud centré copié",
+      "viewer.passport.copy.pinned.success": "Lien de la relation épinglée copié",
+      "viewer.passport.copy.focused.failed": "Impossible de copier le lien du nœud centré",
+      "viewer.passport.copy.pinned.failed": "Impossible de copier le lien de la relation épinglée",
+      "viewer.passport.relationship.none": "Aucune relation connectée",
+      "viewer.passport.relationship.count.one": "{count} relation",
+      "viewer.passport.relationship.count.other": "{count} relations",
+      "viewer.passport.relationship.show.one": "Afficher {count} relation connectée",
+      "viewer.passport.relationship.show.other": "Afficher {count} relations connectées",
+      "viewer.passport.relationship.summary": "{out} sortantes · {in} entrantes{loops}",
+      "viewer.passport.relationship.loops": " · {count} boucle",
+      "viewer.passport.relationship.explorer": "Explorateur de relations directes",
+      "viewer.passport.relationship.help": "Utilisez les flèches pour explorer les relations. Appuyez sur Entrée ou Espace pour épingler les détails ; Échap efface.",
+      "viewer.passport.relationship.loopsBack": "boucle vers",
+      "viewer.passport.relationship.connectsTo": "se connecte à",
+      "viewer.passport.relationship.connectsFrom": "se connecte depuis",
+      "viewer.passport.relationship.pinned": "Relation épinglée · {from} → {to} · {label}",
+      "viewer.passport.relationship.inspect": "Inspecter la relation {index} sur {total} : {from} vers {to}, {label}. Appuyez sur Entrée pour les détails.",
+      "viewer.passport.relationship.group.out": "Sortantes",
+      "viewer.passport.relationship.group.in": "Entrantes",
+      "viewer.passport.relationship.group.loop": "Boucles propres",
+      "viewer.passport.relationship.row": "{group} : {relationship}, {neighbor}",
+      "viewer.passport.relationship.direction.out": "SORT →",
+      "viewer.passport.relationship.direction.in": "← ENTRE",
+      "viewer.passport.relationship.direction.loop": "BOUCLE",
+      "viewer.passport.sourceCount.one": "{count} référence de source vérifiée",
+      "viewer.passport.sourceCount.other": "{count} références de source vérifiées",
+      "viewer.passport.repository.open": "Ouvrir la révision {revision} du dépôt vérifié",
+      "viewer.passport.source.open": "Ouvrir la source vérifiée {path} à la révision {revision}",
+      "viewer.passport.source.openLink": "Ouvrir ↗",
+      "viewer.passport.reach.upstream.one": "Tracer {count} nœud édité en amont",
+      "viewer.passport.reach.upstream.other": "Tracer {count} nœuds édités en amont",
+      "viewer.passport.reach.downstream.one": "Tracer {count} nœud édité en aval",
+      "viewer.passport.reach.downstream.other": "Tracer {count} nœuds édités en aval",
+      "viewer.passport.reach.noUpstream": "Aucun nœud édité en amont",
+      "viewer.passport.reach.noDownstream": "Aucun nœud édité en aval",
+      "viewer.passport.reach.status": "{direction} · {nodes} nœuds · {links} liens · max {hops} sauts",
+      "viewer.route.eyebrow": "Sonde d'itinéraire",
+      "viewer.route.start": "Choisir un nœud de départ",
+      "viewer.route.start.find": "Trouver le départ",
+      "viewer.route.start.find.aria": "Trouver un départ d'itinéraire",
+      "viewer.route.copy": "Copier le lien",
+      "viewer.route.copy.aria": "Copier le lien de l'itinéraire tracé",
+      "viewer.route.clear": "Effacer",
+      "viewer.route.clear.aria": "Effacer la sonde d'itinéraire",
+      "viewer.route.traced": "Itinéraire tracé",
+      "viewer.route.pickTwo": "Choisissez deux nœuds sémantiques sur le diagramme",
+      "viewer.route.pickOne": "Choisissez un nœud sémantique sur le diagramme",
+      "viewer.route.controls": "Contrôles du parcours d'itinéraire",
+      "viewer.route.previous": "Position précédente de l'itinéraire",
+      "viewer.route.play": "Lire le parcours de l'itinéraire",
+      "viewer.route.pause": "Mettre le parcours de l'itinéraire en pause",
+      "viewer.route.replay": "Rejouer le parcours de l'itinéraire",
+      "viewer.route.next": "Position suivante de l'itinéraire",
+      "viewer.route.journey": "Parcours",
+      "viewer.route.pause.label": "Pause",
+      "viewer.route.replay.label": "Rejouer",
+      "viewer.route.overview": "Vue d'ensemble",
+      "viewer.route.overview.aria": "Afficher la vue d'ensemble complète de l'itinéraire",
+      "viewer.route.instructions": "Choisissez la source, puis la destination. Le sens compte.",
+      "viewer.route.destination": "Choisir une destination depuis {label}",
+      "viewer.route.destination.find": "Trouver une cible",
+      "viewer.route.destination.find.aria": "Trouver une destination d'itinéraire accessible",
+      "viewer.route.differentDestination": "Choisir une autre destination",
+      "viewer.route.distinct": "Un itinéraire nécessite deux nœuds sémantiques distincts.",
+      "viewer.route.unreachable": "Aucun itinéraire orienté vers {label}",
+      "viewer.route.unreachable.detail": "{target} n'est pas accessible depuis {source}. Choisissez une destination surlignée.",
+      "viewer.route.start.instructions": "Sélectionnez la source. L'étape suivante ne révélera que les destinations orientées.",
+      "viewer.route.copy.success": "Lien de l'itinéraire tracé copié",
+      "viewer.route.copy.failed": "Impossible de copier le lien de l'itinéraire tracé",
+      "viewer.route.position": "Position {index} sur {total} de l'itinéraire : {label}",
+      "viewer.route.step": "Étape {index} sur {total} · {phase} · {label}",
+      "viewer.route.motionRequired": "Le parcours automatique nécessite le mode Animé",
+      "viewer.route.trigger.clear": "Effacer l'itinéraire tracé",
+      "viewer.route.overview.status": "{nodes} · {hops} · itinéraire édité le plus court",
+      "viewer.route.overview.node.one": "{count} nœud",
+      "viewer.route.overview.node.other": "{count} nœuds",
+      "viewer.route.overview.hop.one": "{count} saut orienté",
+      "viewer.route.overview.hop.other": "{count} sauts orientés",
+      "viewer.route.phase.playing": "En lecture",
+      "viewer.route.phase.complete": "Terminé",
+      "viewer.route.phase.inspecting": "Inspection",
+      "viewer.route.destination.count.one": "{count} destination orientée disponible. Choisissez un nœud surligné.",
+      "viewer.route.destination.count.other": "{count} destinations orientées disponibles. Choisissez un nœud surligné.",
+      "viewer.route.noOutgoing": "Aucun itinéraire sortant ne débute ici. Effacez et choisissez une autre source.",
+      "viewer.route.result.title": "{source} vers {target}",
+      "viewer.route.finder.source.title": "Choisir le départ de l'itinéraire",
+      "viewer.route.finder.source.placeholder": "Rechercher des sources d'itinéraire",
+      "viewer.route.finder.source.empty": "Aucune source d'itinéraire correspondante",
+      "viewer.route.finder.source.results": "Nœuds pouvant débuter un itinéraire",
+      "viewer.route.finder.source.noun": "sources d'itinéraire",
+      "viewer.route.finder.source.badge": "départ",
+      "viewer.route.finder.target.title": "Destination depuis {label}",
+      "viewer.route.finder.target.placeholder": "Rechercher des destinations accessibles",
+      "viewer.route.finder.target.empty": "Aucune destination accessible correspondante",
+      "viewer.route.finder.target.results": "Destinations d'itinéraire accessibles",
+      "viewer.route.finder.target.noun": "destinations accessibles",
+      "viewer.route.hop.one": "{count} saut",
+      "viewer.route.hop.other": "{count} sauts",
+      "viewer.lens.eyebrow": "Lentille sémantique",
+      "viewer.lens.title": "Comparer les rôles du système",
+      "viewer.lens.close": "Fermer la lentille sémantique",
+      "viewer.lens.instruction": "Choisissez jusqu'à deux types sémantiques. Un seul révèle son trafic réel ; deux comparent uniquement les relations éditées directes.",
+      "viewer.lens.kinds": "Types sémantiques",
+      "viewer.lens.choose": "Choisissez un type pour inspecter ses nœuds et relations associées.",
+      "viewer.lens.copy": "Copier le lien de la lentille sémantique",
+      "viewer.lens.clear": "Effacer la lentille sémantique",
+      "viewer.lens.open": "Ouvrir la lentille sémantique",
+      "viewer.lens.openActive": "Ouvrir la lentille sémantique active",
+      "viewer.lens.legend": "Légende sémantique",
+      "viewer.lens.legend.inspect.one": "Inspecter {label}, {count} nœud",
+      "viewer.lens.legend.inspect.other": "Inspecter {label}, {count} nœuds",
+      "viewer.lens.kind.count.one": "{label}, {count} nœud",
+      "viewer.lens.kind.count.other": "{label}, {count} nœuds",
+      "viewer.lens.compare.one": "{first} → {second} : {forward} · {second} → {first} : {reverse} · {count} relation directe",
+      "viewer.lens.compare.other": "{first} → {second} : {forward} · {second} → {first} : {reverse} · {count} relations directes",
+      "viewer.lens.single": "{nodes} · {relationships} · les nœuds connectés restent visibles",
+      "viewer.lens.node.one": "{count} nœud {label}",
+      "viewer.lens.node.other": "{count} nœuds {label}",
+      "viewer.lens.relationship.one": "{count} relation associée",
+      "viewer.lens.relationship.other": "{count} relations associées",
+      "viewer.radar.title": "Radar sémantique",
+      "viewer.radar.building": "Construction de la vue d'ensemble",
+      "viewer.radar.openFull": "Ouvrir le radar sémantique complet",
+      "viewer.radar.open": "Ouvrir le radar",
+      "viewer.radar.close": "Fermer le radar sémantique",
+      "viewer.radar.surface": "Vue d'ensemble du diagramme. Cliquez sur un nœud pour le centrer, ou utilisez les flèches pour vous déplacer.",
+      "viewer.radar.click": "Cliquer sur le nœud",
+      "viewer.radar.drag": "Glisser pour se déplacer",
+      "viewer.radar.space": "Le radar sémantique a besoin de plus d'espace MAP.",
+      "viewer.radar.nodes": "Nœuds du radar du diagramme sémantique",
+      "viewer.radar.focus": "Centrer sur {label} depuis le radar sémantique",
+      "viewer.radar.status": "{count} nœuds · {viewport}",
+      "viewer.radar.fullMap": "{count} nœuds · carte complète",
+      "viewer.radar.compacted": "Radar compacté pour éviter de masquer le passeport sémantique ou les contrôles MAP.",
+      "viewer.radar.cancelWaiting": "Annuler l'attente du radar sémantique pour plus d'espace MAP",
+      "viewer.radar.needsSpace": "Le radar sémantique a besoin de plus d'espace MAP visible",
+      "viewer.radar.viewport.full": "carte complète",
+      "viewer.radar.viewport.width": "{percent} % de largeur",
+      "viewer.radar.viewport.scale": "{percent} % du viewport",
+      "viewer.nav.controls": "Contrôles de la vue du diagramme",
+      "viewer.nav.route": "Tracer un itinéraire orienté",
+      "viewer.nav.route.title": "Tracer l'itinéraire (R)",
+      "viewer.nav.route.short": "TRACÉ",
+      "viewer.nav.radar": "Ouvrir le radar sémantique",
+      "viewer.nav.radar.title": "Radar sémantique (M)",
+      "viewer.nav.radar.short": "CARTE",
+      "viewer.nav.lens": "Ouvrir la lentille sémantique",
+      "viewer.nav.lens.title": "Lentille sémantique (L)",
+      "viewer.nav.lens.short": "LENTILLE",
+      "viewer.nav.find": "Trouver un nœud",
+      "viewer.nav.find.title": "Trouver un nœud (/)",
+      "viewer.nav.guide": "Ouvrir le guide du diagramme",
+      "viewer.nav.guide.title": "Guide du diagramme (?)",
+      "viewer.nav.zoomOut": "Zoom arrière",
+      "viewer.nav.zoomOut.title": "Zoom arrière (-)",
+      "viewer.nav.reset": "Réinitialiser la vue du diagramme",
+      "viewer.nav.reset.title": "Réinitialiser la vue (0)",
+      "viewer.nav.read": "LIRE",
+      "viewer.nav.zoomIn": "Zoom avant",
+      "viewer.nav.zoomIn.title": "Zoom avant (+)",
+      "viewer.nav.camera": "{hint}. Réinitialiser la vue du diagramme",
+      "viewer.nav.camera.title": "{semantic}{hint} · réinitialiser la vue (0)",
+      "viewer.nav.camera.semantic": "Caméra sémantique active · ",
+      "viewer.nav.level.map": "CARTE",
+      "viewer.nav.level.read": "LIRE",
+      "viewer.nav.level.full": "COMPLET",
+      "viewer.nav.level.auto": "AUTO",
+      "viewer.nav.detail.map": "Zoomez pour révéler les libellés des relations et le contexte des nœuds",
+      "viewer.nav.detail.read": "Zoomez à nouveau pour révéler les étiquettes et annotations",
+      "viewer.nav.detail.full": "Détail complet du diagramme",
+      "viewer.intent.summary": "{label}. {out} sortantes, {in} entrantes{loops}. {total} connexions. Appuyez sur Entrée pour les détails.",
+      "viewer.intent.loops": ", {count} boucle propre",
+      "viewer.common.copied": "Copié",
+      "viewer.common.copyFailed": "Échec de la copie",
+      "viewer.common.copyLink": "Copier le lien",
+      "viewer.common.clear": "Effacer",
+      "viewer.common.close": "Fermer",
+      "diagram.description.tree": "Un diagramme hiérarchique généré par Archify.",
+      "node.context.tree.root": "Racine",
+      "node.context.tree.branch": "Branche",
+      "node.context.tree.leaf": "Feuille",
+      "tree.toggle.collapse": "Replier {label} ({count} descendants)",
+      "tree.toggle.expand": "Déplier {label} ({count} masqués)",
+      "tree.expandAll": "Tout déplier",
+      "diagram.description.class": "Un diagramme de classes et d’interfaces généré par Archify.",
+      "node.context.class.class": "Classe",
+      "node.context.class.abstract": "Classe abstraite",
+      "node.context.class.interface": "Interface",
+      "node.context.class.enum": "Énumération",
+      "node.context.class.record": "Enregistrement",
+      "legend.class.dependency": "Dépend de",
+      "legend.class.association": "Association",
+      "legend.class.inheritance": "Hérite de",
+      "legend.class.realization": "Implémente",
+      "legend.class.composition": "Composition",
+      "legend.class.aggregation": "Agrégation",
+      "diagram.description.timeline": "Une chronologie d’événements générée par Archify.",
+      "timeline.axis": "Temps",
+      "timeline.break": "Rupture d’axe : {duration} sans événements omises",
+      "timeline.compressed": "{count} période(s) calme(s) comprimée(s) (≈)",
+      "timeline.evidence.observed": "Événements observés",
+      "timeline.evidence.illustrative": "Données illustratives",
+      "legend.timeline.default": "Événement",
+      "legend.timeline.change": "Changement",
+      "legend.timeline.alert": "Alerte",
+      "legend.timeline.action": "Intervention",
+      "legend.timeline.recovery": "Rétablissement",
+      "diagram.description.waterfall": "Un diagramme en cascade d’exécution généré par Archify.",
+      "waterfall.evidence.measured": "Durées mesurées",
+      "waterfall.evidence.illustrative": "Durées illustratives",
+      "waterfall.wall": "Durée totale {duration}",
+      "waterfall.share": "{percent} de la durée totale {total}",
+      "waterfall.incomplete": "incomplet, ≥ {duration}",
+      "waterfall.operation": "Opération",
+      "legend.waterfall.ok": "Terminé",
+      "legend.waterfall.error": "Erreur",
+      "legend.waterfall.cancelled": "Annulé",
+      "legend.waterfall.incomplete": "Incomplet (fin non enregistrée)",
+      "viewer.export.svg.auto": "SVG · Automatique",
+      "viewer.export.svg.auto.hint": "Suit le thème de la page",
+      "viewer.export.svg.light": "SVG · Clair",
+      "viewer.export.svg.light.hint": "Toujours clair",
+      "viewer.export.svg.dark": "SVG · Sombre",
+      "viewer.export.svg.dark.hint": "Toujours sombre",
+      "viewer.guide.title": "Explorer ce système",
+      "viewer.focus.selectedNodes": "{count} nœuds sélectionnés",
+      "viewer.guide.credit": "Archify vous est utile ? Une étoile sur GitHub peut aider",
+      "viewer.guide.star": "Étoile",
+      "viewer.passport.move": "Déplacer la fiche. Glisser, utiliser les flèches ou appuyer sur Home pour réinitialiser.",
+      "viewer.outline.title": "Index des éléments",
+      "viewer.rail.show": "Notes et index",
+      "viewer.rail.controls": "Panneau latéral",
+      "viewer.rail.collapse": "Réduire le panneau latéral",
+      "viewer.rail.bottom": "Déplacer le panneau sous le diagramme",
+      "viewer.rail.right": "Déplacer le panneau à côté du diagramme",
+      "diagram.description.erd": "Un diagramme entité-association généré par Archify.",
+      "node.context.erd": "Entité",
+      "legend.erd.pk": "Clé primaire",
+      "legend.erd.fk": "Clé étrangère",
+      "legend.erd.uk": "Clé unique",
+      "legend.erd.one": "Un",
+      "legend.erd.many": "Plusieurs",
+      "legend.erd.optional": "Facultatif"
+    },
+    "output": "doc/archify/generated/auto-react.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ogetstephane/kanban-ia-factory.git",
+      "revision": "12cdd3aec0474b2c530e3c132031d4e772c7c036"
+    }
+  },
+  "layout": {
+    "direction": "right"
+  },
+  "nodes": [
+    {
+      "id": "n6b810c90aa9a9985",
+      "label": "Composition React",
+      "sublabel": "balises JSX locales",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 1
+        },
+        {
+          "path": "server.ts",
+          "line": 1
+        },
+        {
+          "path": "src/main.tsx",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "n3c5b34817b6a6097",
+      "parent": "n6b810c90aa9a9985",
+      "label": "App",
+      "sublabel": "src/App.tsx",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 35
+        }
+      ]
+    },
+    {
+      "id": "n3d7e3de41447947e",
+      "parent": "n3c5b34817b6a6097",
+      "label": "rend NotFound",
+      "sublabel": "src/App.tsx:42",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 42
+        },
+        {
+          "path": "src/App.tsx",
+          "line": 46
+        }
+      ]
+    },
+    {
+      "id": "n0836530ae6026c3d",
+      "parent": "n3c5b34817b6a6097",
+      "label": "rend TaskPage",
+      "sublabel": "src/App.tsx:40 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 40
+        },
+        {
+          "path": "src/components/TaskPage.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "n1be53c7fde6359fb",
+      "parent": "n3c5b34817b6a6097",
+      "label": "rend Workspace",
+      "sublabel": "src/App.tsx:37 · 3 occurrences",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 37
+        },
+        {
+          "path": "src/App.tsx",
+          "line": 53
+        }
+      ]
+    },
+    {
+      "id": "n4e5a1ca21898d49a",
+      "parent": "n6b810c90aa9a9985",
+      "label": "Workspace",
+      "sublabel": "src/App.tsx",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 53
+        }
+      ]
+    },
+    {
+      "id": "nc301bbf9760d3554",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend ActivityView",
+      "sublabel": "src/App.tsx:431",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 431
+        },
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 116
+        }
+      ]
+    },
+    {
+      "id": "n8028039c58fdd04f",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend ArchifyView",
+      "sublabel": "src/App.tsx:443",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 443
+        },
+        {
+          "path": "src/components/ArchifyView.tsx",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "id": "n12f4f252afe57aeb",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend CockpitView",
+      "sublabel": "src/App.tsx:397",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 397
+        },
+        {
+          "path": "src/components/CockpitView.tsx",
+          "line": 28
+        }
+      ]
+    },
+    {
+      "id": "ncc5d0061d0fec7b8",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend CodeGraphView",
+      "sublabel": "src/App.tsx:439",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 439
+        },
+        {
+          "path": "src/components/CodeGraphView.tsx",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "n5b6c82dd74cf0a75",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend DeliveryHistoryView",
+      "sublabel": "src/App.tsx:426",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 426
+        },
+        {
+          "path": "src/components/DeliveryHistoryView.tsx",
+          "line": 28
+        }
+      ]
+    },
+    {
+      "id": "nd1b8c9c2078bdcce",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend FeatureBar",
+      "sublabel": "src/App.tsx:353",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 353
+        },
+        {
+          "path": "src/components/FeatureBar.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "n579914f283f27d10",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend FeatureBreakdownModal",
+      "sublabel": "src/App.tsx:489",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 489
+        },
+        {
+          "path": "src/components/FeatureBreakdownModal.tsx",
+          "line": 36
+        }
+      ]
+    },
+    {
+      "id": "n341f7a13da9ea314",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend GitView",
+      "sublabel": "src/App.tsx:451",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 451
+        },
+        {
+          "path": "src/components/GitView.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "nff94faa8bfaa2476",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend KanbanBoard",
+      "sublabel": "src/App.tsx:406",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 406
+        },
+        {
+          "path": "src/components/KanbanBoard.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "nf8dcdc4c7ed70b96",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend Navbar",
+      "sublabel": "src/App.tsx:334",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 334
+        },
+        {
+          "path": "src/components/Navbar.tsx",
+          "line": 28
+        }
+      ]
+    },
+    {
+      "id": "n86b244db8526a2e0",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend NewFeatureModal",
+      "sublabel": "src/App.tsx:503",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 503
+        },
+        {
+          "path": "src/components/NewFeatureModal.tsx",
+          "line": 22
+        }
+      ]
+    },
+    {
+      "id": "nb081ce66d9c097de",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend NotFound",
+      "sublabel": "src/App.tsx:300 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 300
+        },
+        {
+          "path": "src/App.tsx",
+          "line": 46
+        }
+      ]
+    },
+    {
+      "id": "ne1549bd8af9117e2",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend ProjectManagerModal",
+      "sublabel": "src/App.tsx:509",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 509
+        },
+        {
+          "path": "src/components/ProjectManagerModal.tsx",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "id": "n64331fc6521a0cbe",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend ReleasesView",
+      "sublabel": "src/App.tsx:447",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 447
+        },
+        {
+          "path": "src/components/ReleasesView.tsx",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "id": "n21b3da73f7426b3a",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend SessionsView",
+      "sublabel": "src/App.tsx:422",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 422
+        },
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "n191fa77dd648ad08",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend VelocityDashboard",
+      "sublabel": "src/App.tsx:460",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 460
+        },
+        {
+          "path": "src/components/VelocityDashboard.tsx",
+          "line": 42
+        }
+      ]
+    },
+    {
+      "id": "n75d3bcce72b4f9c7",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend WikiView",
+      "sublabel": "src/App.tsx:435",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 435
+        },
+        {
+          "path": "src/components/WikiView.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "n9bc05b22df9f9a1c",
+      "parent": "n4e5a1ca21898d49a",
+      "label": "rend WorkflowAdvisorModal",
+      "sublabel": "src/App.tsx:497",
+      "sources": [
+        {
+          "path": "src/App.tsx",
+          "line": 497
+        },
+        {
+          "path": "src/components/WorkflowAdvisorModal.tsx",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "id": "n8626ed48bb81db74",
+      "parent": "n6b810c90aa9a9985",
+      "label": "ActivityRow",
+      "sublabel": "src/components/ActivityView.tsx",
+      "sources": [
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 62
+        }
+      ]
+    },
+    {
+      "id": "n118657298dd39173",
+      "parent": "n8626ed48bb81db74",
+      "label": "rend StatusBadge",
+      "sublabel": "src/components/ActivityView.tsx:99 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 99
+        },
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "n78ae0ed7afd74305",
+      "parent": "n6b810c90aa9a9985",
+      "label": "ActivityView",
+      "sublabel": "src/components/ActivityView.tsx",
+      "sources": [
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 116
+        }
+      ]
+    },
+    {
+      "id": "n93ac1614083ca6f3",
+      "parent": "n78ae0ed7afd74305",
+      "label": "rend ActivityRow",
+      "sublabel": "src/components/ActivityView.tsx:179 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 179
+        },
+        {
+          "path": "src/components/ActivityView.tsx",
+          "line": 62
+        }
+      ]
+    },
+    {
+      "id": "n8a63d85ad37862ed",
+      "parent": "n6b810c90aa9a9985",
+      "label": "AgentAssistant",
+      "sublabel": "src/components/AgentAssistant.tsx",
+      "sources": [
+        {
+          "path": "src/components/AgentAssistant.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "n83556f796b0583b2",
+      "parent": "n8a63d85ad37862ed",
+      "label": "rend ContextFiles",
+      "sublabel": "src/components/AgentAssistant.tsx:56",
+      "sources": [
+        {
+          "path": "src/components/AgentAssistant.tsx",
+          "line": 56
+        },
+        {
+          "path": "src/components/ContextFiles.tsx",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "n1f9920028a22ba3c",
+      "parent": "n8a63d85ad37862ed",
+      "label": "rend MarkdownPreview",
+      "sublabel": "src/components/AgentAssistant.tsx:70",
+      "sources": [
+        {
+          "path": "src/components/AgentAssistant.tsx",
+          "line": 70
+        },
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "n9eef0ccefa3578eb",
+      "parent": "n6b810c90aa9a9985",
+      "label": "AgentOverviewSummary",
+      "sublabel": "src/components/AgentOverviewSummary.tsx",
+      "sources": [
+        {
+          "path": "src/components/AgentOverviewSummary.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "nefa2a76a75f65dd1",
+      "parent": "n9eef0ccefa3578eb",
+      "label": "rend Gauge",
+      "sublabel": "src/components/AgentOverviewSummary.tsx:39 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/AgentOverviewSummary.tsx",
+          "line": 39
+        },
+        {
+          "path": "src/components/AgentOverviewSummary.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "ncee13ba24f199496",
+      "parent": "n6b810c90aa9a9985",
+      "label": "BoardReview",
+      "sublabel": "src/components/BoardReview.tsx",
+      "sources": [
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "n16d6542d13f916a8",
+      "parent": "ncee13ba24f199496",
+      "label": "rend ReviewValidation",
+      "sublabel": "src/components/BoardReview.tsx:41",
+      "sources": [
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 41
+        },
+        {
+          "path": "src/components/ReviewValidation.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "n2d962d415f05b783",
+      "parent": "ncee13ba24f199496",
+      "label": "rend TaskReview",
+      "sublabel": "src/components/BoardReview.tsx:39",
+      "sources": [
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 39
+        },
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 46
+        }
+      ]
+    },
+    {
+      "id": "nef115a4cae37f7bf",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TaskReview",
+      "sublabel": "src/components/BoardReview.tsx",
+      "sources": [
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 46
+        }
+      ]
+    },
+    {
+      "id": "n7455f8f60dbc7d8f",
+      "parent": "nef115a4cae37f7bf",
+      "label": "rend TicketReview",
+      "sublabel": "src/components/BoardReview.tsx:71",
+      "sources": [
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 71
+        },
+        {
+          "path": "src/components/TicketReview.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "n03b6298e9a526185",
+      "parent": "n6b810c90aa9a9985",
+      "label": "CockpitView",
+      "sublabel": "src/components/CockpitView.tsx",
+      "sources": [
+        {
+          "path": "src/components/CockpitView.tsx",
+          "line": 28
+        }
+      ]
+    },
+    {
+      "id": "ne69727150625c983",
+      "parent": "n03b6298e9a526185",
+      "label": "rend Stat",
+      "sublabel": "src/components/CockpitView.tsx:93 · 4 occurrences",
+      "sources": [
+        {
+          "path": "src/components/CockpitView.tsx",
+          "line": 93
+        },
+        {
+          "path": "src/components/CockpitView.tsx",
+          "line": 204
+        }
+      ]
+    },
+    {
+      "id": "n380cb6c53e794dce",
+      "parent": "n6b810c90aa9a9985",
+      "label": "CodeGraphView",
+      "sublabel": "src/components/CodeGraphView.tsx",
+      "sources": [
+        {
+          "path": "src/components/CodeGraphView.tsx",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "ncbdfa2570015b7aa",
+      "parent": "n380cb6c53e794dce",
+      "label": "rend MarkdownPreview",
+      "sublabel": "src/components/CodeGraphView.tsx:93",
+      "sources": [
+        {
+          "path": "src/components/CodeGraphView.tsx",
+          "line": 93
+        },
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "n7800645cb37d581b",
+      "parent": "n6b810c90aa9a9985",
+      "label": "EpicCard",
+      "sublabel": "src/components/EpicCard.tsx",
+      "sources": [
+        {
+          "path": "src/components/EpicCard.tsx",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "id": "nff256a0aedb2ab3c",
+      "parent": "n7800645cb37d581b",
+      "label": "rend ReviewActions",
+      "sublabel": "src/components/EpicCard.tsx:61 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/EpicCard.tsx",
+          "line": 61
+        },
+        {
+          "path": "src/components/ReviewActions.tsx",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "id": "n0d71bba332019aa3",
+      "parent": "n7800645cb37d581b",
+      "label": "rend WorkflowTimeline",
+      "sublabel": "src/components/EpicCard.tsx:133",
+      "sources": [
+        {
+          "path": "src/components/EpicCard.tsx",
+          "line": 133
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "n1fca584956924deb",
+      "parent": "n6b810c90aa9a9985",
+      "label": "FileDiff",
+      "sublabel": "src/components/FileDiff.tsx",
+      "sources": [
+        {
+          "path": "src/components/FileDiff.tsx",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "id": "n9f056473b5fc5dbc",
+      "parent": "n1fca584956924deb",
+      "label": "rend LineContent",
+      "sublabel": "src/components/FileDiff.tsx:130 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/FileDiff.tsx",
+          "line": 130
+        },
+        {
+          "path": "src/components/FileDiff.tsx",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "n79ddffab79f7b0b0",
+      "parent": "n6b810c90aa9a9985",
+      "label": "GitTaskDiffView",
+      "sublabel": "src/components/GitTaskDiffView.tsx",
+      "sources": [
+        {
+          "path": "src/components/GitTaskDiffView.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "ncffb8e5bf850402c",
+      "parent": "n79ddffab79f7b0b0",
+      "label": "rend FileDiff",
+      "sublabel": "src/components/GitTaskDiffView.tsx:76",
+      "sources": [
+        {
+          "path": "src/components/GitTaskDiffView.tsx",
+          "line": 76
+        },
+        {
+          "path": "src/components/FileDiff.tsx",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "id": "na23400890d18401b",
+      "parent": "n6b810c90aa9a9985",
+      "label": "GitView",
+      "sublabel": "src/components/GitView.tsx",
+      "sources": [
+        {
+          "path": "src/components/GitView.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "n689d75446785f368",
+      "parent": "na23400890d18401b",
+      "label": "rend GitTaskDiffView",
+      "sublabel": "src/components/GitView.tsx:34",
+      "sources": [
+        {
+          "path": "src/components/GitView.tsx",
+          "line": 34
+        },
+        {
+          "path": "src/components/GitTaskDiffView.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "na99887054997b0ff",
+      "parent": "na23400890d18401b",
+      "label": "rend PublishedWork",
+      "sublabel": "src/components/GitView.tsx:70",
+      "sources": [
+        {
+          "path": "src/components/GitView.tsx",
+          "line": 70
+        },
+        {
+          "path": "src/components/PublishedWork.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "nedf90c0a94cb2dd4",
+      "parent": "n6b810c90aa9a9985",
+      "label": "KanbanBoard",
+      "sublabel": "src/components/KanbanBoard.tsx",
+      "sources": [
+        {
+          "path": "src/components/KanbanBoard.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "n4af690c825ffa619",
+      "parent": "nedf90c0a94cb2dd4",
+      "label": "rend BoardReview",
+      "sublabel": "src/components/KanbanBoard.tsx:89",
+      "sources": [
+        {
+          "path": "src/components/KanbanBoard.tsx",
+          "line": 89
+        },
+        {
+          "path": "src/components/BoardReview.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "na9ec4f4f47a69bd4",
+      "parent": "nedf90c0a94cb2dd4",
+      "label": "rend KanbanColumn",
+      "sublabel": "src/components/KanbanBoard.tsx:67",
+      "sources": [
+        {
+          "path": "src/components/KanbanBoard.tsx",
+          "line": 67
+        },
+        {
+          "path": "src/components/KanbanColumn.tsx",
+          "line": 89
+        }
+      ]
+    },
+    {
+      "id": "n48dd988ca044e141",
+      "parent": "n6b810c90aa9a9985",
+      "label": "KanbanCard",
+      "sublabel": "src/components/KanbanCard.tsx",
+      "sources": [
+        {
+          "path": "src/components/KanbanCard.tsx",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "nf1fea1bcd06f74fb",
+      "parent": "n48dd988ca044e141",
+      "label": "rend ReviewActions",
+      "sublabel": "src/components/KanbanCard.tsx:80",
+      "sources": [
+        {
+          "path": "src/components/KanbanCard.tsx",
+          "line": 80
+        },
+        {
+          "path": "src/components/ReviewActions.tsx",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "id": "ne70efcbf8b9f2c91",
+      "parent": "n48dd988ca044e141",
+      "label": "rend WorkflowTimeline",
+      "sublabel": "src/components/KanbanCard.tsx:115",
+      "sources": [
+        {
+          "path": "src/components/KanbanCard.tsx",
+          "line": 115
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "nd366d5fa9e44703b",
+      "parent": "n6b810c90aa9a9985",
+      "label": "KanbanColumn",
+      "sublabel": "src/components/KanbanColumn.tsx",
+      "sources": [
+        {
+          "path": "src/components/KanbanColumn.tsx",
+          "line": 89
+        }
+      ]
+    },
+    {
+      "id": "n48512caab3525eb5",
+      "parent": "nd366d5fa9e44703b",
+      "label": "rend EpicCard",
+      "sublabel": "src/components/KanbanColumn.tsx:200",
+      "sources": [
+        {
+          "path": "src/components/KanbanColumn.tsx",
+          "line": 200
+        },
+        {
+          "path": "src/components/EpicCard.tsx",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "id": "n8ff0bc53d22df2a2",
+      "parent": "nd366d5fa9e44703b",
+      "label": "rend KanbanCard",
+      "sublabel": "src/components/KanbanColumn.tsx:216",
+      "sources": [
+        {
+          "path": "src/components/KanbanColumn.tsx",
+          "line": 216
+        },
+        {
+          "path": "src/components/KanbanCard.tsx",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "n2fbc3fc39db6d927",
+      "parent": "n6b810c90aa9a9985",
+      "label": "MarkdownPreview",
+      "sublabel": "src/components/MarkdownPreview.tsx",
+      "sources": [
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "n714d403265159e78",
+      "parent": "n2fbc3fc39db6d927",
+      "label": "rend MermaidDiagram",
+      "sublabel": "src/components/MarkdownPreview.tsx:48",
+      "sources": [
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 48
+        },
+        {
+          "path": "src/components/MermaidDiagram.tsx",
+          "line": 5
+        }
+      ]
+    },
+    {
+      "id": "n462bea287a810d4c",
+      "parent": "n6b810c90aa9a9985",
+      "label": "Navbar",
+      "sublabel": "src/components/Navbar.tsx",
+      "sources": [
+        {
+          "path": "src/components/Navbar.tsx",
+          "line": 28
+        }
+      ]
+    },
+    {
+      "id": "nf0fac9280130f917",
+      "parent": "n462bea287a810d4c",
+      "label": "rend ProjectSwitcher",
+      "sublabel": "src/components/Navbar.tsx:71",
+      "sources": [
+        {
+          "path": "src/components/Navbar.tsx",
+          "line": 71
+        },
+        {
+          "path": "src/components/ProjectSwitcher.tsx",
+          "line": 14
+        }
+      ]
+    },
+    {
+      "id": "na1644f1dfd38500d",
+      "parent": "n6b810c90aa9a9985",
+      "label": "ProjectManagerModal",
+      "sublabel": "src/components/ProjectManagerModal.tsx",
+      "sources": [
+        {
+          "path": "src/components/ProjectManagerModal.tsx",
+          "line": 45
+        }
+      ]
+    },
+    {
+      "id": "nb6543f6ffe319b10",
+      "parent": "na1644f1dfd38500d",
+      "label": "rend BranchSwitcher",
+      "sublabel": "src/components/ProjectManagerModal.tsx:294",
+      "sources": [
+        {
+          "path": "src/components/ProjectManagerModal.tsx",
+          "line": 294
+        },
+        {
+          "path": "src/components/BranchSwitcher.tsx",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "ncaf15b3415c43938",
+      "parent": "na1644f1dfd38500d",
+      "label": "rend RepositoryFields",
+      "sublabel": "src/components/ProjectManagerModal.tsx:282",
+      "sources": [
+        {
+          "path": "src/components/ProjectManagerModal.tsx",
+          "line": 282
+        },
+        {
+          "path": "src/components/RepositoryFields.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "n4a190d5c1f7b8151",
+      "parent": "n6b810c90aa9a9985",
+      "label": "PublishedWork",
+      "sublabel": "src/components/PublishedWork.tsx",
+      "sources": [
+        {
+          "path": "src/components/PublishedWork.tsx",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "id": "nf466e04b8c261619",
+      "parent": "n4a190d5c1f7b8151",
+      "label": "rend ReleaseSelect",
+      "sublabel": "src/components/PublishedWork.tsx:28",
+      "sources": [
+        {
+          "path": "src/components/PublishedWork.tsx",
+          "line": 28
+        },
+        {
+          "path": "src/components/ReleaseSelect.tsx",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "nb31fe0a458f506e3",
+      "parent": "n6b810c90aa9a9985",
+      "label": "ReleasesView",
+      "sublabel": "src/components/ReleasesView.tsx",
+      "sources": [
+        {
+          "path": "src/components/ReleasesView.tsx",
+          "line": 117
+        }
+      ]
+    },
+    {
+      "id": "n11f91f34d8282425",
+      "parent": "nb31fe0a458f506e3",
+      "label": "rend ReleaseDetail",
+      "sublabel": "src/components/ReleasesView.tsx:199",
+      "sources": [
+        {
+          "path": "src/components/ReleasesView.tsx",
+          "line": 199
+        },
+        {
+          "path": "src/components/ReleasesView.tsx",
+          "line": 14
+        }
+      ]
+    },
+    {
+      "id": "nce3589bf2dfd8a4f",
+      "parent": "n6b810c90aa9a9985",
+      "label": "RuntimeDetails",
+      "sublabel": "src/components/SessionAgentDetails.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "id": "n58806dd3f74e0f0a",
+      "parent": "nce3589bf2dfd8a4f",
+      "label": "rend JsonDetails",
+      "sublabel": "src/components/SessionAgentDetails.tsx:72 · 6 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 72
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "n02d5bc3a7dc215ac",
+      "parent": "nce3589bf2dfd8a4f",
+      "label": "rend Metric",
+      "sublabel": "src/components/SessionAgentDetails.tsx:52 · 18 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 52
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "n6bee00d64d316b78",
+      "parent": "nce3589bf2dfd8a4f",
+      "label": "rend Usage",
+      "sublabel": "src/components/SessionAgentDetails.tsx:50",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 50
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "id": "n1c784e0f9e251c87",
+      "parent": "n6b810c90aa9a9985",
+      "label": "SessionAgentDetails",
+      "sublabel": "src/components/SessionAgentDetails.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 81
+        }
+      ]
+    },
+    {
+      "id": "nda4a12effe4ca586",
+      "parent": "n1c784e0f9e251c87",
+      "label": "rend JsonDetails",
+      "sublabel": "src/components/SessionAgentDetails.tsx:86 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 86
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "n9773c27abfe864db",
+      "parent": "n1c784e0f9e251c87",
+      "label": "rend RuntimeDetails",
+      "sublabel": "src/components/SessionAgentDetails.tsx:89",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 89
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 38
+        }
+      ]
+    },
+    {
+      "id": "ne237c2e33eda55ea",
+      "parent": "n1c784e0f9e251c87",
+      "label": "rend Usage",
+      "sublabel": "src/components/SessionAgentDetails.tsx:85",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 85
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "id": "nba9667d025813628",
+      "parent": "n6b810c90aa9a9985",
+      "label": "Usage",
+      "sublabel": "src/components/SessionAgentDetails.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 24
+        }
+      ]
+    },
+    {
+      "id": "n06e6ee7753da9c61",
+      "parent": "nba9667d025813628",
+      "label": "rend Metric",
+      "sublabel": "src/components/SessionAgentDetails.tsx:27 · 8 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 27
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 15
+        }
+      ]
+    },
+    {
+      "id": "n88833f2fb30d7a8d",
+      "parent": "n6b810c90aa9a9985",
+      "label": "AttemptTimeline",
+      "sublabel": "src/components/SessionHistory.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "n610c56205d71ddfb",
+      "parent": "n88833f2fb30d7a8d",
+      "label": "rend MarkdownPreview",
+      "sublabel": "src/components/SessionHistory.tsx:68 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 68
+        },
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "nccaaafeedddab480",
+      "parent": "n88833f2fb30d7a8d",
+      "label": "rend SessionAgentDetails",
+      "sublabel": "src/components/SessionHistory.tsx:59",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 59
+        },
+        {
+          "path": "src/components/SessionAgentDetails.tsx",
+          "line": 81
+        }
+      ]
+    },
+    {
+      "id": "na34f887f8da77a56",
+      "parent": "n88833f2fb30d7a8d",
+      "label": "rend WorkflowStepPanel",
+      "sublabel": "src/components/SessionHistory.tsx:62 · 5 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 62
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "id": "n93a770e303a684bf",
+      "parent": "n88833f2fb30d7a8d",
+      "label": "rend WorkflowTimeline",
+      "sublabel": "src/components/SessionHistory.tsx:60",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 60
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "n48fe5942f58bb901",
+      "parent": "n6b810c90aa9a9985",
+      "label": "SessionHistory",
+      "sublabel": "src/components/SessionHistory.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 128
+        }
+      ]
+    },
+    {
+      "id": "n3661f3a91ab72067",
+      "parent": "n48fe5942f58bb901",
+      "label": "rend AttemptTimeline",
+      "sublabel": "src/components/SessionHistory.tsx:159 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 159
+        },
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "n5f8ad8958485a318",
+      "parent": "n6b810c90aa9a9985",
+      "label": "SessionsView",
+      "sublabel": "src/components/SessionsView.tsx",
+      "sources": [
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 20
+        }
+      ]
+    },
+    {
+      "id": "n31ef70a21074b692",
+      "parent": "n5f8ad8958485a318",
+      "label": "rend AgentOverviewSummary",
+      "sublabel": "src/components/SessionsView.tsx:122 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 122
+        },
+        {
+          "path": "src/components/AgentOverviewSummary.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "n26b5bc109ce93dec",
+      "parent": "n5f8ad8958485a318",
+      "label": "rend ProjectHealth",
+      "sublabel": "src/components/SessionsView.tsx:99",
+      "sources": [
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 99
+        },
+        {
+          "path": "src/components/ProjectHealth.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "nfbd12f443722daa7",
+      "parent": "n5f8ad8958485a318",
+      "label": "rend TaskAgentSession",
+      "sublabel": "src/components/SessionsView.tsx:149",
+      "sources": [
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 149
+        },
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "n78d1f97742451b40",
+      "parent": "n5f8ad8958485a318",
+      "label": "rend WorkflowTimeline",
+      "sublabel": "src/components/SessionsView.tsx:123",
+      "sources": [
+        {
+          "path": "src/components/SessionsView.tsx",
+          "line": 123
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "na6adecaa2aa39e6d",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TaskAgentSession",
+      "sublabel": "src/components/TaskAgentSession.tsx",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "n617892b14b66a5ed",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend AgentQuestionForm",
+      "sublabel": "src/components/TaskAgentSession.tsx:58",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 58
+        },
+        {
+          "path": "src/components/AgentQuestionForm.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "n669a45b3ea1cdb7f",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend ReviewValidation",
+      "sublabel": "src/components/TaskAgentSession.tsx:83",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 83
+        },
+        {
+          "path": "src/components/ReviewValidation.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "ncff0a358ed9052c7",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend SessionHistory",
+      "sublabel": "src/components/TaskAgentSession.tsx:87",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 87
+        },
+        {
+          "path": "src/components/SessionHistory.tsx",
+          "line": 128
+        }
+      ]
+    },
+    {
+      "id": "n82904c1bd8a8c088",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend TicketDelivery",
+      "sublabel": "src/components/TaskAgentSession.tsx:126",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 126
+        },
+        {
+          "path": "src/components/TicketDelivery.tsx",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "id": "n821840a2fab0e783",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend TicketReview",
+      "sublabel": "src/components/TaskAgentSession.tsx:97 · 2 occurrences",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 97
+        },
+        {
+          "path": "src/components/TicketReview.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "n2511853493567c7d",
+      "parent": "na6adecaa2aa39e6d",
+      "label": "rend WorkflowTimeline",
+      "sublabel": "src/components/TaskAgentSession.tsx:74",
+      "sources": [
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 74
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "n8f6bb15b7468e843",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TaskModal",
+      "sublabel": "src/components/TaskModal.tsx",
+      "sources": [
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "n5a0368e74ac94dad",
+      "parent": "n8f6bb15b7468e843",
+      "label": "rend ContextFiles",
+      "sublabel": "src/components/TaskModal.tsx:343",
+      "sources": [
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 343
+        },
+        {
+          "path": "src/components/ContextFiles.tsx",
+          "line": 13
+        }
+      ]
+    },
+    {
+      "id": "n50adc5076447bdc9",
+      "parent": "n8f6bb15b7468e843",
+      "label": "rend ReleaseSelect",
+      "sublabel": "src/components/TaskModal.tsx:348",
+      "sources": [
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 348
+        },
+        {
+          "path": "src/components/ReleaseSelect.tsx",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "n6d4184822859bc1b",
+      "parent": "n8f6bb15b7468e843",
+      "label": "rend TaskAgentSelect",
+      "sublabel": "src/components/TaskModal.tsx:351",
+      "sources": [
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 351
+        },
+        {
+          "path": "src/components/TaskAgentSelect.tsx",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "n6a209c89cf0221a4",
+      "parent": "n8f6bb15b7468e843",
+      "label": "rend TaskAgentSession",
+      "sublabel": "src/components/TaskModal.tsx:574",
+      "sources": [
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 574
+        },
+        {
+          "path": "src/components/TaskAgentSession.tsx",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "id": "n3fca60e0739c60ed",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TaskPage",
+      "sublabel": "src/components/TaskPage.tsx",
+      "sources": [
+        {
+          "path": "src/components/TaskPage.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "nddfc5505b5905998",
+      "parent": "n3fca60e0739c60ed",
+      "label": "rend TaskModal",
+      "sublabel": "src/components/TaskPage.tsx:59",
+      "sources": [
+        {
+          "path": "src/components/TaskPage.tsx",
+          "line": 59
+        },
+        {
+          "path": "src/components/TaskModal.tsx",
+          "line": 41
+        }
+      ]
+    },
+    {
+      "id": "n143f3b57eff296c9",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TicketDelivery",
+      "sublabel": "src/components/TicketDelivery.tsx",
+      "sources": [
+        {
+          "path": "src/components/TicketDelivery.tsx",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "id": "n15960493197f882a",
+      "parent": "n143f3b57eff296c9",
+      "label": "rend ReleaseSelect",
+      "sublabel": "src/components/TicketDelivery.tsx:59",
+      "sources": [
+        {
+          "path": "src/components/TicketDelivery.tsx",
+          "line": 59
+        },
+        {
+          "path": "src/components/ReleaseSelect.tsx",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "id": "nd11d92afc7251968",
+      "parent": "n6b810c90aa9a9985",
+      "label": "TicketReview",
+      "sublabel": "src/components/TicketReview.tsx",
+      "sources": [
+        {
+          "path": "src/components/TicketReview.tsx",
+          "line": 11
+        }
+      ]
+    },
+    {
+      "id": "nfb2a914d39cbe397",
+      "parent": "nd11d92afc7251968",
+      "label": "rend FileDiff",
+      "sublabel": "src/components/TicketReview.tsx:111",
+      "sources": [
+        {
+          "path": "src/components/TicketReview.tsx",
+          "line": 111
+        },
+        {
+          "path": "src/components/FileDiff.tsx",
+          "line": 30
+        }
+      ]
+    },
+    {
+      "id": "n81e30b2bb7c32ede",
+      "parent": "nd11d92afc7251968",
+      "label": "rend ReviewValidation",
+      "sublabel": "src/components/TicketReview.tsx:131",
+      "sources": [
+        {
+          "path": "src/components/TicketReview.tsx",
+          "line": 131
+        },
+        {
+          "path": "src/components/ReviewValidation.tsx",
+          "line": 7
+        }
+      ]
+    },
+    {
+      "id": "n0da8d884db8e4b3c",
+      "parent": "n6b810c90aa9a9985",
+      "label": "WikiView",
+      "sublabel": "src/components/WikiView.tsx",
+      "sources": [
+        {
+          "path": "src/components/WikiView.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "na2d08c5c8ba42f05",
+      "parent": "n0da8d884db8e4b3c",
+      "label": "rend AgentAssistant",
+      "sublabel": "src/components/WikiView.tsx:311",
+      "sources": [
+        {
+          "path": "src/components/WikiView.tsx",
+          "line": 311
+        },
+        {
+          "path": "src/components/AgentAssistant.tsx",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "id": "ndb5fe67c8de4f574",
+      "parent": "n0da8d884db8e4b3c",
+      "label": "rend MarkdownPreview",
+      "sublabel": "src/components/WikiView.tsx:323",
+      "sources": [
+        {
+          "path": "src/components/WikiView.tsx",
+          "line": 323
+        },
+        {
+          "path": "src/components/MarkdownPreview.tsx",
+          "line": 34
+        }
+      ]
+    },
+    {
+      "id": "n8c51b86e9b4687d3",
+      "parent": "n6b810c90aa9a9985",
+      "label": "WorkflowStepPanel",
+      "sublabel": "src/components/WorkflowTimeline.tsx",
+      "sources": [
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 48
+        }
+      ]
+    },
+    {
+      "id": "ndf5a1c8f8dac103f",
+      "parent": "n8c51b86e9b4687d3",
+      "label": "rend WorkflowStepIcon",
+      "sublabel": "src/components/WorkflowTimeline.tsx:57",
+      "sources": [
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 57
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 19
+        }
+      ]
+    },
+    {
+      "id": "n424034ecd4d7000a",
+      "parent": "n6b810c90aa9a9985",
+      "label": "WorkflowTimeline",
+      "sublabel": "src/components/WorkflowTimeline.tsx",
+      "sources": [
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 27
+        }
+      ]
+    },
+    {
+      "id": "nea2c93adab634130",
+      "parent": "n424034ecd4d7000a",
+      "label": "rend WorkflowStepIcon",
+      "sublabel": "src/components/WorkflowTimeline.tsx:40",
+      "sources": [
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 40
+        },
+        {
+          "path": "src/components/WorkflowTimeline.tsx",
+          "line": 19
+        }
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Lecture",
+      "items": [
+        "Analyse du commit 12cdd3a : 36 composants parents, 83 liens JSX directs.",
+        "Chaque branche regroupe les composants locaux mentionnés en JSX par un parent ; les composants partagés apparaissent dans chaque branche.",
+        "Les imports nommés, les exports par défaut et React.lazy sont suivis ; les composants de bibliothèques externes sont exclus.",
+        "Les balises dynamiques, createElement et les choix conditionnels à l’exécution ne sont pas déduits."
+      ]
+    }
+  ]
+}

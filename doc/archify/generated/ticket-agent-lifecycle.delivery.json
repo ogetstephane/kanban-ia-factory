@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "db22b1bd-2986-4b7a-8db6-9b9c46f70bd9",
+  "status": "current",
+  "command": "deliver",
+  "type": "lifecycle",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-lifecycle.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-lifecycle.html",
+  "specification": {
+    "sha256": "73ed90825badd9999d0e2ee3ceac823014292c8e93973e4825eff262b5f1db9d",
+    "bytes": 37289
+  },
+  "artifact": {
+    "sha256": "192b20e1e42e08b15c9eafe0412e320478e1293e6050d5fdf98ac92d9a1df40a",
+    "bytes": 857549
+  }
+}

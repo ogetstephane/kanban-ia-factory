@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "da7b1134-1576-4741-b4cf-15098c7fbed8",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-delivery-workflow.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-delivery-workflow.html",
+  "specification": {
+    "sha256": "6ce0ff4fa8604e7f4a6272c37ac659e0f656b3534ae98e120ac3d63876e093a9",
+    "bytes": 39111
+  },
+  "artifact": {
+    "sha256": "fcb287749557c035db4540c306c27507f2ae0fa5aa436317cbd3de93c00e7e75",
+    "bytes": 857205
+  }
+}

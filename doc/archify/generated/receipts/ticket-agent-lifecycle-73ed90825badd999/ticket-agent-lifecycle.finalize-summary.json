@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "lifecycle",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-lifecycle.json",
+    "sha256": "73ed90825badd9999d0e2ee3ceac823014292c8e93973e4825eff262b5f1db9d",
+    "bytes": 37289
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-lifecycle.html",
+    "sha256": "192b20e1e42e08b15c9eafe0412e320478e1293e6050d5fdf98ac92d9a1df40a",
+    "bytes": 857549
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [
+    {
+      "code": "i18n/translation-coverage",
+      "severity": "warning",
+      "message": "meta.locale \"fr\" resolves 461/486 renderer-owned messages (94%) from 461 meta.translations entries; 25 fall back to English.",
+      "subject": {
+        "diagramType": "lifecycle",
+        "path": "/meta/translations"
+      },
+      "evidence": {
+        "locale": "fr",
+        "resolvedLocale": "fr",
+        "bundledLocale": null,
+        "translatedKeys": 461,
+        "totalKeys": 486,
+        "appliedOverrideKeys": 461,
+        "missingKeys": [
+          "viewer.export.svg.auto",
+          "viewer.export.svg.auto.hint",
+          "viewer.export.svg.light",
+          "viewer.export.svg.light.hint",
+          "viewer.export.svg.dark",
+          "viewer.export.svg.dark.hint",
+          "viewer.guide.title",
+          "viewer.focus.selectedNodes",
+          "viewer.guide.credit",
+          "viewer.guide.star"
+        ],
+        "missingKeysTotal": 25,
+        "englishSource": {
+          "viewer.export.svg.auto": "SVG · Auto",
+          "viewer.export.svg.auto.hint": "Matches host theme",
+          "viewer.export.svg.light": "SVG · Light",
+          "viewer.export.svg.light.hint": "Always light",
+          "viewer.export.svg.dark": "SVG · Dark",
+          "viewer.export.svg.dark.hint": "Always dark",
+          "viewer.guide.title": "Explore this system",
+          "viewer.focus.selectedNodes": "{count} selected nodes",
+          "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+          "viewer.guide.star": "Star"
+        }
+      },
+      "supportedFixes": [
+        "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-agent-lifecycle-73ed90825badd999/ticket-agent-lifecycle.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-agent-lifecycle-73ed90825badd999/ticket-agent-lifecycle.finalize-summary.json",
+    "browserCheckReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-agent-lifecycle-73ed90825badd999/ticket-agent-lifecycle.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2502,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "resolvedCrossovers": 3
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [
+        {
+          "left": {
+            "id": "planning-question",
+            "from": "planning",
+            "to": "awaiting_input",
+            "label": "",
+            "collectionIndex": 1,
+            "artifactIndex": 2
+          },
+          "right": {
+            "id": "retry-failure",
+            "from": "failed",
+            "to": "queued",
+            "label": "retry",
+            "collectionIndex": 14,
+            "artifactIndex": 15
+          },
+          "point": [
+            318.3,
+            228.00000000000003
+          ]
+        },
+        {
+          "left": {
+            "id": "answer-resumes-plan",
+            "from": "awaiting_input",
+            "to": "planning",
+            "label": "",
+            "collectionIndex": 2,
+            "artifactIndex": 3
+          },
+          "right": {
+            "id": "retry-failure",
+            "from": "failed",
+            "to": "queued",
+            "label": "retry",
+            "collectionIndex": 14,
+            "artifactIndex": 15
+          },
+          "point": [
+            344.3,
+            228.00000000000003
+          ]
+        },
+        {
+          "left": {
+            "id": "request-cancel",
+            "from": "planning",
+            "to": "cancelling",
+            "label": "stop",
+            "collectionIndex": 12,
+            "artifactIndex": 13
+          },
+          "right": {
+            "id": "retry-failure",
+            "from": "failed",
+            "to": "queued",
+            "label": "retry",
+            "collectionIndex": 14,
+            "artifactIndex": 15
+          },
+          "point": [
+            446,
+            228.00000000000003
+          ]
+        }
+      ],
+      "detours": [],
+      "truncated": false
+    },
+    "repair": "Advisory only: this mode places or routes these relationships itself. Report them; do not remove relationships or meaning to reduce crossings."
+  }
+}

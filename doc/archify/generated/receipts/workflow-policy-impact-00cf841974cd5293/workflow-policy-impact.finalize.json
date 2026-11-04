@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "startedAt": "2026-11-03T14:15:08.247Z",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/workflow-policy-impact.json",
+    "sha256": "00cf841974cd52936f061fced443473c42c28801ef51071d4affec02032b249b",
+    "bytes": 3909
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/workflow-policy-impact.html"
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "/usr/bin/node",
+        "/home/oget/Perso/kanban-ia-factory/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "architecture",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/workflow-policy-impact.json",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/workflow-policy-impact.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/oget/Perso/kanban-ia-factory",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "78c3261d-9a94-4603-af24-353eb9b3fef3",
+        "stage": "render",
+        "type": "architecture",
+        "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/workflow-policy-impact.json",
+        "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/workflow-policy-impact.html",
+        "error": "Cannot read properties of undefined (reading '0')",
+        "diagnostics": [
+          {
+            "code": "internal/unclassified",
+            "severity": "error",
+            "message": "Cannot read properties of undefined (reading '0')",
+            "subject": {
+              "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/.archify-delivery-2qbrZ6/specification.snapshot.json"
+            },
+            "evidence": {
+              "errorName": "TypeError"
+            },
+            "supportedFixes": []
+          }
+        ],
+        "provenance": "absent",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "internal/unclassified",
+      "severity": "error",
+      "message": "Cannot read properties of undefined (reading '0')",
+      "subject": {
+        "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/.archify-delivery-2qbrZ6/specification.snapshot.json"
+      },
+      "evidence": {
+        "errorName": "TypeError"
+      },
+      "supportedFixes": []
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/workflow-policy-impact-00cf841974cd5293/workflow-policy-impact.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/workflow-policy-impact-00cf841974cd5293/workflow-policy-impact.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-11-03T14:15:08.629Z",
+  "durationMs": 381,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

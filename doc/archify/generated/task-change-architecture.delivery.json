@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "04e26b75-8f1c-4f4c-81e5-8ac5bac32257",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/task-change-architecture.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/task-change-architecture.html",
+  "specification": {
+    "sha256": "1ff8597888f18923228705634c18fdc4dd765af7d013c9a1a11220b29c05e85c",
+    "bytes": 36564
+  },
+  "artifact": {
+    "sha256": "bcc9ea092aa2c86f81a88663af99cfbc17fb942993f8363f263553eec7e944c3",
+    "bytes": 847367
+  }
+}

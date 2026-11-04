@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "544a8e9f-5434-477d-89ae-b6d3a05b3f49",
+  "status": "current",
+  "command": "deliver",
+  "type": "tree",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/sources/auto-architecture.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/auto-architecture.html",
+  "specification": {
+    "sha256": "fe11a0368305831c93487c639272f32422b5ff2f945fc0437246d0713cdec8a2",
+    "bytes": 68830
+  },
+  "artifact": {
+    "sha256": "9457cc9b7a4e6510f812694a7c5626e6b55243e0431fd31a26d4d4e860f7d910",
+    "bytes": 1043989
+  }
+}

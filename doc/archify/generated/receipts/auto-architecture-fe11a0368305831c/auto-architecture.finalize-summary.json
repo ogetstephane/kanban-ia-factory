@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "tree",
+  "quality": "showcase",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/sources/auto-architecture.json",
+    "sha256": "fe11a0368305831c93487c639272f32422b5ff2f945fc0437246d0713cdec8a2",
+    "bytes": 68830
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/auto-architecture.html",
+    "sha256": "9457cc9b7a4e6510f812694a7c5626e6b55243e0431fd31a26d4d4e860f7d910",
+    "bytes": 1043989
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/auto-architecture-fe11a0368305831c/auto-architecture.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/auto-architecture-fe11a0368305831c/auto-architecture.finalize-summary.json",
+    "browserCheckReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/auto-architecture-fe11a0368305831c/auto-architecture.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3716,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "workflow",
+  "quality": "showcase",
+  "startedAt": "2026-11-03T14:17:22.925Z",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-delivery-workflow.json",
+    "sha256": "e958c85e6e72887244bbf8ba399d9b65300bc6ad494549772bc9bc067cdb28b7",
+    "bytes": 39134
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-delivery-workflow.html"
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "/usr/bin/node",
+        "/home/oget/Perso/kanban-ia-factory/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "workflow",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-delivery-workflow.json",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-delivery-workflow.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/oget/Perso/kanban-ia-factory",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "d19e776a-a5a7-4583-b9a7-135194e28d50",
+        "stage": "render",
+        "type": "workflow",
+        "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-delivery-workflow.json",
+        "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-delivery-workflow.html",
+        "error": "Workflow nodes \"ack_checks\" and \"commit_action\" are less than 8px apart in lane \"person\".",
+        "diagnostics": [
+          {
+            "code": "i18n/translation-coverage",
+            "severity": "warning",
+            "message": "meta.locale \"fr\" resolves 461/486 renderer-owned messages (94%) from 461 meta.translations entries; 25 fall back to English.",
+            "subject": {
+              "diagramType": "workflow",
+              "path": "/meta/translations"
+            },
+            "evidence": {
+              "locale": "fr",
+              "resolvedLocale": "fr",
+              "bundledLocale": null,
+              "translatedKeys": 461,
+              "totalKeys": 486,
+              "appliedOverrideKeys": 461,
+              "missingKeys": [
+                "viewer.export.svg.auto",
+                "viewer.export.svg.auto.hint",
+                "viewer.export.svg.light",
+                "viewer.export.svg.light.hint",
+                "viewer.export.svg.dark",
+                "viewer.export.svg.dark.hint",
+                "viewer.guide.title",
+                "viewer.focus.selectedNodes",
+                "viewer.guide.credit",
+                "viewer.guide.star"
+              ],
+              "missingKeysTotal": 25,
+              "englishSource": {
+                "viewer.export.svg.auto": "SVG · Auto",
+                "viewer.export.svg.auto.hint": "Matches host theme",
+                "viewer.export.svg.light": "SVG · Light",
+                "viewer.export.svg.light.hint": "Always light",
+                "viewer.export.svg.dark": "SVG · Dark",
+                "viewer.export.svg.dark.hint": "Always dark",
+                "viewer.guide.title": "Explore this system",
+                "viewer.focus.selectedNodes": "{count} selected nodes",
+                "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+                "viewer.guide.star": "Star"
+              }
+            },
+            "supportedFixes": [
+              "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+            ]
+          },
+          {
+            "code": "workflow/node-overlap",
+            "severity": "error",
+            "message": "Workflow nodes \"ack_checks\" and \"commit_action\" are less than 8px apart in lane \"person\".",
+            "subject": {
+              "diagramType": "workflow",
+              "node": "commit_action",
+              "path": "/nodes/5"
+            },
+            "evidence": {
+              "lane": "person",
+              "minimumClearancePx": 8,
+              "nodes": [
+                {
+                  "id": "ack_checks",
+                  "rect": {
+                    "x": 545.2,
+                    "y": 93,
+                    "width": 152,
+                    "height": 52
+                  }
+                },
+                {
+                  "id": "commit_action",
+                  "rect": {
+                    "x": 545.2,
+                    "y": 93,
+                    "width": 152,
+                    "height": 52
+                  }
+                }
+              ]
+            },
+            "supportedFixes": []
+          }
+        ],
+        "provenance": "absent",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "i18n/translation-coverage",
+      "severity": "warning",
+      "message": "meta.locale \"fr\" resolves 461/486 renderer-owned messages (94%) from 461 meta.translations entries; 25 fall back to English.",
+      "subject": {
+        "diagramType": "workflow",
+        "path": "/meta/translations"
+      },
+      "evidence": {
+        "locale": "fr",
+        "resolvedLocale": "fr",
+        "bundledLocale": null,
+        "translatedKeys": 461,
+        "totalKeys": 486,
+        "appliedOverrideKeys": 461,
+        "missingKeys": [
+          "viewer.export.svg.auto",
+          "viewer.export.svg.auto.hint",
+          "viewer.export.svg.light",
+          "viewer.export.svg.light.hint",
+          "viewer.export.svg.dark",
+          "viewer.export.svg.dark.hint",
+          "viewer.guide.title",
+          "viewer.focus.selectedNodes",
+          "viewer.guide.credit",
+          "viewer.guide.star"
+        ],
+        "missingKeysTotal": 25,
+        "englishSource": {
+          "viewer.export.svg.auto": "SVG · Auto",
+          "viewer.export.svg.auto.hint": "Matches host theme",
+          "viewer.export.svg.light": "SVG · Light",
+          "viewer.export.svg.light.hint": "Always light",
+          "viewer.export.svg.dark": "SVG · Dark",
+          "viewer.export.svg.dark.hint": "Always dark",
+          "viewer.guide.title": "Explore this system",
+          "viewer.focus.selectedNodes": "{count} selected nodes",
+          "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+          "viewer.guide.star": "Star"
+        }
+      },
+      "supportedFixes": [
+        "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+      ]
+    },
+    {
+      "code": "workflow/node-overlap",
+      "severity": "error",
+      "message": "Workflow nodes \"ack_checks\" and \"commit_action\" are less than 8px apart in lane \"person\".",
+      "subject": {
+        "diagramType": "workflow",
+        "node": "commit_action",
+        "path": "/nodes/5"
+      },
+      "evidence": {
+        "lane": "person",
+        "minimumClearancePx": 8,
+        "nodes": [
+          {
+            "id": "ack_checks",
+            "rect": {
+              "x": 545.2,
+              "y": 93,
+              "width": 152,
+              "height": 52
+            }
+          },
+          {
+            "id": "commit_action",
+            "rect": {
+              "x": 545.2,
+              "y": 93,
+              "width": 152,
+              "height": 52
+            }
+          }
+        ]
+      },
+      "supportedFixes": []
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-delivery-workflow-e958c85e6e728872/ticket-delivery-workflow.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-delivery-workflow-e958c85e6e728872/ticket-delivery-workflow.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-11-03T14:17:23.875Z",
+  "durationMs": 949,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

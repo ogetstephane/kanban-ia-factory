@@ -1,0 +1,259 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "lifecycle",
+  "quality": "showcase",
+  "startedAt": "2026-11-03T14:19:40.209Z",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-lifecycle.json",
+    "sha256": "5d861064da0a11ccff5da23efbff14d9d60c8c556f49c2ca512374eb63df4e51",
+    "bytes": 37351
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-lifecycle.html"
+  },
+  "stages": {
+    "validate": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": null,
+      "command": [
+        "/usr/bin/node",
+        "/home/oget/Perso/kanban-ia-factory/.agents/skills/archify/bin/archify.mjs",
+        "deliver",
+        "lifecycle",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-lifecycle.json",
+        "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-lifecycle.html",
+        "--quality",
+        "showcase",
+        "--repo-root",
+        "/home/oget/Perso/kanban-ia-factory",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "deliver",
+        "receiptId": "d221e38b-5fd9-4beb-964c-44020bda434e",
+        "stage": "render",
+        "type": "lifecycle",
+        "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-lifecycle.json",
+        "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-lifecycle.html",
+        "error": "Lifecycle layout validation failed:\n- The lifecycle is 1450px wide; at 9px text it stays readable on a desktop only up to 1395px. Transition labels or notes widen their main-path gaps.",
+        "diagnostics": [
+          {
+            "code": "i18n/translation-coverage",
+            "severity": "warning",
+            "message": "meta.locale \"fr\" resolves 461/486 renderer-owned messages (94%) from 461 meta.translations entries; 25 fall back to English.",
+            "subject": {
+              "diagramType": "lifecycle",
+              "path": "/meta/translations"
+            },
+            "evidence": {
+              "locale": "fr",
+              "resolvedLocale": "fr",
+              "bundledLocale": null,
+              "translatedKeys": 461,
+              "totalKeys": 486,
+              "appliedOverrideKeys": 461,
+              "missingKeys": [
+                "viewer.export.svg.auto",
+                "viewer.export.svg.auto.hint",
+                "viewer.export.svg.light",
+                "viewer.export.svg.light.hint",
+                "viewer.export.svg.dark",
+                "viewer.export.svg.dark.hint",
+                "viewer.guide.title",
+                "viewer.focus.selectedNodes",
+                "viewer.guide.credit",
+                "viewer.guide.star"
+              ],
+              "missingKeysTotal": 25,
+              "englishSource": {
+                "viewer.export.svg.auto": "SVG · Auto",
+                "viewer.export.svg.auto.hint": "Matches host theme",
+                "viewer.export.svg.light": "SVG · Light",
+                "viewer.export.svg.light.hint": "Always light",
+                "viewer.export.svg.dark": "SVG · Dark",
+                "viewer.export.svg.dark.hint": "Always dark",
+                "viewer.guide.title": "Explore this system",
+                "viewer.focus.selectedNodes": "{count} selected nodes",
+                "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+                "viewer.guide.star": "Star"
+              }
+            },
+            "supportedFixes": [
+              "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+            ]
+          },
+          {
+            "code": "lifecycle/too-wide",
+            "severity": "error",
+            "message": "The lifecycle is 1450px wide; at 9px text it stays readable on a desktop only up to 1395px. Transition labels or notes widen their main-path gaps.",
+            "subject": {
+              "diagramType": "lifecycle",
+              "path": "/mainPath"
+            },
+            "evidence": {
+              "viewBoxWidth": 1450,
+              "budgetPx": 1395,
+              "mainPathStates": 6,
+              "lowerRowStates": 5,
+              "wideStepLabels": [
+                {
+                  "from": "planning",
+                  "to": "awaiting_approval",
+                  "label": "manuel",
+                  "excessPx": 2,
+                  "widthDriver": "label"
+                }
+              ],
+              "spacingWideners": [
+                {
+                  "from": "awaiting_input",
+                  "to": "planning",
+                  "label": "retour",
+                  "widthDriver": "label"
+                }
+              ]
+            },
+            "supportedFixes": [
+              "relieve the routes crowding \"retour\": those label/note boxes found no clear spot at the base spacing, so lower-row and route spacing grew; main-path gap growth is bounded by the text readability budget. Only equivalent exits with identical labels, notes and variants can share an arrow; keep distinct notes separate, or move a secondary transition elsewhere",
+              "review the width-driving main-path transition text: \"planning\" -> \"awaiting_approval\" label (+2px); preserve every condition; shorten wording only, or move complete detail to a card explicitly associated with the same transition; shorter wording may not resolve other layout constraints",
+              "shorten state labels and sublabels",
+              "move secondary phases off mainPath or merge adjacent phases",
+              "split the lifecycle into two diagrams"
+            ]
+          }
+        ],
+        "provenance": "absent",
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      },
+      "execution": "embedded-in-deliver"
+    },
+    "deliver": {
+      "status": "not-run",
+      "execution": "blocked-by-validate"
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "i18n/translation-coverage",
+      "severity": "warning",
+      "message": "meta.locale \"fr\" resolves 461/486 renderer-owned messages (94%) from 461 meta.translations entries; 25 fall back to English.",
+      "subject": {
+        "diagramType": "lifecycle",
+        "path": "/meta/translations"
+      },
+      "evidence": {
+        "locale": "fr",
+        "resolvedLocale": "fr",
+        "bundledLocale": null,
+        "translatedKeys": 461,
+        "totalKeys": 486,
+        "appliedOverrideKeys": 461,
+        "missingKeys": [
+          "viewer.export.svg.auto",
+          "viewer.export.svg.auto.hint",
+          "viewer.export.svg.light",
+          "viewer.export.svg.light.hint",
+          "viewer.export.svg.dark",
+          "viewer.export.svg.dark.hint",
+          "viewer.guide.title",
+          "viewer.focus.selectedNodes",
+          "viewer.guide.credit",
+          "viewer.guide.star"
+        ],
+        "missingKeysTotal": 25,
+        "englishSource": {
+          "viewer.export.svg.auto": "SVG · Auto",
+          "viewer.export.svg.auto.hint": "Matches host theme",
+          "viewer.export.svg.light": "SVG · Light",
+          "viewer.export.svg.light.hint": "Always light",
+          "viewer.export.svg.dark": "SVG · Dark",
+          "viewer.export.svg.dark.hint": "Always dark",
+          "viewer.guide.title": "Explore this system",
+          "viewer.focus.selectedNodes": "{count} selected nodes",
+          "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+          "viewer.guide.star": "Star"
+        }
+      },
+      "supportedFixes": [
+        "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+      ]
+    },
+    {
+      "code": "lifecycle/too-wide",
+      "severity": "error",
+      "message": "The lifecycle is 1450px wide; at 9px text it stays readable on a desktop only up to 1395px. Transition labels or notes widen their main-path gaps.",
+      "subject": {
+        "diagramType": "lifecycle",
+        "path": "/mainPath"
+      },
+      "evidence": {
+        "viewBoxWidth": 1450,
+        "budgetPx": 1395,
+        "mainPathStates": 6,
+        "lowerRowStates": 5,
+        "wideStepLabels": [
+          {
+            "from": "planning",
+            "to": "awaiting_approval",
+            "label": "manuel",
+            "excessPx": 2,
+            "widthDriver": "label"
+          }
+        ],
+        "spacingWideners": [
+          {
+            "from": "awaiting_input",
+            "to": "planning",
+            "label": "retour",
+            "widthDriver": "label"
+          }
+        ]
+      },
+      "supportedFixes": [
+        "relieve the routes crowding \"retour\": those label/note boxes found no clear spot at the base spacing, so lower-row and route spacing grew; main-path gap growth is bounded by the text readability budget. Only equivalent exits with identical labels, notes and variants can share an arrow; keep distinct notes separate, or move a secondary transition elsewhere",
+        "review the width-driving main-path transition text: \"planning\" -> \"awaiting_approval\" label (+2px); preserve every condition; shorten wording only, or move complete detail to a card explicitly associated with the same transition; shorter wording may not resolve other layout constraints",
+        "shorten state labels and sublabels",
+        "move secondary phases off mainPath or merge adjacent phases",
+        "split the lifecycle into two diagrams"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-agent-lifecycle-5d861064da0a11cc/ticket-agent-lifecycle.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-agent-lifecycle-5d861064da0a11cc/ticket-agent-lifecycle.finalize-summary.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "validate",
+  "finishedAt": "2026-11-03T14:19:40.607Z",
+  "durationMs": 398,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}

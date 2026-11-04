@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "a1fb4efa-4316-407d-91a7-0ecfc4196c15",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/kanban-architecture.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/kanban-architecture.html",
+  "specification": {
+    "sha256": "ac01b46a2e2427de493612f7c3750172c8d91ae0dfccf654d343a09ff2acc999",
+    "bytes": 6080
+  },
+  "artifact": {
+    "sha256": "df0c17b534fd28c8978706a33cd993465890ce482fd3701b3889f2b09cb383ab",
+    "bytes": 845711
+  }
+}

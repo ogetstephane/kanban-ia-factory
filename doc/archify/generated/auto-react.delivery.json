@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "81974024-128c-43f4-a803-df65324e9f22",
+  "status": "current",
+  "command": "deliver",
+  "type": "tree",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/sources/auto-react.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/auto-react.html",
+  "specification": {
+    "sha256": "85df89eb24d3934ab7ce4aa0b903ce436bdb990e4d272fe87b338b293e784ab9",
+    "bytes": 76608
+  },
+  "artifact": {
+    "sha256": "5686d42be039f97d792efdadc9d5b8cbcbfce64b29a548113cef4bbe9802841a",
+    "bytes": 1116748
+  }
+}

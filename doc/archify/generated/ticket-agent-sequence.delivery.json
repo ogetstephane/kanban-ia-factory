@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "8bd5f082-27de-47fb-a43b-cc6ee80f204d",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-agent-sequence.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-agent-sequence.html",
+  "specification": {
+    "sha256": "d229bc68bb1efbf3a133c96f27a9fdca55e62f2a409fff3ba6b41bef910e4334",
+    "bytes": 38693
+  },
+  "artifact": {
+    "sha256": "5d2573513ae3f7f3135b49fcb379b06ba7e44643dff7afe63e6c03fa14b396dd",
+    "bytes": 852345
+  }
+}

@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "erd",
+  "quality": "standard",
+  "specification": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-data-erd.json",
+    "sha256": "a6b2839ff953bb04da45fd41b7ff68647455109c1336a9fe83639128725634d0",
+    "bytes": 49325
+  },
+  "artifact": {
+    "path": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-data-erd.html"
+  },
+  "gates": {
+    "validate": "fail",
+    "deliver": "not-run",
+    "check": "not-run",
+    "browser-check": "not-run"
+  },
+  "failedStage": "validate",
+  "diagnostics": [
+    {
+      "code": "i18n/translation-coverage",
+      "severity": "warning",
+      "message": "meta.locale \"fr\" resolves 462/486 renderer-owned messages (95%) from 462 meta.translations entries; 24 fall back to English.",
+      "subject": {
+        "diagramType": "erd",
+        "path": "/meta/translations"
+      },
+      "evidence": {
+        "locale": "fr",
+        "resolvedLocale": "fr",
+        "bundledLocale": null,
+        "translatedKeys": 462,
+        "totalKeys": 486,
+        "appliedOverrideKeys": 462,
+        "missingKeys": [
+          "viewer.export.svg.auto",
+          "viewer.export.svg.auto.hint",
+          "viewer.export.svg.light",
+          "viewer.export.svg.light.hint",
+          "viewer.export.svg.dark",
+          "viewer.export.svg.dark.hint",
+          "viewer.guide.title",
+          "viewer.focus.selectedNodes",
+          "viewer.guide.credit",
+          "viewer.guide.star"
+        ],
+        "missingKeysTotal": 24,
+        "englishSource": {
+          "viewer.export.svg.auto": "SVG · Auto",
+          "viewer.export.svg.auto.hint": "Matches host theme",
+          "viewer.export.svg.light": "SVG · Light",
+          "viewer.export.svg.light.hint": "Always light",
+          "viewer.export.svg.dark": "SVG · Dark",
+          "viewer.export.svg.dark.hint": "Always dark",
+          "viewer.guide.title": "Explore this system",
+          "viewer.focus.selectedNodes": "{count} selected nodes",
+          "viewer.guide.credit": "Find Archify useful? A star on GitHub helps",
+          "viewer.guide.star": "Star"
+        }
+      },
+      "supportedFixes": [
+        "Add each missing key to meta.translations, translating its English source string and keeping its {placeholders}."
+      ]
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"feature\" attribute 6 \"projectId\" references unknown entity \"Project\" in \"Project.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"task\" attribute 6 \"projectId\" references unknown entity \"Project\" in \"Project.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"task\" attribute 7 \"featureId\" references unknown entity \"Feature\" in \"Feature.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"task\" attribute 20 \"releaseId\" references unknown entity \"Release\" in \"Release.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"subtask\" attribute 0 \"taskId\" references unknown entity \"Task\" in \"Task.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"release\" attribute 1 \"projectId\" references unknown entity \"Project\" in \"Project.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    },
+    {
+      "code": "layout/constraint",
+      "severity": "error",
+      "message": "Entity \"agent_session\" attribute 1 \"taskId\" references unknown entity \"Task\" in \"Task.id\".",
+      "subject": {
+        "diagramType": "erd"
+      }
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 13,
+    "shown": 8,
+    "truncated": true,
+    "omittedByCode": {
+      "layout/constraint": 5
+    }
+  },
+  "evidence": {
+    "receipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-data-erd-a6b2839ff953bb04/ticket-data-erd.finalize.json",
+    "summaryReceipt": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/receipts/ticket-data-erd-a6b2839ff953bb04/ticket-data-erd.finalize-summary.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-11-03T13:20:47.007Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 436,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "nextAction": {
+    "action": "edit-in-place",
+    "candidate": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-data-erd.json",
+    "constraint": "Preserve unaffected semantics and geometry; apply each diagnostic's supportedFixes, or the fix its message names, and do not replace the whole candidate.",
+    "then": "finalize-once"
+  }
+}

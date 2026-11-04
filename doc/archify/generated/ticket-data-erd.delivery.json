@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "87dddb45-78c6-4d81-a1d7-96d4e68eb7f8",
+  "status": "current",
+  "command": "deliver",
+  "type": "erd",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/ticket-data-erd.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/ticket-data-erd.html",
+  "specification": {
+    "sha256": "c86702d48fd67f131c023d54341942e9227dfc4ce6baefcdaca6788ab1ad4088",
+    "bytes": 49330
+  },
+  "artifact": {
+    "sha256": "8fc934ad6638264bbcc262135f3224009f7d2aa86efb1291e546edd2821ce59f",
+    "bytes": 925757
+  }
+}

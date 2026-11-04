@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "e3ad343c-771d-4fe6-8a7e-ab753e97f84a",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/home/oget/Perso/kanban-ia-factory/doc/archify/workflow-policy-impact.json",
+  "output": "/home/oget/Perso/kanban-ia-factory/doc/archify/generated/workflow-policy-impact.html",
+  "specification": {
+    "sha256": "880c797e8af4c5443063f9d4936f44f94cf107c243b55e7abd8806d1b8e55015",
+    "bytes": 35071
+  },
+  "artifact": {
+    "sha256": "689e53ac4a92aa8e40ed0e96b0242076977554d6b9a71bfe9fc028279e532cf4",
+    "bytes": 840155
+  }
+}
