@@ -37,7 +37,7 @@ the version and membership; retries reuse the pinned tag. See [Project releases]
 - [ReleaseSelect.tsx](../../../src/components/ReleaseSelect.tsx)
 - [releases.ts route](../../../server/routes/releases.ts)
 - [releaseService.ts](../../../server/releases/releaseService.ts)
-- [release.ts types](../../../src/types/release.ts)
+- [release.ts types](../../../shared/types/release.ts)
 
 ## Related features
 

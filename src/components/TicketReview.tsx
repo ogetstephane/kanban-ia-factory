@@ -2,9 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LoaderCircle, Maximize2, Sparkles, X } from 'lucide-react';
 import type { z } from 'zod';
-import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
 import { useOperation } from '../data/useOperation';
-import type { AgentSession, reviewSchema } from '../types/agent';
+import type { AgentSession, reviewSchema } from '../../shared/types/agent';
 import FileDiff from './FileDiff';
 import ReviewValidation from './ReviewValidation';
 
@@ -42,7 +42,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
   useEffect(() => {
     const controller = new AbortController();
     setReview(null); setConfirmed(false); setCriteria([]);
-    void boardApi.reviewAgent(session.taskId, controller.signal).then((value) => {
+    void agentApi.reviewAgent(session.taskId, controller.signal).then((value) => {
       if (!controller.signal.aborted) {
         setReview(value); setError(''); setSelected(value.files[0]?.path ?? '');
         setAiReport((current) => current?.token === value.token ? current : null);
@@ -56,7 +56,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
     setFile(null);
     if (!selected || !review || summaryOnly && !fullscreen) return;
     const controller = new AbortController();
-    void boardApi.reviewAgent(session.taskId, controller.signal, selected).then((value) => {
+    void agentApi.reviewAgent(session.taskId, controller.signal, selected).then((value) => {
       if (controller.signal.aborted) return;
       if (value.token !== review.token) throw new Error('Files changed. Reload the diff before continuing.');
       setFile(value.files.find((item) => item.path === selected) ?? null);
@@ -69,7 +69,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
   const runAiReview = async () => {
     if (!review || aiPending) return;
     setAiPending(true); setAiError('');
-    try { setAiReport(await boardApi.aiReviewAgent(session.taskId, review.token)); }
+    try { setAiReport(await agentApi.aiReviewAgent(session.taskId, review.token)); }
     catch (cause) { setAiError(cause instanceof Error ? cause.message : 'Unable to run the AI review'); }
     finally { setAiPending(false); }
   };
@@ -121,7 +121,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
         </label>
         <button type="button" disabled={!!error || !review.documentation?.ready || !confirmed || criteria.length !== review.criteria.length || operation.pending}
           className="bg-emerald-700 px-3 py-2 rounded disabled:opacity-40"
-          onClick={() => { void operation.run(async () => onChange(await boardApi.acceptReview(session.taskId, session.id, session.updatedAt, review.token))); }}>
+          onClick={() => { void operation.run(async () => onChange(await agentApi.acceptReview(session.taskId, session.id, session.updatedAt, review.token))); }}>
           Accept human review
         </button>
       </>}
@@ -129,7 +129,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
       {!epicReview && session.status === 'completed' && session.publication?.status !== 'pushed' &&
         session.reviewStatus === 'accepted' && session.reviewToken === review.token &&
         <ReviewValidation key={`${session.updatedAt}-${review.token}`} kind="tasks" id={session.taskId} onDone={async () => {
-          onChange(await boardApi.agentSession(session.taskId)); onValidated?.();
+          onChange(await agentApi.agentSession(session.taskId)); onValidated?.();
         }} />}
     </>}
   </section>;

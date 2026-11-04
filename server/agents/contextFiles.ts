@@ -1,6 +1,6 @@
 import type { MessageOptions } from '@github/copilot-sdk';
 import type { AgentRequest } from './provider';
-import { contextFilesSchema } from '../../src/types/contextFile';
+import { contextFilesSchema } from '../../shared/types/contextFile';
 
 export function prepareContextFiles(input: unknown) {
   const files = contextFilesSchema.parse(input ?? []);

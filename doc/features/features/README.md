@@ -50,7 +50,7 @@ See the [API reference](../../api.md); breakdown is a separate Copilot feature h
 - [NewFeatureModal.tsx](../../../src/components/NewFeatureModal.tsx)
 - [FeatureBreakdownModal.tsx](../../../src/components/FeatureBreakdownModal.tsx)
 - [board.ts route](../../../server/routes/board.ts)
-- [kanban.ts types](../../../src/types/kanban.ts)
+- [kanban.ts types](../../../shared/types/kanban.ts)
 
 ## Related features
 

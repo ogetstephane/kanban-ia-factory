@@ -1,24 +1,56 @@
-import { CopilotClient, defineTool, type ToolResultObject } from '@github/copilot-sdk';
+import { CopilotClient, defineTool, type SessionConfig } from '@github/copilot-sdk';
 import { z } from 'zod';
 import type { AgentProvider, AgentRequest } from './provider';
 import { WorkspaceTools } from './workspaceTools';
-import { agentQuestionInputSchema } from '../../src/types/agent';
+import { agentQuestionInputSchema } from '../../shared/types/agent';
 import { requiredTicketDocumentationPath } from './ticketDocumentation';
 import { agentMessage } from './contextFiles';
+import type { CodeGraph } from './codeGraph';
+import { RuntimeTelemetry } from './runtimeTelemetry';
+import { GRAPHIFY_SKILL_INSTRUCTION, graphifySkillConfiguration } from './graphifySkill';
+import { graphTools, readOnlyTools, toolResult } from './ticketTools';
 
-async function toolResult(operation: () => Promise<unknown>): Promise<ToolResultObject> {
+async function accountQuota(client: CopilotClient) {
+  const observedAt = new Date().toISOString();
   try {
-    const result = await operation();
-    return { resultType: 'success', textResultForLlm: typeof result === 'string' ? result : JSON.stringify(result) };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const { quotaSnapshots } = await Promise.race([
+      client.rpc.account.getQuota({}),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Quota request timed out')), 5_000); }),
+    ]).finally(() => clearTimeout(timer));
+    return { observedAt, quotaSnapshots };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Ticket tool failed';
-    console.error('Ticket agent tool failed:', error);
-    return { resultType: 'failure', textResultForLlm: message, error: message };
+    return { observedAt, error: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export function unavailableModelError(error: unknown, model: string | undefined, fromTicket: boolean) {
+  if (!model || !(error instanceof Error) || !/model\b.*\bis not available/i.test(error.message)) return null;
+  return new Error(fromTicket
+    ? `Model "${model}" selected on this ticket is not available for your Copilot account. Edit the ticket, choose another model or the default, then retry.`
+    : `Server default model "${model}" (COPILOT_MODEL) is not available for your Copilot account. Change or remove COPILOT_MODEL in .env and restart the server, or select a model on the ticket.`,
+  { cause: error });
 }
 
 export class CopilotProvider implements AgentProvider {
   readonly id = 'copilot';
+
+  constructor(private readonly codeGraph?: CodeGraph) {}
+
+  async models() {
+    const client = new CopilotClient();
+    try {
+      await client.start();
+      const auth = await client.getAuthStatus();
+      if (!auth.isAuthenticated) throw new Error('Authenticate the server user with Copilot CLI to load models.');
+      return (await client.listModels())
+        .filter((model) => model.policy?.state !== 'disabled')
+        .map(({ id, name }) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    } finally {
+      await client.stop();
+    }
+  }
 
   async health() {
     const client = new CopilotClient();
@@ -30,6 +62,19 @@ export class CopilotProvider implements AgentProvider {
   }
 
   async run(request: AgentRequest): Promise<string> {
+    const telemetry = new RuntimeTelemetry(request);
+    try {
+      await telemetry.update({});
+      const result = await this.runSession(request, telemetry);
+      await telemetry.finish();
+      return result;
+    } catch (error) {
+      await telemetry.finish(error);
+      throw error;
+    }
+  }
+
+  private async runSession(request: AgentRequest, telemetry: RuntimeTelemetry): Promise<string> {
     const files = new WorkspaceTools(request.workspace, request.signal);
     const documentationPath = requiredTicketDocumentationPath({
       docsPath: request.context.project?.docsPath,
@@ -37,31 +82,15 @@ export class CopilotProvider implements AgentProvider {
       taskTitle: request.context.task.title,
       featureTitle: request.context.feature?.title,
     });
+    const graph = await this.codeGraph?.prepare(request.workspace, request.signal);
     const tools = [
+      ...(graph ? graphTools(graph) : []),
       ...(request.phase !== 'review' ? [defineTool('ticket_ask_user', {
         description: 'Ask the user a clarification question and wait for their answer. Use whenever a product or implementation decision needs user input.',
         parameters: agentQuestionInputSchema,
         handler: (question) => toolResult(() => request.ask(question)),
       })] : []),
-      defineTool('ticket_list_files', {
-        description: 'List files in a relative worktree directory. Hidden paths and symlinks are excluded.',
-        parameters: z.object({ path: z.string() }),
-        handler: ({ path }) => toolResult(() => files.list(path)),
-      }),
-      defineTool('ticket_read_file', {
-        description: 'Read a UTF-8 file in the ticket worktree. For large files, provide startLine and optionally endLine; ranges return line numbers and can cover up to 500 lines.',
-        parameters: z.object({
-          path: z.string(),
-          startLine: z.number().int().positive().optional(),
-          endLine: z.number().int().positive().optional(),
-        }),
-        handler: ({ path, startLine, endLine }) => toolResult(() => files.read(path, startLine, endLine)),
-      }),
-      defineTool('ticket_search_files', {
-        description: 'Search for literal text in files under a worktree directory and return matching paths, line numbers and snippets. Hidden files, symlinks, binary files and node_modules are excluded.',
-        parameters: z.object({ path: z.string(), query: z.string().min(1).max(200) }),
-        handler: ({ path, query }) => toolResult(() => files.search(path, query)),
-      }),
+      ...readOnlyTools(files),
       ...(request.phase === 'execute' ? [
         defineTool('ticket_create_directory', {
           description: 'Create a directory inside an existing worktree directory.',
@@ -97,22 +126,23 @@ export class CopilotProvider implements AgentProvider {
     const client = new CopilotClient();
     const abort = () => { void client.forceStop().catch((error: unknown) => console.error('Unable to stop Copilot:', error)); };
     request.signal?.addEventListener('abort', abort, { once: true });
+    let authenticated = false;
     try {
       request.signal?.throwIfAborted();
       await client.start();
       const auth = await client.getAuthStatus();
       if (!auth.isAuthenticated) throw new Error('Copilot is not authenticated. Authenticate the server user with Copilot CLI first.');
-      const session = await client.createSession({
+      authenticated = true;
+      await telemetry.update({ accountQuotaAtStart: await accountQuota(client) });
+      const message = agentMessage(request);
+      const ticketModel = request.context.task.agentModel;
+      const requestedModel = ticketModel || process.env.COPILOT_MODEL || undefined;
+      const configuration = {
+        onEvent: telemetry.event,
         workingDirectory: request.workspace,
-        ...(process.env.COPILOT_MODEL ? { model: process.env.COPILOT_MODEL } : {}),
-        tools,
-        availableTools: tools.map((tool) => tool.name),
+        ...(requestedModel ? { model: requestedModel } : {}),
+        ...graphifySkillConfiguration(tools),
         streaming: true,
-        // Only our explicitly registered tools may act; built-in permission requests are denied.
-        onPermissionRequest: (permission) => ({
-          kind: permission.kind === 'custom-tool' && tools.some((tool) => tool.name === permission.toolName)
-            ? 'approved' : 'denied-interactively-by-user',
-        }),
         systemMessage: {
           mode: 'replace',
           content: [
@@ -122,6 +152,7 @@ export class CopilotProvider implements AgentProvider {
             'Use only the supplied tools. Never commit, push, access credentials, or change git configuration.',
             'Do not install dependencies or start services. Report missing prerequisites explicitly.',
             'Ask clarification questions using ticket_ask_user rather than guessing requirements.',
+            GRAPHIFY_SKILL_INSTRUCTION,
             `Required ticket documentation: ${documentationPath}. Include a concise, useful Markdown page describing the user-visible behavior and relevant technical changes. It must be added to this ticket worktree and contain real content, not a placeholder; human review cannot be accepted without it. Create missing parent directories one level at a time with ticket_create_directory before writing the page.`,
             request.phase === 'plan'
               ? 'READ ONLY: inspect relevant files and return a concrete implementation and verification plan, including how you will write the required documentation. Do not execute it.'
@@ -130,7 +161,15 @@ export class CopilotProvider implements AgentProvider {
                 : 'Implement ONLY the approved plan, write the required documentation, run available checks, and report files changed, results and remaining limitations.',
           ].join('\n'),
         },
+      } satisfies SessionConfig;
+      await telemetry.update({
+        message, configuration,
+        permissionPolicy: 'Only the bundled ticket-graphify skill may be loaded. Registered custom tools are approved; built-in permissions are denied.',
       });
+      const session = await client.createSession(configuration).catch((error: unknown) => {
+        throw unavailableModelError(error, requestedModel, !!ticketModel) ?? error;
+      });
+      await telemetry.update({}, session.sessionId);
       await request.onSession(session.sessionId);
       let content = '';
       let messageId: string | undefined;
@@ -158,7 +197,7 @@ export class CopilotProvider implements AgentProvider {
       });
       let response;
       try {
-        response = await session.sendAndWait(agentMessage(request), 3_600_000);
+        response = await session.sendAndWait(message, 3_600_000);
       } finally {
         unsubscribe();
         if (contentWriteTimer) clearTimeout(contentWriteTimer);
@@ -171,7 +210,12 @@ export class CopilotProvider implements AgentProvider {
       return response.data.content;
     } finally {
       request.signal?.removeEventListener('abort', abort);
+      if (authenticated && !request.signal?.aborted) {
+        await telemetry.update({ accountQuota: await accountQuota(client) })
+          .catch((error: unknown) => console.warn('Unable to record Copilot quota:', error));
+      }
       await client.stop();
+      await graph?.dispose().catch((error: unknown) => console.warn('Unable to remove code graph:', error));
     }
   }
 }

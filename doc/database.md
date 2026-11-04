@@ -58,8 +58,13 @@ The app can also restore the demo dataset with `POST /api/board/reset`.
 ## Data import
 
 On first load of an empty database, the browser's legacy localStorage data is imported via
-`POST /api/board/initialize`. If there is none, demo data is used. Once initialized, the
-database is authoritative; local browser keys are left untouched as a backup.
+`POST /api/board/initialize` with `{ legacy: { projects?, features?, tasks? } }`.
+Only existing keys are sent; missing collections are filled on the server from
+[the shared demo seed](../shared/data/initialData.ts), which is not bundled with the frontend.
+Legacy missing project links and dangling feature links are normalized before validation.
+An explicit empty features/tasks array stays empty; invalid data fails instead of falling back.
+Full `{ projects, features, tasks, releases? }` imports remain supported without legacy repairs.
+Once initialized, the database is authoritative; local browser keys are left untouched as a backup.
 
 ## Storage and backups
 

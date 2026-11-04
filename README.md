@@ -44,7 +44,11 @@ with effects when the selected project changes.
 - [server/db/boardStore.ts](server/db/boardStore.ts): initialization/reset operations.
 - [server/db/entityStore.ts](server/db/entityStore.ts): atomic per-entity transactions.
 - [server/routes/board.ts](server/routes/board.ts): validated board API.
-- [src/data/boardApi.ts](src/data/boardApi.ts): HTTP client and legacy-data import.
+- [src/data/apiClient.ts](src/data/apiClient.ts): shared HTTP request, error and query helpers.
+- [src/data/boardApi.ts](src/data/boardApi.ts): project, feature and task client plus legacy-data import.
+- Domain clients: [agentApi.ts](src/data/agentApi.ts), [wikiApi.ts](src/data/wikiApi.ts),
+  [releaseApi.ts](src/data/releaseApi.ts), [gitApi.ts](src/data/gitApi.ts),
+  [graphApi.ts](src/data/graphApi.ts) and [activityApi.ts](src/data/activityApi.ts).
 - [src/data/useProjects.ts](src/data/useProjects.ts): project list loading and mutations.
 - [src/data/useBoard.ts](src/data/useBoard.ts): project-scoped board loading and entity mutations.
 - [src/components/KanbanBoard.tsx](src/components/KanbanBoard.tsx): lazy-loaded board surface.
@@ -87,10 +91,28 @@ npm run db:migrate  # Apply committed migrations in another environment
 npm test
 npm run lint
 npm run build
+make playwright-install # Install Chromium for browser tests
+make test-ui            # Playwright UI at http://127.0.0.1:9323
+make test-e2e           # Run browser smoke tests headlessly
+make test-report        # Open the last browser test report
 make storybook       # Browse component stories at http://localhost:6006
 make build-storybook # Build the static component catalog
 make test-storybook  # Validate mock API contracts and in-memory workflows
 ```
+
+### Playwright browser tests
+
+Run `make playwright-install` once after installing dependencies, then `make test-ui`
+and open http://127.0.0.1:9323 to select, run, watch and debug browser tests.
+Use `make test-e2e` for a headless run and `make test-report` to inspect its HTML report.
+
+Playwright starts its own frontend-only Vite server on port 3100 and the
+[smoke tests](e2e/app.spec.ts) use mocked API data. No application server, database,
+Git operations or AI credentials are used, and your app on port 3000 is left alone.
+These tests are separate from `make test` and `make check`. The Make targets supply
+Node 22 when needed; direct npm commands require Node 22.12+.
+See [Playwright commands](doc/commands.md#playwright-browser-tests) for setup,
+Linux browser dependencies and command-line options.
 
 ### Standalone component catalog
 
@@ -138,7 +160,8 @@ newer changes.
 ### Board API
 
 - `GET /api/board/projects`: list projects with stats for the switcher and manager.
-- `POST /api/board/initialize`: initialize an empty database from browser/import data.
+- `POST /api/board/initialize`: initialize an empty database from a full board import or
+  `{ legacy: { projects?, features?, tasks? } }`; missing legacy collections use the server-side demo seed.
 - `GET /api/board/projects/:id/board`: load only the selected project's board entities.
 - `POST/PUT/DELETE /api/board/projects`: atomic project operations (revision-checked).
 - `POST/PUT/DELETE /api/board/features`: atomic feature operations (revision-checked).

@@ -25,5 +25,5 @@
     "noEmit": true
   },
   "include": ["**/*", ".storybook/**/*.ts"],
-  "exclude": ["dist", "storybook-static"]
+  "exclude": ["dist", "storybook-static", "playwright-report", "test-results", "workspaces"]
 }

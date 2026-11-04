@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { getAgentWorkflow } from './agentWorkflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
 import WorkflowTimeline from '../components/WorkflowTimeline';
 import { agentSession } from '../components/stories/fixtures';
-import type { AgentSession } from '../types/agent';
+import type { AgentSession } from '../../shared/types/agent';
 
 const states = (patch: Partial<AgentSession>) => getAgentWorkflow({ ...agentSession, output: '', ...patch });
 

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Check, ClipboardCheck, Eye, FileText, Play, Send } from 'lucide-react';
-import { WORKFLOW_STEPS, type AgentWorkflow, type WorkflowStepId, type WorkflowStepState } from '../types/workflow';
+import { WORKFLOW_STEPS, type AgentWorkflow, type WorkflowStepId, type WorkflowStepState } from '../../shared/types/workflow';
 
 const STEP_ICONS = { plan: FileText, approval: ClipboardCheck, execution: Play, review: Eye, delivery: Send };
 const STATE_LABELS: Record<WorkflowStepState, string> = {

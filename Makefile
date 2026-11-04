@@ -1,20 +1,21 @@
 .DEFAULT_GOAL := help
-.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live lint check \
-	db-generate db-migrate db-dev db-studio db-reset clean
+.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live test-agent-skills lint check \
+	playwright-install test-e2e test-ui test-report db-generate db-migrate db-dev db-studio db-reset clean archify archify-install archify-doctor
 
 NPM ?= npm
 BUN ?= npx --yes bun
 NODE_VERSION := $(shell node -p 'process.versions.node' 2>/dev/null)
-# Vite 8 and the Copilot runtime require a modern Node; use Node 22 when the local one is older.
+# Vite 8, Playwright and the Copilot runtime require a modern Node; use Node 22 when the local one is older.
 NODE_OK := $(shell printf '22.12.0\n$(NODE_VERSION)\n' | sort -V -C && echo ok)
 ifeq ($(NODE_OK),ok)
 vite_run = $(NPM) run $(1)
 else
 vite_run = npx --yes --package=node@22 -c '$(NPM) run $(1)'
 endif
+ARCHIFY_CLI ?= .agents/skills/archify/bin/archify.mjs
 
 help: ## List available commands
-	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 install: ## Install dependencies from bun.lock and generate the Prisma client
 	$(BUN) install
@@ -48,8 +49,23 @@ preview: ## Preview the built frontend only (no API or database)
 test: ## Run unit and database integration tests
 	$(NPM) test
 
+playwright-install: ## Install Chromium for Playwright browser tests
+	$(call vite_run,playwright:install)
+
+test-e2e: ## Run Playwright browser smoke tests headlessly
+	$(call vite_run,test:e2e)
+
+test-ui: ## Start Playwright UI (http://127.0.0.1:9323)
+	$(call vite_run,test:ui)
+
+test-report: ## Open the last Playwright HTML report
+	$(call vite_run,test:report)
+
 test-agent-live: ## Test real Copilot on disposable files (requires authentication; uses AI quota)
 	$(call vite_run,test:agent:live)
+
+test-agent-skills: ## Test native Copilot skill loading without a model request (requires the runtime)
+	$(call vite_run,test:agent:skills)
 
 lint: ## Type-check the project
 	$(NPM) run lint
@@ -74,3 +90,13 @@ db-reset: ## DESTRUCTIVE: drop the local database and re-apply all migrations
 
 clean: ## Remove build output
 	$(NPM) run clean
+
+archify: ## Analyze committed code and render Archify diagrams (one: make archify NAME=auto-react)
+	node scripts/archify.mjs $(NAME)
+
+archify-install: ## Install the Archify skill for GitHub Copilot in this project (.agents/skills/archify)
+	npx --yes --package=node@22 -c 'npx -y skills@latest add https://archify.si --skill archify --agent github-copilot --copy --yes'
+	node $(ARCHIFY_CLI) doctor
+
+archify-doctor: ## Check the installed Archify skill
+	node $(ARCHIFY_CLI) doctor

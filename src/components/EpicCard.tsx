@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, Layers, Plus, Trash2 } from 'lucide-react';
-import type { Feature, KanbanStatus, Task } from '../types/kanban';
-import { reachableStatuses } from '../utils/kanbanLogic';
+import type { Feature, KanbanStatus, Task } from '../../shared/types/kanban';
+import { reachableStatuses } from '../../shared/utils/kanbanLogic';
 import ReviewActions from './ReviewActions';
 import WorkflowTimeline from './WorkflowTimeline';
-import { getAgentWorkflow } from '../utils/agentWorkflow';
-import type { AgentWorkflow } from '../types/workflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
+import type { AgentWorkflow } from '../../shared/types/workflow';
 
 interface EpicCardProps {
   feature: Feature;

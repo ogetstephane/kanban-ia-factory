@@ -36,8 +36,9 @@ is available after its agent session has stopped. Details are in
 - [GitTaskDiffView.tsx](../../../src/components/GitTaskDiffView.tsx)
 - [FileDiff.tsx](../../../src/components/FileDiff.tsx)
 - [board.ts route](../../../server/routes/board.ts)
-- [repositoryService.ts](../../../server/git/repositoryService.ts)
-- [git.ts types](../../../src/types/git.ts)
+- [workspaceService.ts](../../../server/git/workspaceService.ts)
+- [gitOperationsService.ts](../../../server/git/gitOperationsService.ts)
+- [git.ts types](../../../shared/types/git.ts)
 - [App.tsx](../../../src/App.tsx)
 
 ## Related features

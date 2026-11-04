@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Layers, Plus, Sparkles, ChevronRight, ChevronDown, CheckCircle2, Clock, Trash2, Edit3 } from 'lucide-react';
-import { Feature, Project, Task } from '../types/kanban';
-import { calculateFeatureProgress } from '../utils/kanbanLogic';
+import { Feature, Project, Task } from '../../shared/types/kanban';
+import { calculateFeatureProgress } from '../../shared/utils/kanbanLogic';
 
 interface FeatureBarProps {
   features: Feature[];

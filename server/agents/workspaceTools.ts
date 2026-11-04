@@ -12,18 +12,65 @@ const MAX_SEARCH_FILES = 500;
 const MAX_SEARCH_FILE_SIZE = 2_000_000;
 const MAX_SEARCH_BYTES = 20_000_000;
 
+type IgnoreRule = { path: string; directory: boolean };
+
+function isMissingFile(error: unknown) {
+  return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
+function parseIgnoreRules(contents: string): IgnoreRule[] {
+  return contents.split(/\r?\n/).flatMap((line, index) => {
+    const value = line.trim();
+    if (!value || value.startsWith('#')) return [];
+    if (value.startsWith('!') || value.includes('\\')) {
+      throw new Error(`Unsupported .copilotignore rule on line ${index + 1}`);
+    }
+    const directory = value.endsWith('/');
+    const ignoredPath = value.replace(/^\/|\/$/g, '');
+    if (!ignoredPath || ignoredPath.split('/').some((part) => part === '.' || part === '..')) {
+      throw new Error(`Invalid .copilotignore rule on line ${index + 1}`);
+    }
+    return [{ path: ignoredPath, directory }];
+  });
+}
+
 /** Custom tools keep file operations in the worktree and expose no general-purpose shell. */
 export class WorkspaceTools {
+  private ignoreRules?: Promise<IgnoreRule[]>;
+
   constructor(private readonly root: string, private readonly signal?: AbortSignal) {}
+
+  private async isIgnored(relative: string) {
+    this.ignoreRules ??= this.loadIgnoreRules();
+    const normalized = relative.split(path.sep).join('/');
+    return (await this.ignoreRules).some((rule) => {
+      if (rule.directory) {
+        if (normalized === rule.path || normalized.startsWith(`${rule.path}/`)) return true;
+        return !rule.path.includes('/') && normalized.split('/').includes(rule.path);
+      }
+      if (normalized === rule.path) return true;
+      return !rule.path.includes('/') && path.posix.basename(normalized) === rule.path;
+    });
+  }
+
+  private async loadIgnoreRules() {
+    try {
+      return parseIgnoreRules(await readFile(path.join(await realpath(this.root), '.copilotignore'), 'utf8'));
+    } catch (error) {
+      if (isMissingFile(error)) return [];
+      throw error;
+    }
+  }
 
   private async resolve(relative: string, create = false): Promise<string> {
     this.signal?.throwIfAborted();
     const parts = relative.split(/[\\/]/);
-    if (path.isAbsolute(relative) || parts.some((part) => part === '..' || hidden(part))) {
-      throw new Error('Use a relative workspace path without hidden folders or node_modules');
+    if (path.isAbsolute(relative) || parts.some((part) => part === '..' || (part !== '.' && hidden(part)))) {
+      throw new Error('Use a relative workspace path such as "src" or "./src", or "." for the workspace root; absolute paths, "..", hidden folders and node_modules are not allowed');
     }
     const root = await realpath(this.root);
     const target = path.resolve(root, relative);
+    if (await this.isIgnored(path.relative(root, target))) throw new Error('Path is excluded by .copilotignore');
     const resolved = await realpath(create ? path.dirname(target) : target);
     if (resolved !== root && !resolved.startsWith(`${root}${path.sep}`)) throw new Error('Path leaves the ticket worktree');
     if (path.relative(root, resolved).split(path.sep).some(hidden)) throw new Error('Hidden paths and node_modules are not accessible');
@@ -38,9 +85,17 @@ export class WorkspaceTools {
   }
 
   async list(relative: string) {
-    return (await readdir(await this.resolve(relative === '.' ? '' : relative), { withFileTypes: true }))
-      .filter((entry) => !hidden(entry.name) && !entry.isSymbolicLink())
-      .map((entry) => ({ name: entry.name, directory: entry.isDirectory() }));
+    const folder = await this.resolve(relative === '.' ? '' : relative);
+    const root = await realpath(this.root);
+    const entries = await readdir(folder, { withFileTypes: true });
+    const visible = [];
+    for (const entry of entries) {
+      if (hidden(entry.name) || entry.isSymbolicLink()) continue;
+      const entryPath = path.relative(root, path.join(folder, entry.name));
+      if (await this.isIgnored(entryPath)) continue;
+      visible.push({ name: entry.name, directory: entry.isDirectory() });
+    }
+    return visible;
   }
 
   async read(relative: string, startLine?: number, endLine?: number) {
@@ -85,6 +140,7 @@ export class WorkspaceTools {
         this.signal?.throwIfAborted();
         if (hidden(entry.name) || entry.isSymbolicLink()) continue;
         const file = path.join(folder, entry.name);
+        if (await this.isIgnored(path.relative(root, file))) continue;
         if (entry.isDirectory()) {
           await visit(file, depth + 1);
           if (truncated) return;

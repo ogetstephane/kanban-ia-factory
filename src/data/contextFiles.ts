@@ -1,7 +1,7 @@
 import {
   contextFileSchema, contextFilesSchema, MAX_CONTEXT_FILE_BYTES, MAX_CONTEXT_FILES, MAX_CONTEXT_TOTAL_BYTES,
   type ContextFile,
-} from '../types/contextFile';
+} from '../../shared/types/contextFile';
 
 export async function readContextFiles(files: File[], existing: ContextFile[]): Promise<ContextFile[]> {
   if (existing.length + files.length > MAX_CONTEXT_FILES) throw new Error('A task can have at most 10 context files.');

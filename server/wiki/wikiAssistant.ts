@@ -1,6 +1,6 @@
 import { CopilotClient, type MessageOptions } from '@github/copilot-sdk';
 import { prepareContextFiles } from '../agents/contextFiles';
-import { wikiAssistantInputSchema, wikiAssistantResultSchema, type WikiAssistantInput, type WikiAssistantResult } from '../../src/types/wiki';
+import { wikiAssistantInputSchema, wikiAssistantResultSchema, type WikiAssistantInput, type WikiAssistantResult } from '../../shared/types/wiki';
 import { RepositoryError } from '../git/repositoryService';
 
 export interface WikiGenerator {

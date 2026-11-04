@@ -34,7 +34,7 @@ board, project or Copilot endpoints documented in the [API reference](../../api.
 - [Navbar.tsx](../../../src/components/Navbar.tsx)
 - [ProjectSwitcher.tsx](../../../src/components/ProjectSwitcher.tsx)
 - [App.tsx](../../../src/App.tsx)
-- [kanbanLogic.ts](../../../src/utils/kanbanLogic.ts)
+- [kanbanLogic.ts](../../../shared/utils/kanbanLogic.ts)
 
 ## Related features
 

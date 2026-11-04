@@ -3,9 +3,9 @@ import {
   AlertTriangle, BookOpen, CheckCircle2, CloudUpload, Columns2, Eye, ChevronDown, ChevronRight, FilePlus2, FileText, Folder, FolderPlus, GitCommitHorizontal,
   Loader2, Pencil, Save, Search, Sparkles,
 } from 'lucide-react';
-import type { Project } from '../types/kanban';
-import type { DocFile, DocStatus, DocSyncResult } from '../types/wiki';
-import { boardApi } from '../data/boardApi';
+import type { Project } from '../../shared/types/kanban';
+import type { DocFile, DocStatus, DocSyncResult } from '../../shared/types/wiki';
+import { wikiApi } from '../data/wikiApi';
 import { MarkdownPreview } from './MarkdownPreview';
 import { AgentAssistant } from './AgentAssistant';
 
@@ -39,7 +39,7 @@ export function WikiView({ project }: { project: Project }) {
 
   const loadFiles = useCallback(async (signal?: AbortSignal) => {
     try {
-      const [listing, nextStatus] = await Promise.all([boardApi.wikiFiles(project.id, signal), boardApi.wikiStatus(project.id, signal)]);
+      const [listing, nextStatus] = await Promise.all([wikiApi.wikiFiles(project.id, signal), wikiApi.wikiStatus(project.id, signal)]);
       setStatus(nextStatus);
       setFiles(listing.files); setDocsPath(listing.docsPath); setBranch(listing.branch); setListError('');
     } catch (requestError) {
@@ -72,7 +72,7 @@ export function WikiView({ project }: { project: Project }) {
     if (path === current?.path || !confirmDiscard()) return;
     setOpening(true); setError(''); setConflict(false); setResult(null);
     try {
-      const doc = await boardApi.wikiFile(project.id, path);
+      const doc = await wikiApi.wikiFile(project.id, path);
       setCurrent(doc); setDraft(doc.content);
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to open this document'));
@@ -83,7 +83,7 @@ export function WikiView({ project }: { project: Project }) {
     if (!current) return;
     setOpening(true); setError(''); setConflict(false);
     try {
-      const doc = await boardApi.wikiFile(project.id, current.path);
+      const doc = await wikiApi.wikiFile(project.id, current.path);
       setCurrent(doc); setDraft(doc.content);
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to reload this document'));
@@ -122,7 +122,7 @@ export function WikiView({ project }: { project: Project }) {
     if (!current || saving || !dirty) return;
     setSaving(true); setError(''); setConflict(false);
     try {
-      const saved = await boardApi.saveWikiFile(project.id, current.path, draft, current.sha);
+      const saved = await wikiApi.saveWikiFile(project.id, current.path, draft, current.sha);
       setCurrent({ path: current.path, content: draft, sha: saved.sha });
       setResult(null);
       await loadFiles();
@@ -136,7 +136,7 @@ export function WikiView({ project }: { project: Project }) {
     if (syncing || saving) return;
     setSyncing(true); setError(''); setConflict(false);
     try {
-      setResult(await boardApi.syncWiki(project.id));
+      setResult(await wikiApi.syncWiki(project.id));
       await loadFiles();
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to sync the documentation'));
@@ -309,7 +309,7 @@ export function WikiView({ project }: { project: Project }) {
 
               <div id="wiki-ai-assistant" hidden={!assistantOpen} className="p-3">
                 <AgentAssistant key={`${project.id}:${current.path}`} content={draft} disabled={saving || syncing}
-                  onGenerate={(input, signal) => boardApi.assistWiki(project.id, { ...input, path: current.path, content: draft }, signal)}
+                  onGenerate={(input, signal) => wikiApi.assistWiki(project.id, { ...input, path: current.path, content: draft }, signal)}
                   onApply={(content) => { setDraft(content); setMode('split'); setError(''); setResult(null); }} />
               </div>
 

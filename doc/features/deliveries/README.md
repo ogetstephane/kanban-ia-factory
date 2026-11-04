@@ -33,7 +33,7 @@ The response is metadata-only and paginated; see the [API reference](../../api.m
 - [App.tsx](../../../src/App.tsx)
 - [agents.ts](../../../server/routes/agents.ts)
 - [sessionService.ts](../../../server/agents/sessionService.ts)
-- [agent.ts types](../../../src/types/agent.ts)
+- [agent.ts types](../../../shared/types/agent.ts)
 
 ## Related features
 

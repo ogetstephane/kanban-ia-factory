@@ -1,8 +1,29 @@
 # Architecture
 
-The app is an Express server ([server.ts](../server.ts)) that serves a React 19 + Vite frontend,
-Gemini AI endpoints, and a Prisma-backed board API. Code is split into small modules so each
-change needs only a narrow context.
+The app is an Express server that serves a React 19 + Vite frontend, Gemini AI endpoints, and
+a Prisma-backed board API. [server/app.ts](../server/app.ts) (`createApp`) composes the API from
+injected dependencies (database, git workspaces, agent provider, code graph, optional Gemini
+client) without listening or starting background work. [server.ts](../server.ts) is the entry
+point: it builds the production dependencies from the environment, adds Vite or static file
+serving, listens, then starts and stops the release and agent-session services. Code is split
+into small modules so each change needs only a narrow context.
+
+## Client / server boundary
+
+- `src/` contains browser code; `server/` contains API, persistence and runtime code.
+  Neither imports the other in production.
+- [shared/types/](../shared/types/) owns domain types and Zod contracts.
+  [shared/utils/](../shared/utils/) owns the pure Kanban rules, agent workflow and telemetry
+  helpers used by both sides. Shared production modules do not depend on either application layer.
+- [shared/data/initialData.ts](../shared/data/initialData.ts) contains the demo seed, imported
+  only by the server and tests, never by production browser code. There is no shared barrel
+  re-exporting the seed alongside contracts.
+- On an empty database, the browser posts only its existing legacy localStorage collections
+  to `/initialize` in a `{ legacy: { projects?, features?, tasks? } }` envelope. The server
+  fills absent collections from the seed, normalizes legacy links and validates the result.
+  Full board imports retain their existing strict validation. Reset also uses the server seed.
+- [module-boundaries.test.mjs](../scripts/module-boundaries.test.mjs) checks the import
+  boundary and the browser bundle's module graph, including lazy imports.
 
 ## Frontend: dynamic loading
 
@@ -92,9 +113,9 @@ the revision the client last saw:
 | Layer | Files |
 |-------|-------|
 | Schema | [prisma/schema.prisma](../prisma/schema.prisma) |
-| Validation | [src/types/board.ts](../src/types/board.ts) (zod, shared by client and server) |
+| Validation | [shared/types/board.ts](../shared/types/board.ts) (zod, shared by client and server) |
 | Server stores | [entityStore.ts](../server/db/entityStore.ts), [boardStore.ts](../server/db/boardStore.ts) |
-| Git | [server/git/repositoryService.ts](../server/git/repositoryService.ts), [RepositoryFields.tsx](../src/components/RepositoryFields.tsx), [BranchSwitcher.tsx](../src/components/BranchSwitcher.tsx) |
+| Git | [server/git/repositoryService.ts](../server/git/repositoryService.ts) composes [workspaceService.ts](../server/git/workspaceService.ts) (clones, worktrees, inventory), [gitOperationsService.ts](../server/git/gitOperationsService.ts) (docs and ticket commits, delivery merges, release tags) and [gitPublicationService.ts](../server/git/gitPublicationService.ts) (pushes), which share [gitCommand.ts](../server/git/gitCommand.ts); [RepositoryFields.tsx](../src/components/RepositoryFields.tsx), [BranchSwitcher.tsx](../src/components/BranchSwitcher.tsx) |
 | Routes | [server/routes/board.ts](../server/routes/board.ts) |
-| HTTP client | [src/data/boardApi.ts](../src/data/boardApi.ts) |
+| HTTP client | [apiClient.ts](../src/data/apiClient.ts) (shared request/errors); domain clients [boardApi.ts](../src/data/boardApi.ts), [agentApi.ts](../src/data/agentApi.ts), [wikiApi.ts](../src/data/wikiApi.ts), [releaseApi.ts](../src/data/releaseApi.ts), [gitApi.ts](../src/data/gitApi.ts), [graphApi.ts](../src/data/graphApi.ts), [activityApi.ts](../src/data/activityApi.ts) |
 | Hooks | [useProjects.ts](../src/data/useProjects.ts), [useBoard.ts](../src/data/useBoard.ts), [useOperation.ts](../src/data/useOperation.ts) |

@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CopilotClient, type MessageOptions } from '@github/copilot-sdk';
 import { WikiAssistant, wikiAssistantMessage } from './wikiAssistant';
-import { wikiAssistantInputSchema, MAX_WIKI_ASSISTANT_CONTEXT_BYTES, wikiAssistantContextBytes } from '../../src/types/wiki';
-import { boardApi } from '../../src/data/boardApi';
+import { wikiAssistantInputSchema, MAX_WIKI_ASSISTANT_CONTEXT_BYTES, wikiAssistantContextBytes } from '../../shared/types/wiki';
+import { wikiApi } from '../../src/data/wikiApi';
 
 const input = wikiAssistantInputSchema.parse({
   path: 'guide.md', content: '# Existing\n', prompt: 'Improve the introduction',
@@ -21,6 +21,7 @@ test('wiki proposal request includes the unsaved draft, instruction, readable te
   assert.equal(prompt.contextFiles[0].content, 'test');
   assert.equal(prompt.contextFiles[0].data, undefined);
   assert.deepEqual(message.attachments, [{ type: 'blob', data: 'AP8K', mimeType: 'application/pdf', displayName: 'design.pdf' }]);
+  assert.equal(prompt.codeGraph, undefined);
   assert.equal(wikiAssistantInputSchema.safeParse({ ...input, prompt: ' ' }).success, false);
   assert.equal(wikiAssistantInputSchema.safeParse({ ...input, files: [{ ...input.files[0], size: 99 }] }).success, false);
 });
@@ -39,6 +40,7 @@ test('wiki assistant is tool-free, returns a proposal and always stops its runti
   assert.deepEqual(config?.tools, []);
   assert.deepEqual(config?.availableTools, []);
   assert.equal(config?.skipCustomInstructions, true);
+  assert.doesNotMatch(config?.systemMessage?.content ?? '', /codeGraph|Graphify/);
   assert.equal(send.mock.calls[0].arguments[1], 120000);
   assert.deepEqual(send.mock.calls[0].arguments[0], wikiAssistantMessage(input));
 });
@@ -59,7 +61,7 @@ test('oversized context is rejected in browser API and generator before fetch or
   const oversized = { ...input, content: 'a'.repeat(MAX_WIKI_ASSISTANT_CONTEXT_BYTES) };
   const fetch = t.mock.method(globalThis, 'fetch', async () => { throw new Error('Must not fetch'); });
   const start = t.mock.method(CopilotClient.prototype, 'start', async () => {});
-  await assert.rejects(boardApi.assistWiki('project', oversized), /context is too large/);
+  await assert.rejects(wikiApi.assistWiki('project', oversized), /context is too large/);
   await assert.rejects(new WikiAssistant().generate(oversized, new AbortController().signal), /context is too large/);
   assert.equal(fetch.mock.callCount(), 0);
   assert.equal(start.mock.callCount(), 0);

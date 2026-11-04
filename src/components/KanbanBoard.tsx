@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import type { Feature, Project, Task, KanbanFilters, KanbanStatus } from '../types/kanban';
-import { KANBAN_STATUSES, canMoveTask, filterTasks } from '../utils/kanbanLogic';
+import type { Feature, Project, Task, KanbanFilters, KanbanStatus } from '../../shared/types/kanban';
+import { KANBAN_STATUSES, canMoveTask, filterTasks } from '../../shared/utils/kanbanLogic';
 import { useOperation } from '../data/useOperation';
 import { KanbanColumn } from './KanbanColumn';
 import { useAgentWorkflows } from '../data/useAgentWorkflows';

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import WorkflowTimeline from './WorkflowTimeline';
-import { getAgentWorkflow } from '../utils/agentWorkflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
 import { agentSession } from './stories/fixtures';
 
 const meta = {

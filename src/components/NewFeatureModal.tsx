@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Layers, Plus } from 'lucide-react';
-import { Feature } from '../types/kanban';
+import { Feature } from '../../shared/types/kanban';
 
 interface NewFeatureModalProps {
   isOpen: boolean;

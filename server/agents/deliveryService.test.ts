@@ -7,8 +7,8 @@ import path from 'node:path';
 import express from 'express';
 import type { Server } from 'node:http';
 import { PrismaClient } from '@prisma/client';
-import { featureSchema, taskSchema } from '../../src/types/board';
-import { deliveryPreviewSchema, publicationRequestSchema, type DeliveryRequest } from '../../src/types/agent';
+import { featureSchema, taskSchema } from '../../shared/types/board';
+import { deliveryPreviewSchema, publicationRequestSchema, type DeliveryRequest } from '../../shared/types/agent';
 import { EntityStore } from '../db/entityStore';
 import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
@@ -35,8 +35,8 @@ async function fixture(t: TestContext, epic = false, withSibling = epic) {
   const entities = new EntityStore(db);
   const repositories = new RepositoryService(path.join(directory, 'workspaces'), { localRoots: [directory] });
   const source = await createSourceRepository(path.join(directory, 'source'));
-  const cloned = await repositories.clone('project-delivery', { url: source.url });
-  const root = repositories.pathFor('project-delivery');
+  const cloned = await repositories.workspaces.clone('project-delivery', { url: source.url });
+  const root = repositories.workspaces.pathFor('project-delivery');
   git(root, 'config', 'user.name', 'Delivery Test');
   git(root, 'config', 'user.email', 'delivery@example.com');
   const now = new Date().toISOString();
@@ -128,8 +128,8 @@ test('failed remote push leaves the ticket Review and retries the same durable c
   const preview = await f.sessions.publication.preview('tasks', f.task.id);
   git(f.source.url, 'config', 'receive.denyCurrentBranch', 'refuse');
   git(f.source.url, 'config', 'receive.denyNonFastForwards', 'true');
-  const original = f.repositories.pushReviewCommit.bind(f.repositories);
-  f.repositories.pushReviewCommit = async () => { throw new Error('Origin unavailable'); };
+  const original = f.repositories.publication.pushReviewCommit.bind(f.repositories.publication);
+  f.repositories.publication.pushReviewCommit = async () => { throw new Error('Origin unavailable'); };
   await assert.rejects(f.sessions.publication.execute('tasks', f.task.id, { ...preview, acknowledgeChecks: true }), /Origin unavailable/);
   assert.equal((await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } })).status, 'Review');
   const failed = (await f.sessions.get(f.task.id))!.publication!;
@@ -137,7 +137,7 @@ test('failed remote push leaves the ticket Review and retries the same durable c
   assert.ok((await f.sessions.get(f.task.id))!.workspace);
   assert.ok(await readFile(path.join(f.completed.workspace!, '.git')));
   assert.match(failed.error, /Origin unavailable/);
-  f.repositories.pushReviewCommit = original;
+  f.repositories.publication.pushReviewCommit = original;
   const otherOrigin = await createSourceRepository(path.join(path.dirname(f.source.url), 'other-origin'));
   git(f.root, 'remote', 'set-url', '--push', 'origin', otherOrigin.url);
   await assert.rejects(f.sessions.publication.preview('tasks', f.task.id), /Origin changed/);
@@ -152,8 +152,8 @@ test('cleanup preserves post-publication edits and retries without losing the pu
   const f = await fixture(t);
   await f.accept();
   const preview = await f.sessions.publication.preview('tasks', f.task.id);
-  const cleanup = f.repositories.cleanupPublishedTicket.bind(f.repositories);
-  f.repositories.cleanupPublishedTicket = async (...args) => {
+  const cleanup = f.repositories.operations.cleanupPublishedTicket.bind(f.repositories.operations);
+  f.repositories.operations.cleanupPublishedTicket = async (...args) => {
     await writeFile(path.join(f.completed.workspace!, 'later.txt'), 'Keep my later work\n');
     return cleanup(...args);
   };
@@ -167,7 +167,7 @@ test('cleanup preserves post-publication edits and retries without losing the pu
   assert.equal(await readFile(path.join(f.completed.workspace!, 'later.txt'), 'utf8'), 'Keep my later work\n');
   const remoteCommit = git(f.source.url, 'rev-parse', preview.branch);
   await unlink(path.join(f.completed.workspace!, 'later.txt'));
-  f.repositories.cleanupPublishedTicket = cleanup;
+  f.repositories.operations.cleanupPublishedTicket = cleanup;
   await f.sessions.publication.execute('tasks', f.task.id, {
     ...await f.sessions.publication.preview('tasks', f.task.id), acknowledgeChecks: true,
   });
@@ -186,13 +186,13 @@ test('cleanup refuses private staged content; a retry after removal is idempoten
   await assert.rejects(f.sessions.publication.execute('tasks', f.task.id, input), /partially staged/);
   assert.equal(git(f.completed.workspace!, 'show', ':README.md'), 'Private staged content');
   git(f.completed.workspace!, 'add', '--all');
-  const cleanup = f.repositories.cleanupPublishedTicket.bind(f.repositories);
-  f.repositories.cleanupPublishedTicket = async (...args) => { await cleanup(...args); throw new Error('Disconnected after removal'); };
+  const cleanup = f.repositories.operations.cleanupPublishedTicket.bind(f.repositories.operations);
+  f.repositories.operations.cleanupPublishedTicket = async (...args) => { await cleanup(...args); throw new Error('Disconnected after removal'); };
   await assert.rejects(f.sessions.publication.execute('tasks', f.task.id, {
     ...await f.sessions.publication.preview('tasks', f.task.id), acknowledgeChecks: true,
   }), /Disconnected after removal/);
   await assert.rejects(readFile(path.join(f.completed.workspace!, '.git')), { code: 'ENOENT' });
-  f.repositories.cleanupPublishedTicket = cleanup;
+  f.repositories.operations.cleanupPublishedTicket = cleanup;
   await f.sessions.publication.execute('tasks', f.task.id, {
     ...await f.sessions.publication.preview('tasks', f.task.id), acknowledgeChecks: true,
   });
@@ -216,8 +216,8 @@ test('a disconnect after remote success reconciles on explicit retry without dup
   const f = await fixture(t);
   await f.accept();
   const preview = await f.sessions.publication.preview('tasks', f.task.id);
-  const push = f.repositories.pushReviewCommit.bind(f.repositories);
-  f.repositories.pushReviewCommit = async (...args) => { await push(...args); throw new Error('Disconnected after push'); };
+  const push = f.repositories.publication.pushReviewCommit.bind(f.repositories.publication);
+  f.repositories.publication.pushReviewCommit = async (...args) => { await push(...args); throw new Error('Disconnected after push'); };
   await assert.rejects(f.sessions.publication.execute('tasks', f.task.id, { ...preview, acknowledgeChecks: true }), /Disconnected/);
   assert.equal((await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } })).status, 'Review');
   const commit = git(f.source.url, 'rev-parse', preview.branch);
@@ -226,7 +226,7 @@ test('a disconnect after remote success reconciles on explicit retry without dup
   await f.sessions.delivery.recover();
   await f.sessions.publication.recover();
   assert.equal((await f.sessions.get(f.task.id))!.publication!.status, 'failed');
-  f.repositories.pushReviewCommit = push;
+  f.repositories.publication.pushReviewCommit = push;
   await f.sessions.publication.execute('tasks', f.task.id, {
     ...await f.sessions.publication.preview('tasks', f.task.id), acknowledgeChecks: true,
   });
@@ -278,8 +278,8 @@ test('publication refuses the origin default branch, rejects stale versions, and
   await assert.rejects(f.sessions.publication.execute('tasks', f.task.id, { ...preview, acknowledgeChecks: true }), /default branch/);
   assert.equal((await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } })).status, 'Review');
   git(f.source.url, 'symbolic-ref', 'HEAD', 'refs/heads/main');
-  const push = f.repositories.pushReviewCommit.bind(f.repositories);
-  f.repositories.pushReviewCommit = async (...args) => {
+  const push = f.repositories.publication.pushReviewCommit.bind(f.repositories.publication);
+  f.repositories.publication.pushReviewCommit = async (...args) => {
     const task = await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } });
     await assert.rejects(f.entities.moveTask(f.task.id, { revision: task.revision, status: 'Done' }), /AI session/);
     await assert.rejects(f.sessions.retry(f.task.id, preview.tasks[0].sessionId, 'Corrections'), /Only stopped sessions/);
@@ -313,9 +313,9 @@ test('epic validation pushes all tickets to one shared feature branch and only t
   const preview = await f.sessions.publication.preview('features', 'delivery-epic');
   const siblingWorkspace = (await f.sessions.get(sibling.id))!.workspace!;
   assert.equal(preview.branch, 'feature/reviewed-feature');
-  const push = f.repositories.pushReviewCommit.bind(f.repositories);
+  const push = f.repositories.publication.pushReviewCommit.bind(f.repositories.publication);
   let pushes = 0;
-  f.repositories.pushReviewCommit = async (...args) => {
+  f.repositories.publication.pushReviewCommit = async (...args) => {
     pushes++;
     assert.equal((await f.db.feature.findUniqueOrThrow({ where: { id: 'delivery-epic' } })).status, 'Review');
     if (pushes === 2) throw new Error('Second push failed');
@@ -325,7 +325,7 @@ test('epic validation pushes all tickets to one shared feature branch and only t
   assert.equal((await f.db.feature.findUniqueOrThrow({ where: { id: 'delivery-epic' } })).status, 'Review');
   assert.equal(await f.db.reviewPublication.count({ where: { status: 'pushed' } }), 1);
   assert.ok((await f.sessions.get(f.task.id))!.workspace, 'Keep epic worktrees until the entire epic is Done');
-  f.repositories.pushReviewCommit = push;
+  f.repositories.publication.pushReviewCommit = push;
   await f.sessions.publication.execute('features', 'delivery-epic', {
     ...await f.sessions.publication.preview('features', 'delivery-epic'), acknowledgeChecks: true,
   });
@@ -424,9 +424,9 @@ test('dirty target, wrong target branch and git operation in progress refuse del
   await writeFile(path.join(f.root, 'untracked.txt'), 'Do not overwrite');
   await assert.rejects(f.sessions.delivery.execute(f.task.id, 'commit', request(preview)), /uncommitted or untracked/);
   await rm(path.join(f.root, 'untracked.txt'));
-  await f.repositories.switchBranch('project-delivery', 'dev');
+  await f.repositories.workspaces.switchBranch('project-delivery', 'dev');
   await assert.rejects(f.sessions.delivery.preview(f.task.id), /Switch the project clone back to main/);
-  await f.repositories.switchBranch('project-delivery', 'main');
+  await f.repositories.workspaces.switchBranch('project-delivery', 'main');
   await writeFile(path.join(f.root, '.git', 'MERGE_HEAD'), preview.targetHead);
   await assert.rejects(f.sessions.delivery.preview(f.task.id), /git operation is in progress/);
   assert.equal(await f.db.agentDelivery.count(), 0);
@@ -479,10 +479,10 @@ test('conflicts leave the clone clean, preserve ticket commit, never mark Done, 
 test('interruption after ticket commit is recoverable without a duplicate commit', async (t) => {
   const f = await fixture(t);
   const preview = await f.accept();
-  const original = f.repositories.applyTicketCommit.bind(f.repositories);
-  f.repositories.applyTicketCommit = async (...args) => { await original(...args); throw new Error('Simulated disconnect after commit'); };
+  const original = f.repositories.operations.applyTicketCommit.bind(f.repositories.operations);
+  f.repositories.operations.applyTicketCommit = async (...args) => { await original(...args); throw new Error('Simulated disconnect after commit'); };
   await assert.rejects(f.sessions.delivery.execute(f.task.id, 'commit', request(preview)), /Simulated disconnect/);
-  f.repositories.applyTicketCommit = original;
+  f.repositories.operations.applyTicketCommit = original;
   const failed = await f.sessions.delivery.preview(f.task.id);
   assert.equal(failed.ticketHead, failed.delivery!.commitHash);
   assert.equal((await f.sessions.delivery.execute(f.task.id, 'merge', request(failed))).delivery!.status, 'delivered');
@@ -492,13 +492,13 @@ test('interruption after ticket commit is recoverable without a duplicate commit
 test('prepared ticket commit can be resumed when failure happened before ref update', async (t) => {
   const f = await fixture(t);
   const preview = await f.accept();
-  const original = f.repositories.applyTicketCommit.bind(f.repositories);
-  f.repositories.applyTicketCommit = async () => { throw new Error('Before commit ref'); };
+  const original = f.repositories.operations.applyTicketCommit.bind(f.repositories.operations);
+  f.repositories.operations.applyTicketCommit = async () => { throw new Error('Before commit ref'); };
   await assert.rejects(f.sessions.delivery.execute(f.task.id, 'commit', request(preview)), /Before commit ref/);
   const failed = await f.sessions.delivery.preview(f.task.id);
   assert.ok(failed.delivery!.commitHash);
   assert.equal(failed.ticketHead, preview.ticketHead);
-  f.repositories.applyTicketCommit = original;
+  f.repositories.operations.applyTicketCommit = original;
   const resumed = await f.sessions.delivery.execute(f.task.id, 'commit', request(failed));
   assert.equal(resumed.ticketHead, failed.delivery!.commitHash);
   assert.equal(resumed.delivery!.status, 'committed');
@@ -507,8 +507,8 @@ test('prepared ticket commit can be resumed when failure happened before ref upd
 test('interruption after Git merge can be reconciled after restart without another merge or premature Done', async (t) => {
   const f = await fixture(t);
   const committed = await f.sessions.delivery.execute(f.task.id, 'commit', request(await f.accept()));
-  const original = f.repositories.applyDeliveryMerge.bind(f.repositories);
-  f.repositories.applyDeliveryMerge = async (...args) => { await original(...args); throw new Error('Disconnect after merge'); };
+  const original = f.repositories.operations.applyDeliveryMerge.bind(f.repositories.operations);
+  f.repositories.operations.applyDeliveryMerge = async (...args) => { await original(...args); throw new Error('Disconnect after merge'); };
   await assert.rejects(f.sessions.delivery.execute(f.task.id, 'merge', request(committed)), /Disconnect after merge/);
   const interrupted = (await f.sessions.get(f.task.id))!.delivery!;
   assert.equal(git(f.root, 'rev-parse', 'HEAD'), interrupted.mergeHash);
@@ -519,7 +519,7 @@ test('interruption after Git merge can be reconciled after restart without anoth
   await f.sessions.delivery.recover();
   assert.equal((await f.sessions.get(f.task.id))!.status, 'completed');
   assert.equal((await f.sessions.get(f.task.id))!.delivery!.status, 'failed');
-  f.repositories.applyDeliveryMerge = original;
+  f.repositories.operations.applyDeliveryMerge = original;
   const delivered = await f.sessions.delivery.execute(f.task.id, 'merge', request(await f.sessions.delivery.preview(f.task.id)));
   assert.equal(delivered.delivery!.status, 'delivered');
   assert.equal(delivered.delivery!.mergeHash, interrupted.mergeHash);
@@ -529,8 +529,8 @@ test('interruption after Git merge can be reconciled after restart without anoth
 test('concurrent requests are serialized and context stays locked throughout delivery', async (t) => {
   const f = await fixture(t);
   const preview = await f.accept();
-  const original = f.repositories.createTicketCommit.bind(f.repositories);
-  f.repositories.createTicketCommit = async (...args) => {
+  const original = f.repositories.operations.createTicketCommit.bind(f.repositories.operations);
+  f.repositories.operations.createTicketCommit = async (...args) => {
     const task = await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } });
     await assert.rejects(f.entities.moveTask(f.task.id, { revision: task.revision, status: 'Review' }), /AI session/);
     await assert.rejects(f.sessions.retry(f.task.id, preview.sessionId, 'Corrections'), /Only stopped sessions/);
@@ -585,15 +585,15 @@ test('binary, empty-file, deletion and pathspec-looking names survive commit and
 test('a later target commit after an interrupted merge is retained and recovery does not merge twice', async (t) => {
   const f = await fixture(t);
   const committed = await f.sessions.delivery.execute(f.task.id, 'commit', request(await f.accept()));
-  const original = f.repositories.applyDeliveryMerge.bind(f.repositories);
-  f.repositories.applyDeliveryMerge = async (...args) => { await original(...args); throw new Error('Merge applied before disconnect'); };
+  const original = f.repositories.operations.applyDeliveryMerge.bind(f.repositories.operations);
+  f.repositories.operations.applyDeliveryMerge = async (...args) => { await original(...args); throw new Error('Merge applied before disconnect'); };
   await assert.rejects(f.sessions.delivery.execute(f.task.id, 'merge', request(committed)), /disconnect/);
   const prepared = (await f.sessions.get(f.task.id))!.delivery!.mergeHash;
   await writeFile(path.join(f.root, 'later.txt'), 'independent target work\n');
   git(f.root, 'add', '.');
   git(f.root, 'commit', '-m', 'Later target commit');
   const target = git(f.root, 'rev-parse', 'HEAD');
-  f.repositories.applyDeliveryMerge = original;
+  f.repositories.operations.applyDeliveryMerge = original;
   const delivered = await f.sessions.delivery.execute(f.task.id, 'merge', request(await f.sessions.delivery.preview(f.task.id)));
   assert.equal(delivered.delivery!.mergeHash, prepared);
   assert.equal(git(f.root, 'rev-parse', 'HEAD'), target);
@@ -707,24 +707,24 @@ test('Finish epic lists the epic, not its children, and finishes its shared bran
 test('Finish retries saved merges after project push failure and a disconnect after branch deletion', async (t) => {
   const f = await publishedFixture(t);
   const preview = await f.sessions.finish.preview('tasks', f.task.id);
-  const push = f.repositories.pushFinishedProject.bind(f.repositories);
-  f.repositories.pushFinishedProject = async () => { throw new Error('Project push unavailable'); };
+  const push = f.repositories.publication.pushFinishedProject.bind(f.repositories.publication);
+  f.repositories.publication.pushFinishedProject = async () => { throw new Error('Project push unavailable'); };
   await assert.rejects(f.sessions.finish.execute('tasks', f.task.id, preview), /Project push unavailable/);
   const saved = await f.db.branchFinish.findFirstOrThrow();
   assert.ok(saved.mergeHash);
   assert.equal(git(f.source.url, 'rev-parse', preview.branch), preview.featureHead);
   assert.equal(git(f.root, 'rev-parse', 'main'), saved.mergeHash);
   assert.notEqual(git(f.source.url, 'rev-parse', 'main'), saved.mergeHash);
-  f.repositories.pushFinishedProject = push;
-  const close = f.repositories.closeFinishedBranch.bind(f.repositories);
-  f.repositories.closeFinishedBranch = async (...args) => { await close(...args); throw new Error('Disconnected after closing'); };
+  f.repositories.publication.pushFinishedProject = push;
+  const close = f.repositories.publication.closeFinishedBranch.bind(f.repositories.publication);
+  f.repositories.publication.closeFinishedBranch = async (...args) => { await close(...args); throw new Error('Disconnected after closing'); };
   await assert.rejects(f.sessions.finish.execute('tasks', f.task.id, await f.sessions.finish.preview('tasks', f.task.id)), /Disconnected after closing/);
   assert.equal(git(f.source.url, 'rev-parse', 'main'), saved.mergeHash);
   assert.equal(git(f.source.url, 'for-each-ref', '--format=%(refname)', `refs/heads/${preview.branch}`), '');
   await f.db.branchFinish.update({ where: { id: saved.id }, data: { status: 'closing' } });
   await f.sessions.finish.recover();
   assert.equal((await f.db.branchFinish.findUniqueOrThrow({ where: { id: saved.id } })).status, 'failed');
-  f.repositories.closeFinishedBranch = close;
+  f.repositories.publication.closeFinishedBranch = close;
   await f.sessions.finish.execute('tasks', f.task.id, await f.sessions.finish.preview('tasks', f.task.id));
   assert.equal(git(f.root, 'rev-parse', 'main'), saved.mergeHash);
   assert.equal((await f.db.branchFinish.findUniqueOrThrow({ where: { id: saved.id } })).status, 'finished');
@@ -774,8 +774,8 @@ test('Finish requires a next release; creation backfills unassigned tickets and 
 test('Finish locks session and release context while pushing and preserves concurrently advanced feature branches', async (t) => {
   const f = await publishedFixture(t);
   const preview = await f.sessions.finish.preview('tasks', f.task.id);
-  const push = f.repositories.pushFinishedProject.bind(f.repositories);
-  f.repositories.pushFinishedProject = async (...args) => {
+  const push = f.repositories.publication.pushFinishedProject.bind(f.repositories.publication);
+  f.repositories.publication.pushFinishedProject = async (...args) => {
     const task = await f.db.task.findUniqueOrThrow({ where: { id: f.task.id } });
     await assert.rejects(f.entities.moveTask(task.id, { revision: task.revision, status: 'Done' }), /AI session/);
     await push(...args);

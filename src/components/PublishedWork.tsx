@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { z } from 'zod';
-import type { finishPreviewSchema, publishedWorkSchema } from '../types/git';
-import { boardApi } from '../data/boardApi';
+import type { finishPreviewSchema, publishedWorkSchema } from '../../shared/types/git';
+import { releaseApi } from '../data/releaseApi';
+import { gitApi } from '../data/gitApi';
 import { useOperation } from '../data/useOperation';
 import ReleaseSelect from './ReleaseSelect';
 
@@ -27,12 +28,12 @@ export default function PublishedWork({ work, projectId, onRefresh, onOpenTask }
       <p className="text-xs text-slate-400">Release: {task.releaseVersion ? `v${task.releaseVersion}` : 'Unassigned · create the next release before Finish'}</p>
       {!finished && !work.finishStatus && <ReleaseSelect projectId={projectId} value={task.releaseId ?? ''}
         id={`git-release-${task.id}`} disabled={operation.pending} onChange={(value) => { void operation.run(async () => {
-          await boardApi.assignRelease(projectId, task.id, value || null, task.revision); setPreview(null); onRefresh();
+          await releaseApi.assignRelease(projectId, task.id, value || null, task.revision); setPreview(null); onRefresh();
         }); }} />}
     </div>)}
     {!finished && <button type="button" disabled={operation.pending} className="rounded bg-indigo-700 px-3 py-2 disabled:opacity-40"
       onClick={() => { void operation.run(async () => {
-        setPreview(null); setConfirmed(false); setPreview(await boardApi.finishPreview(work.kind, work.id));
+        setPreview(null); setConfirmed(false); setPreview(await gitApi.finishPreview(work.kind, work.id));
       }); }}>{operation.pending ? 'Working…' : preview ? 'Reload Finish preview' : work.finishStatus ? 'Retry Finish' : 'Finish'}</button>}
     {preview && !finished && <div className="space-y-3 rounded border border-amber-500/30 p-3">
       <p>Merge <code>{preview.branch}</code> into <code>{preview.targetBranch}</code> for <strong>v{preview.releaseVersion}</strong>.</p>
@@ -41,7 +42,7 @@ export default function PublishedWork({ work, projectId, onRefresh, onOpenTask }
         onChange={(event) => setConfirmed(event.target.checked)} />I confirm the merge, push and feature-branch deletion.</label>
       <button type="button" disabled={!confirmed || operation.pending} className="rounded bg-emerald-700 px-3 py-2 disabled:opacity-40"
         onClick={() => { void operation.run(async () => {
-          await boardApi.finishBranch(work.kind, work.id, preview); setPreview(null); onRefresh();
+          await gitApi.finishBranch(work.kind, work.id, preview); setPreview(null); onRefresh();
         }); }}>{operation.pending ? 'Finishing…' : 'Confirm Finish · merge, push & close branch'}</button>
     </div>}
   </section>;

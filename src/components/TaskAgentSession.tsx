@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
 import { useOperation } from '../data/useOperation';
-import type { AgentSession, SessionActionFocus } from '../types/agent';
+import type { AgentSession, SessionActionFocus } from '../../shared/types/agent';
 import AgentQuestionForm from './AgentQuestionForm';
 import WorkflowTimeline from './WorkflowTimeline';
-import { getAgentWorkflow } from '../utils/agentWorkflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
 const TicketReview = lazy(() => import('./TicketReview'));
 const SessionTimeline = lazy(() => import('./SessionHistory'));
 const TicketDelivery = lazy(() => import('./TicketDelivery'));
@@ -35,7 +35,7 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
     let timer: ReturnType<typeof setTimeout>;
     const load = async () => {
       try {
-        const result = await boardApi.agentSession(taskId);
+        const result = await agentApi.agentSession(taskId);
         if (active) { setSession(result); setError(''); }
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : 'Unable to load session');
@@ -49,7 +49,7 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
 
   const act = (action: 'approve' | 'retry' | 'cancel') => operation.run(async () => {
     if (!session) throw new Error('No session loaded');
-    setSession(await boardApi.agentAction(taskId, session.id, action, session.updatedAt));
+    setSession(await agentApi.agentAction(taskId, session.id, action, session.updatedAt));
   });
 
   const canReview = !!session?.workspace && ['completed', 'failed', 'cancelled', 'awaiting_approval'].includes(session.status);
@@ -57,7 +57,7 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
   const questionForm = session?.status === 'awaiting_input' && session.questions.filter((question) => question.answer === null).slice(-1).map((question) =>
     <AgentQuestionForm key={question.id} question={question} pending={operation.pending}
       onAnswer={(answer) => operation.run(async () => {
-        setSession(await boardApi.answerAgent(taskId, session.id, question.id, answer));
+        setSession(await agentApi.answerAgent(taskId, session.id, question.id, answer));
       })} />);
   return (
     <section aria-label="AI ticket session" className={workspaceLayout
@@ -81,7 +81,7 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
         {session.publication?.error && <p role="alert" className="text-rose-300">{session.publication.error}</p>}
         {session.publication?.status === 'pushed' && session.workspace && <Suspense fallback={<p>Loading cleanup retry…</p>}>
           <ReviewValidation kind="tasks" id={taskId} onDone={async () => {
-            setSession(await boardApi.agentSession(taskId)); onTaskChange?.();
+            setSession(await agentApi.agentSession(taskId)); onTaskChange?.();
           }} />
         </Suspense>}
         <SessionTimeline key={session.attempt} taskId={taskId} session={session} stepActions={{
@@ -114,7 +114,7 @@ export default function TaskAgentSession({ taskId, onTaskChange, initialAction, 
                 className="w-full bg-slate-800 p-2 rounded" placeholder="Describe the changes you want. A new read-only plan will require your approval." />
               <button type="button" disabled={operation.pending || !feedback.trim()} className="px-3 py-2 bg-indigo-700 rounded disabled:opacity-40"
                 onClick={() => { void operation.run(async () => {
-                  setSession(await boardApi.feedbackAgent(taskId, session.id, feedback.trim(), session.updatedAt)); setFeedback(''); setShowReview(false); onTaskChange?.();
+                  setSession(await agentApi.feedbackAgent(taskId, session.id, feedback.trim(), session.updatedAt)); setFeedback(''); setShowReview(false); onTaskChange?.();
                 }); }}>Request a correction plan</button>
             </div>}
         </div>} />

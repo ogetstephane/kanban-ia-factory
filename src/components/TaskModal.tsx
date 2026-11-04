@@ -8,15 +8,17 @@ import {
   Square,
   AlertCircle,
   HelpCircle,
-  Loader2,
   Tag as TagIcon
 } from 'lucide-react';
-import { Task, Feature, KanbanStatus, TaskPriority, Subtask } from '../types/kanban';
-import { CREATION_STATUSES, TASK_PRIORITIES, canCreateTaskIn, reachableStatuses } from '../utils/kanbanLogic';
-import type { SessionActionFocus } from '../types/agent';
+import { Task, Feature, KanbanStatus, TaskPriority, Subtask } from '../../shared/types/kanban';
+import { CREATION_STATUSES, TASK_PRIORITIES, canCreateTaskIn, reachableStatuses } from '../../shared/utils/kanbanLogic';
+import type { SessionActionFocus } from '../../shared/types/agent';
 import { useOperation } from '../data/useOperation';
 import { ContextFiles } from './ContextFiles';
-import type { ContextFile } from '../types/contextFile';
+import type { ContextFile } from '../../shared/types/contextFile';
+import TaskAgentSelect from './TaskAgentSelect';
+import { useTaskAutoSpec } from '../data/useTaskAutoSpec';
+import { TaskAutoSpecButton, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
 
 const TaskAgentSession = lazy(() => import('./TaskAgentSession'));
 const ReleaseSelect = lazy(() => import('./ReleaseSelect'));
@@ -61,6 +63,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [priority, setPriority] = useState<TaskPriority>('Medium');
   const [featureId, setFeatureId] = useState<string>('');
   const [releaseId, setReleaseId] = useState('');
+  const [agentProvider, setAgentProvider] = useState<NonNullable<Task['agentProvider']>>('copilot');
+  const [agentModel, setAgentModel] = useState('');
   const [storyPoints, setStoryPoints] = useState<number>(3);
   const [tagsInput, setTagsInput] = useState('');
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
@@ -69,10 +73,12 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [newCriterion, setNewCriterion] = useState('');
   const [suggestedWorkflow, setSuggestedWorkflow] = useState('');
   const [blockedReason, setBlockedReason] = useState('');
-  const [isCopilotGenerating, setIsCopilotGenerating] = useState(false);
-  const [copilotFeedback, setCopilotFeedback] = useState<string | null>(null);
+  const autoSpec = useTaskAutoSpec({
+    setDescription, setAcceptanceCriteria, setSubtasks, setSuggestedWorkflow, setStoryPoints, setTagsInput,
+  });
 
   useEffect(() => {
+    autoSpec.reset();
     upload.clearError();
     if (task) {
       setContextFiles(task.contextFiles ?? []);
@@ -82,13 +88,14 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setPriority(task.priority);
       setFeatureId(task.featureId || '');
       setReleaseId(task.releaseId || '');
+      setAgentProvider(task.agentProvider ?? 'copilot');
+      setAgentModel(task.agentModel ?? '');
       setStoryPoints(task.storyPoints || 3);
       setTagsInput(task.tags ? task.tags.join(', ') : '');
       setSubtasks(task.subtasks || []);
       setAcceptanceCriteria(task.acceptanceCriteria || []);
       setSuggestedWorkflow(task.suggestedWorkflow || '');
       setBlockedReason(task.blockedReason || '');
-      setCopilotFeedback(null);
     } else {
       setContextFiles([]);
       setTitle('');
@@ -99,15 +106,16 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setFeatureId(defaultFeature?.id ?? '');
       setStatus(defaultFeature?.status ?? (canCreateTaskIn(defaultStatus) ? defaultStatus : 'To Do'));
       setReleaseId('');
+      setAgentProvider('copilot');
+      setAgentModel('');
       setStoryPoints(3);
       setTagsInput('');
       setSubtasks([]);
       setAcceptanceCriteria([]);
       setSuggestedWorkflow('');
       setBlockedReason('');
-      setCopilotFeedback(null);
     }
-  }, [task, isOpen, defaultStatus, defaultFeatureId, features]);
+  }, [task, projectId, isOpen, defaultStatus, defaultFeatureId, features]);
 
   if (!isOpen) return null;
 
@@ -146,62 +154,25 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setAcceptanceCriteria(acceptanceCriteria.filter((_, i) => i !== index));
   };
 
-  // AI Copilot Auto-Specification trigger
-  const handleCopilotEnhance = async () => {
-    if (!title.trim()) {
-      setCopilotFeedback('Please enter at least a Task Title for Copilot to enhance.');
-      return;
-    }
-    setIsCopilotGenerating(true);
-    setCopilotFeedback(null);
-
-    const parentFeature = features.find((f) => f.id === featureId);
-
-    try {
-      const response = await fetch('/api/copilot/generate-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          currentDescription: description,
-          featureTitle: parentFeature ? parentFeature.title : undefined,
-          priority,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to generate task description');
-      const data = await response.json();
-
-      if (data.description) setDescription(data.description);
-      if (Array.isArray(data.acceptanceCriteria) && data.acceptanceCriteria.length > 0) {
-        setAcceptanceCriteria(data.acceptanceCriteria);
-      }
-      if (Array.isArray(data.subtasks) && data.subtasks.length > 0) {
-        setSubtasks(
-          data.subtasks.map((text: string, i: number) => ({
-            id: `copilot-st-${Date.now()}-${i}`,
-            text,
-            completed: false,
-          }))
-        );
-      }
-      if (data.suggestedWorkflow) setSuggestedWorkflow(data.suggestedWorkflow);
-      if (data.estimatedStoryPoints) setStoryPoints(data.estimatedStoryPoints);
-      if (Array.isArray(data.suggestedTags) && data.suggestedTags.length > 0) {
-        setTagsInput(data.suggestedTags.join(', '));
-      }
-
-      setCopilotFeedback('✨ Copilot auto-generated detailed spec & acceptance criteria!');
-    } catch (err: any) {
-      setCopilotFeedback(`Notice: ${err.message || 'Error communicating with AI Copilot'}`);
-    } finally {
-      setIsCopilotGenerating(false);
-    }
+  const generateSpec = () => {
+    if (upload.pending) return;
+    void autoSpec.generate(task?.projectId ?? projectId, {
+      title,
+      currentDescription: description,
+      featureTitle: features.find((f) => f.id === featureId)?.title,
+      priority,
+      agentModel: agentModel || undefined,
+      acceptanceCriteria,
+      subtasks: subtasks.map((subtask) => subtask.text),
+      suggestedWorkflow,
+      tags: tagsInput.split(',').map((tag) => tag.trim()).filter(Boolean),
+      contextFiles,
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || upload.pending) return;
+    if (!title.trim() || upload.pending || autoSpec.generating) return;
 
     const parsedTags = tagsInput
       .split(',')
@@ -217,6 +188,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       priority,
       featureId: featureId || undefined,
       releaseId: releaseId || undefined,
+      agentProvider,
+      agentModel: agentModel || undefined,
       storyPoints,
       tags: parsedTags,
       subtasks,
@@ -265,7 +238,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <fieldset disabled={pending || save.pending} className="space-y-4">
+          <TaskAutoSpecStatus spec={autoSpec} />
+          <fieldset disabled={pending || save.pending || autoSpec.generating} className="space-y-4">
           <div className="grid gap-6 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <section aria-label="Task content" className="min-w-0 space-y-4">
           {/* Title & Copilot Button */}
@@ -274,25 +248,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <label htmlFor="task-title-input" className="text-xs font-semibold text-slate-300">
                 Task Title *
               </label>
-              <button
-                type="button"
-                onClick={handleCopilotEnhance}
-                disabled={isCopilotGenerating || !title.trim()}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30 transition-all disabled:opacity-50 cursor-pointer"
-                title="Use Copilot to auto-generate description, acceptance criteria & subtasks"
-              >
-                {isCopilotGenerating ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                    <span>Generating spec...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Copilot Auto-Spec</span>
-                  </>
-                )}
-              </button>
+              <TaskAutoSpecButton spec={autoSpec} disabled={upload.pending || !title.trim()} onGenerate={generateSpec} />
             </div>
             <input
               id="task-title-input"
@@ -305,18 +261,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             />
           </div>
 
-          {copilotFeedback && (
-            <div className="p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs text-indigo-300 flex items-center justify-between">
-              <span>{copilotFeedback}</span>
-              <button
-                type="button"
-                onClick={() => setCopilotFeedback(null)}
-                className="text-xs text-indigo-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-          )}
+          <TaskAutoSpecResult spec={autoSpec} />
 
           <div>
             <label htmlFor="task-desc-input" className="text-xs font-semibold text-slate-300 block mb-1">
@@ -331,13 +276,17 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               className="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-sans"
             />
           </div>
-          <ContextFiles files={contextFiles} onChange={setContextFiles} operation={upload} />
+          <ContextFiles files={contextFiles} onChange={setContextFiles} operation={upload}
+            help="Sent to Copilot for Auto-Spec and ticket sessions; stored when you save the task. Do not upload secrets." />
           </section>
 
           <section aria-label="Task details" className="min-w-0 space-y-4">
           <Suspense fallback={<p className="text-xs">Loading versions...</p>}>
             <ReleaseSelect projectId={task?.projectId ?? projectId} value={releaseId} onChange={setReleaseId} />
           </Suspense>
+
+          <TaskAgentSelect provider={agentProvider} model={agentModel}
+            onProviderChange={setAgentProvider} onModelChange={setAgentModel} />
 
           {/* Metadata Row: Feature, Status, Priority, Story Points */}
           <div className="grid grid-cols-2 gap-3">

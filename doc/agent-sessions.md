@@ -21,6 +21,29 @@ The initial context contains only the ticket (description, criteria, subtasks, t
 workflow notes, uploaded context files), its project, and its linked feature/epic. It does not contain other tickets or
 the entire board. The agent reads relevant repository files on demand.
 
+### Choosing the ticket agent and model
+
+The new/edit ticket form includes **Ticket agent**, with **Agent provider** and
+**Model** selectors. GitHub Copilot is currently the only integrated ticket provider;
+the model list is loaded from the server user's authenticated Copilot SDK catalogue,
+excluding models disabled by policy.
+
+The selection is saved with the ticket and snapshotted when a session is queued or
+replanned. The same model is used for planning, execution and advisory AI review.
+An explicit ticket model overrides `COPILOT_MODEL`; leaving the selection at
+**Server default** uses that environment setting, or Copilot's default if unset.
+Existing tickets continue using the default until a model is selected.
+If `COPILOT_MODEL` is not in the account's catalogue, the form marks the server
+default as unavailable. A run whose model Copilot rejects fails with a message naming
+whether the ticket selection or `COPILOT_MODEL` must be changed.
+
+Active/queued sessions still prevent ticket edits. To change an existing run's model,
+stop the session, save the ticket's new model, then regenerate its plan. Changes do not
+alter the model recorded in previous attempts. A saved model missing from the current
+catalogue is retained and labelled **saved selection**, rather than silently replaced.
+Catalogue failures are shown with **Retry models**; they do not erase a saved choice.
+The separate Gemini Auto-Spec assistant is not affected by ticket agent settings.
+
 ### Uploading task context
 
 In the new/edit task page, use **Upload context files** below **Description & Context**.
@@ -106,6 +129,55 @@ Selecting a row opens that ticket's run timeline. Each run shows its plan, clari
 questions and answers, execution report, checks, review state and delivery when available.
 Actions such as answering, approving, retrying, reviewing and delivery appear on the current
 run only when they are relevant. The same timeline is available inside the task editor.
+
+### Per-run agent details
+
+Every run has a dedicated **Agent details** block in the Sessions view and task editor.
+It exposes all recorded session information without field filtering:
+
+- session IDs, provider, state, revision, timestamps, worktree, branch and base commit;
+- the snapshotted ticket, project and feature context;
+- separate runtime records for planning, execution and each advisory AI review;
+- requested and reported models, Copilot version, reasoning effort and context tier;
+- input/output and cache-read/cache-write tokens, API-call counts and duration;
+- provider-reported premium-request cost in **billing multiplier units**, not dollars;
+- latest root-agent context usage, token limit, utilization and token breakdown;
+- the actual prompt, attachments, system instructions, tool definitions and runtime configuration;
+- all received SDK events, including ephemeral usage/context events, subagent events,
+  tool calls/results, reasoning, billing/quota data, compaction, errors and future event fields.
+
+Totals sum individual `assistant.usage` events across all runtime phases and subagents;
+cumulative context samples are not added to token totals. Missing metrics are displayed
+as **Not reported**, while an explicitly reported zero remains zero. Expand the JSON
+sections to inspect every field; raw event content is not truncated or filtered.
+
+### Agent usage at a glance
+
+Each session row in the Sessions list, and the header of the selected session, show
+the latest agent of the current run:
+
+- **Agent name**: role (Planning, Execution or AI review agent), model and provider,
+  plus any subagents in the header;
+- **Context window**: percentage available, with tokens used / model limit and tokens left;
+- **Copilot quota**: percentage of your premium-request entitlement available, with
+  requests used / entitlement and the reset date.
+
+The quota is read from Copilot (`account.getQuota`) when each run starts and ends, and
+from any `session.quota_observation` event; the newest reading is shown. Gauges turn
+amber at 30% and red at 10% available. Values not reported by the provider show `n/a`.
+These summaries only exist for runs started after this feature was installed.
+
+Runtime records are persisted in SQLite, refreshed with the current session, and retained
+by attempt when a run is replanned. Interrupted runtimes are marked failed on server restart.
+Existing sessions retain their context and session metadata, but usage from runs made before
+telemetry collection was enabled cannot be reconstructed. Queued runs have no runtime yet.
+Providers only supply fields they actually report; no monetary estimate or fabricated
+context limit is supplied.
+
+Apply database migrations (`npm run db:migrate`) and restart the server after upgrading.
+Full telemetry can include task content, attachment data, repository/tool output and
+reasoning; it can grow large. Treat the database and session API with the same access
+and backup protections as the source code, and do not upload secrets as task context.
 
 The shared **workflow summary** shows five icon-labelled steps: **Plan → Approval →
 Execution → Review → Delivery**. The session list and board tickets use a compact version
@@ -350,8 +422,96 @@ server (`copilot login`, with the standalone CLI installed), and ensure the acco
 Copilot access. The server uses that user's existing authentication.
 
 `COPILOT_MODEL` in `.env` optionally selects a model. Empty uses the runtime default.
+
+To use Hydrafusion, set `COPILOT_MODEL=hydrafusion` in `.env` and restart the server.
+This applies to new Copilot runtime sessions for ticket planning, execution, automated
+review, and the wiki assistant. The separate Gemini-powered helpers are unchanged.
+The authenticated Copilot account/runtime must have access to the selected model.
 Planning and execution use the account's AI quota. No Gemini key is needed for ticket
 sessions; the pre-existing Gemini feature-breakdown endpoints are independent.
+
+## Code knowledge graph (Graphify)
+
+Ticket file tools require workspace-relative paths such as `src`, `./src` or
+`./src/App.tsx`. Directory listing and search accept `.` or `./` for the workspace
+root; search expects a directory, not a file or glob. Absolute paths, parent traversal
+(`..`), hidden paths and `node_modules` remain forbidden.
+
+See [Code graph](features/code_graph/README.md) for the complete integration guide,
+including exclusions, cache behavior, manual community naming and the API.
+
+When [Graphify](https://github.com/safishamsi/graphify) is installed, every planning,
+execution and automated-review phase starts by mapping the ticket worktree into a code
+knowledge graph ([codeGraph.ts](../server/agents/codeGraph.ts)). The agent receives:
+
+- the on-demand [`ticket-graphify` skill](../.github/skills/ticket-graphify/SKILL.md),
+  discovered through the SDK's `skillDirectories` and activated with the native
+  `skill` tool. Its body requires task understanding, graph queries, source
+  verification, an impact report before edits, tests and a final comparison of
+  changed files against the analysis;
+- four read-only tools: `ticket_graph_query` (natural-language question),
+  `ticket_graph_explain` (one symbol and its neighbors), `ticket_graph_path` (relationship
+  path between two symbols) and `ticket_graph_affected` (what depends on a symbol).
+
+Neither ticket agents nor the Wiki assistant receive an automatically injected graph
+summary. The initial ticket prompt contains only a short skill activation instruction,
+not the full Graphify workflow. Ticket agents load that workflow on demand and retrieve
+only the graph information needed through the tools.
+Planning and automated review stay read-only; execution rechecks the approved plan
+before modifying code. The skill guides the analysis; it is not a tool-level write gate.
+Other skills are rejected, and enabling the native skill loader does not enable
+built-in shell or file tools.
+
+The ticket editor's **Copilot Auto-Spec** uses the same skill in a read-only SDK
+session against the project's main clone. It respects the selected ticket model,
+returns the proposed specification and impact analysis, and never saves a ticket.
+See [ticket drafting](features/code_graph/README.md#ticket-drafting).
+
+Only code is analyzed (`graphify extract --code-only`): extraction is a local tree-sitter
+AST parse with no LLM call, and API keys are not passed to Graphify. Docs, PDFs and images
+are skipped, and so are dependencies (`node_modules/` is always excluded). The graph is written outside the worktree (default
+`$TMPDIR/kanban-graphify/<hash>-<run-id>`), so it never appears in ticket diffs.
+Each run owns its graph, including concurrent drafts of the same project. It reflects the
+worktree when the phase started; the agent confirms details by reading files. A missing
+or failing Graphify never blocks a session: instructions require the agent to notify the
+user and continue with source-based impact analysis without claiming Graphify was used.
+The same fallback applies when Graphify is disabled or a query fails; build failures
+also log a server warning. A repository `.graphifyignore` (gitignore syntax) narrows the scope.
+
+Install it as the user that runs the server, then restart the server:
+
+```sh
+uv tool install graphifyy      # or: pipx install graphifyy
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `GRAPHIFY_ENABLED` | enabled | `false` disables the graph for all sessions. |
+| `GRAPHIFY_BIN` | `graphify` | Executable path, when it is not on the server's `PATH`. |
+| `GRAPHIFY_CACHE_DIR` | `$TMPDIR/kanban-graphify` | Where graphs are stored. |
+
+### Code graph tab
+
+Projects with a repository get a **Code graph** tab (`/projects/<id>/code-graph`) next to
+Wiki and Git. It maps the project's main clone (the branch used by the Wiki) and shows:
+
+- **Visualization**: Graphify's interactive `graph.html` (communities, search, node details);
+  **Full screen** opens it in its own tab.
+- **Report**: `GRAPH_REPORT.md` (god nodes, communities, surprising connections).
+
+The graph is built on first opening (a few seconds), cached, and rebuilt automatically when
+the clone's `HEAD` changes; **Rebuild** forces a new extraction. The same report is given to
+the Code graph view only, not injected into agent prompts. The page is served by [codeGraph.ts](../server/routes/codeGraph.ts) with a
+strict CSP inside an `<iframe sandbox="allow-scripts">` (opaque origin, no network except the
+SRI-pinned `vis-network` script from unpkg.com, so the visualization needs internet access).
+Very large graphs can use an aggregated community view, depending on the installed
+Graphify version. If no visualization is generated, only the report is shown.
+
+Each project snapshot also publishes the generated files in `graphify-out/` at the
+root of the project's main clone, allowing Copilot in that clone to query the graph.
+Cached snapshots restore this copy without rebuilding. Ticket-phase graphs remain
+in the external cache only. Add `graphify-out/` to the clone's `.gitignore` if the
+project outputs should not appear in Git status.
 
 ## Provider abstraction
 
@@ -361,9 +521,10 @@ callback and session-id callback. [SessionService](../server/agents/sessionServi
 the durable queue, approval, questions and lifecycle, not the AI vendor.
 
 [CopilotProvider](../server/agents/copilotProvider.ts) is the initial adapter. To replace it,
-implement `AgentProvider` and inject it at the composition root in [server.ts](../server.ts);
+implement `AgentProvider` and pass it to `createApp` at the composition root in [server.ts](../server.ts);
 the queue, task routes and UI do not need vendor-specific changes. Persisted sessions retain
-their provider id; a different adapter cannot silently execute them.
+their provider id; a different adapter cannot silently execute them. The
+[app integration test](../server/app.test.ts) injects a simulated provider the same way.
 
 ## Trust boundary
 

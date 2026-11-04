@@ -17,8 +17,14 @@
     "start": "tsx server.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "test": "tsx --test src/**/*.test.ts server/**/*.test.ts",
+    "test": "tsx --test src/**/*.test.ts shared/**/*.test.ts server/*.test.ts server/**/*.test.ts scripts/*.test.mjs",
+    "playwright:install": "playwright install chromium",
+    "test:e2e": "playwright test",
+    "test:e2e:server": "vite --host 127.0.0.1 --port 3100 --strictPort",
+    "test:ui": "playwright test --ui --ui-host=127.0.0.1 --ui-port=9323",
+    "test:report": "playwright show-report --host 127.0.0.1",
     "test:agent:live": "COPILOT_LIVE_TEST=1 tsx --test server/agents/copilotProvider.test.ts",
+    "test:agent:skills": "COPILOT_SKILL_TEST=1 tsx --test server/agents/graphifySkill.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,6 +47,8 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.12",
+    "@playwright/test": "^1.64.1",
     "@storybook/react-vite": "^10.6.5",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",

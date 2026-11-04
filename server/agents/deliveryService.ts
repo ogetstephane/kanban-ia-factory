@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentSession, Prisma, PrismaClient } from '@prisma/client';
-import { agentContextSchema, deliveryPreviewSchema, type DeliveryRequest } from '../../src/types/agent';
+import { agentContextSchema, deliveryPreviewSchema, type DeliveryRequest } from '../../shared/types/agent';
 import { advanceEpicToReviewIfComplete, EntityError } from '../db/entityStore';
 import type { RepositoryService } from '../git/repositoryService';
 import { recordActivity } from '../db/activityLog';
@@ -70,14 +70,14 @@ export class DeliveryService {
     if (row.reviewStatus !== 'accepted') throw new EntityError(409, 'Accept the human code review before delivering');
     const targetBranch = agentContextSchema.parse(row.context).project?.repositoryBranch;
     if (!targetBranch) throw new EntityError(409, 'This ticket has no target branch');
-    const state = await this.repositories.deliveryState(project.id, row.id, targetBranch);
+    const state = await this.repositories.operations.deliveryState(project.id, row.id, targetBranch);
     const documentationPath = requiredTicketDocumentationPath({
       docsPath: project.docsPath,
       taskId: row.task.id,
       taskTitle: row.task.title,
       featureTitle: row.task.feature?.title,
     });
-    const review = await this.repositories.ticketReview(project.id, row.id, row.baseCommit!, undefined, documentationPath);
+    const review = await this.repositories.operations.ticketReview(project.id, row.id, row.baseCommit!, undefined, documentationPath);
     if (!review.documentation?.ready) {
       throw new EntityError(409, `Ticket documentation is missing or empty: ${documentationPath}`);
     }
@@ -104,7 +104,7 @@ export class DeliveryService {
 
   private async perform(taskId: string, action: 'commit' | 'merge', input: DeliveryRequest) {
     const initial = await this.load(taskId);
-    return this.repositories.withProjectLock(initial.project.id, async () => {
+    return this.repositories.workspaces.withProjectLock(initial.project.id, async () => {
       const preview = await this.preview(taskId);
       if (preview.delivery?.status === 'delivered') {
         if (preview.sessionId !== input.sessionId || preview.reviewToken !== input.reviewToken || preview.tree !== input.tree) {
@@ -123,9 +123,9 @@ export class DeliveryService {
       if (action === 'commit' && preview.delivery?.commitHash && preview.ticketHead === preview.delivery.commitHash) {
         throw new EntityError(409, 'The ticket is already committed. Continue with merge.');
       }
-      await this.repositories.deliveryIdentity(initial.project.id);
+      await this.repositories.operations.deliveryIdentity(initial.project.id);
       const alreadyMerged = preview.delivery?.mergeHash
-        ? await this.repositories.containsDeliveryMerge(initial.project.id, preview.delivery.mergeHash, preview.targetHead)
+        ? await this.repositories.operations.containsDeliveryMerge(initial.project.id, preview.delivery.mergeHash, preview.targetHead)
         : false;
       const now = new Date().toISOString();
       const delivery = await this.db.$transaction(async (tx) => {
@@ -169,14 +169,14 @@ export class DeliveryService {
           if (preview.ticketHead !== delivery.ticketHead && preview.ticketHead !== delivery.commitHash) {
             throw new EntityError(409, 'The ticket branch changed since delivery started. Inspect it locally before retrying.');
           }
-          const commit = delivery.commitHash ?? await this.repositories.createTicketCommit(
+          const commit = delivery.commitHash ?? await this.repositories.operations.createTicketCommit(
             projectId, delivery.sessionId, delivery.tree, delivery.ticketHead, delivery.message, delivery.id,
           );
           // Persist the immutable object before moving a ref, so interrupted operations can be reconciled.
           await this.db.agentDelivery.update({ where: { id: delivery.id }, data: { commitHash: commit } });
-          const state = await this.repositories.deliveryState(projectId, delivery.sessionId, delivery.targetBranch);
+          const state = await this.repositories.operations.deliveryState(projectId, delivery.sessionId, delivery.targetBranch);
           if (state.tree !== delivery.tree) throw new EntityError(409, 'Files changed while committing. No branch was updated; inspect the worktree.');
-          await this.repositories.applyTicketCommit(projectId, delivery.sessionId, commit, delivery.ticketHead);
+          await this.repositories.operations.applyTicketCommit(projectId, delivery.sessionId, commit, delivery.ticketHead);
           await this.db.$transaction(async (tx) => {
             await tx.agentDelivery.update({ where: { id: delivery.id }, data: { status: 'committed', updatedAt: new Date().toISOString() } });
             await this.recordTaskActivity(tx, taskId, {
@@ -185,12 +185,12 @@ export class DeliveryService {
           });
         } else {
           if (preview.ticketHead !== delivery.commitHash) throw new EntityError(409, 'The ticket branch no longer points to the reviewed delivery commit');
-          await this.repositories.applyTicketCommit(projectId, delivery.sessionId, delivery.commitHash!, delivery.ticketHead);
-          const merge = delivery.mergeHash ?? await this.repositories.prepareDeliveryMerge(projectId, delivery.targetHead, delivery.commitHash!, delivery.id);
+          await this.repositories.operations.applyTicketCommit(projectId, delivery.sessionId, delivery.commitHash!, delivery.ticketHead);
+          const merge = delivery.mergeHash ?? await this.repositories.operations.prepareDeliveryMerge(projectId, delivery.targetHead, delivery.commitHash!, delivery.id);
           await this.db.agentDelivery.update({ where: { id: delivery.id }, data: { mergeHash: merge } });
-          const state = await this.repositories.deliveryState(projectId, delivery.sessionId, delivery.targetBranch);
+          const state = await this.repositories.operations.deliveryState(projectId, delivery.sessionId, delivery.targetBranch);
           if (state.ticketHead !== delivery.commitHash || state.tree !== delivery.tree) throw new EntityError(409, 'The ticket changed while merging. No merge was applied.');
-          const head = await this.repositories.applyDeliveryMerge(projectId, delivery.targetBranch, delivery.targetHead, merge);
+          const head = await this.repositories.operations.applyDeliveryMerge(projectId, delivery.targetBranch, delivery.targetHead, merge);
           await this.db.$transaction(async (tx) => {
             const row = await tx.agentSession.findUniqueOrThrow({ where: { id: delivery.sessionId } });
             if (row.status !== 'delivering' || row.attempt !== delivery.attempt) throw new EntityError(409, 'The session changed during delivery');

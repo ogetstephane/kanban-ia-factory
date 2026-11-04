@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { docSaveInputSchema, wikiAssistantInputSchema, wikiAssistantResultSchema } from '../../src/types/wiki';
+import { docSaveInputSchema, wikiAssistantInputSchema, wikiAssistantResultSchema } from '../../shared/types/wiki';
 import { EntityError } from '../db/entityStore';
 import { RepositoryError } from '../git/repositoryService';
 import type { DocsService } from '../wiki/docsService';

@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { Project, Feature, Task, KanbanFilters, KanbanStatus } from './types/kanban';
+import { Project, Feature, Task, KanbanFilters, KanbanStatus } from '../shared/types/kanban';
 import { ALL_PROJECTS, createProject, deleteProject, filterByProject } from './utils/projectLogic';
 import { Navbar } from './components/Navbar';
 import { FeatureBar } from './components/FeatureBar';
@@ -16,7 +16,7 @@ import { useProjects } from './data/useProjects';
 import { useBoard } from './data/useBoard';
 import { useOperation } from './data/useOperation';
 import { calculateProjectStats } from './utils/projectLogic';
-import type { SessionActionFocus } from './types/agent';
+import type { SessionActionFocus } from '../shared/types/agent';
 import { isViewMode, taskEditorPath, viewPath, type ViewMode } from './utils/routes';
 
 const KanbanBoard = lazy(() => import('./components/KanbanBoard'));
@@ -27,6 +27,8 @@ const CockpitView = lazy(() => import('./components/CockpitView'));
 const DeliveryHistoryView = lazy(() => import('./components/DeliveryHistoryView'));
 const ActivityView = lazy(() => import('./components/ActivityView').then((module) => ({ default: module.ActivityView })));
 const WikiView = lazy(() => import('./components/WikiView'));
+const CodeGraphView = lazy(() => import('./components/CodeGraphView'));
+const ArchifyView = lazy(() => import('./components/ArchifyView'));
 const STORAGE_ACTIVE_PROJECT_KEY = 'kanban_flow_active_project_id_v1';
 type ProjectAction = { kind: 'task'; status: KanbanStatus } | { kind: 'feature' } | { kind: 'breakdown' };
 
@@ -82,7 +84,9 @@ function Workspace() {
   const allProjects = activeProjectId === ALL_PROJECTS;
   const hasGitRepository = projects.some((project) => (allProjects || project.id === activeProjectId) && project.repositoryUrl);
   const wikiProject = projects.find((project) => project.id === activeProjectId && project.repositoryUrl && project.docsPath);
-  const viewMode = (selectedViewMode === 'git' && !hasGitRepository) || (selectedViewMode === 'wiki' && !wikiProject) ? 'board' : selectedViewMode;
+  const codeGraphProject = projects.find((project) => project.id === activeProjectId && project.repositoryUrl);
+  const viewMode = (selectedViewMode === 'git' && !hasGitRepository) || (selectedViewMode === 'wiki' && !wikiProject)
+    || (selectedViewMode === 'code-graph' && !codeGraphProject) ? 'board' : selectedViewMode;
   useEffect(() => {
     if (!projectsState.ready || projects.length === 0) return;
     if (params.view && !isViewMode(params.view)) return;
@@ -429,6 +433,14 @@ function Workspace() {
         ) : viewMode === 'wiki' && wikiProject ? (
           <Suspense fallback={<p role="status">Loading wiki...</p>}>
             <WikiView key={wikiProject.id} project={wikiProject} />
+          </Suspense>
+        ) : viewMode === 'code-graph' && codeGraphProject ? (
+          <Suspense fallback={<p role="status">Loading code graph...</p>}>
+            <CodeGraphView key={codeGraphProject.id} project={codeGraphProject} />
+          </Suspense>
+        ) : viewMode === 'diagrams' ? (
+          <Suspense fallback={<p role="status">Loading diagrams...</p>}>
+            <ArchifyView />
           </Suspense>
         ) : viewMode === 'releases' ? (
           <Suspense fallback={<p role="status">Loading releases...</p>}>

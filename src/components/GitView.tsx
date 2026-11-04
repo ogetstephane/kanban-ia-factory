@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { boardApi } from '../data/boardApi';
-import type { GitInventory } from '../types/git';
+import { gitApi } from '../data/gitApi';
+import type { GitInventory } from '../../shared/types/git';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 import GitTaskDiffView from './GitTaskDiffView';
 import PublishedWork from './PublishedWork';
 import type { z } from 'zod';
-import type { publishedWorkListSchema } from '../types/git';
+import type { publishedWorkListSchema } from '../../shared/types/git';
 
 export default function GitView({ projectId, onOpenTask, openingTicket, ticketError }: {
   projectId: string;
@@ -23,8 +23,8 @@ export default function GitView({ projectId, onOpenTask, openingTicket, ticketEr
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
-    void boardApi.gitInventory(projectId, controller.signal).then(async (value) => {
-      const work = await Promise.all(value.projects.map(async (project) => [project.id, await boardApi.publishedWork(project.id, controller.signal)] as const));
+    void gitApi.gitInventory(projectId, controller.signal).then(async (value) => {
+      const work = await Promise.all(value.projects.map(async (project) => [project.id, await gitApi.publishedWork(project.id, controller.signal)] as const));
       if (!controller.signal.aborted) { setInventory(value); setPublished(Object.fromEntries(work)); }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load Git inventory');

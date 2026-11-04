@@ -2,8 +2,8 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { PrismaClient } from '@prisma/client';
-import { DEFAULT_DOCS_PATH, docsPathSchema } from '../../src/types/board';
-import type { DocFile, DocSaveResult, DocStatus, DocSyncResult } from '../../src/types/wiki';
+import { DEFAULT_DOCS_PATH, docsPathSchema } from '../../shared/types/board';
+import type { DocFile, DocSaveResult, DocStatus, DocSyncResult } from '../../shared/types/wiki';
 import { activityChanges, recordActivity } from '../db/activityLog';
 import { EntityError } from '../db/entityStore';
 import { RepositoryError, type RepositoryService } from '../git/repositoryService';
@@ -37,7 +37,7 @@ export class DocsService {
     if (!project) throw new EntityError(404, 'Project not found');
     if (!project.repositoryUrl) throw new RepositoryError(400, 'This project has no git repository, so it has no wiki');
     const docsPath = docsPathSchema.parse(project.docsPath ?? DEFAULT_DOCS_PATH);
-    const { cwd, branch } = await this.repositories.docsWorkspace(projectId);
+    const { cwd, branch } = await this.repositories.workspaces.docsWorkspace(projectId);
     return { project, docsPath, cwd, branch, root: path.join(cwd, ...docsPath.split('/')) };
   }
 
@@ -92,7 +92,7 @@ export class DocsService {
   /** Pending documentation changes (relative to the docs folder) and commits not yet pushed. */
   async status(projectId: string): Promise<DocStatus> {
     const { docsPath } = await this.target(projectId);
-    const { changes, ahead } = await this.repositories.docsChanges(projectId, docsPath);
+    const { changes, ahead } = await this.repositories.operations.docsChanges(projectId, docsPath);
     const pending = changes.filter((change) => change.path.startsWith(`${docsPath}/`))
       .map((change) => ({ path: change.path.slice(docsPath.length + 1), status: change.status }))
       .filter((change) => { try { checkDocPath(change.path); return true; } catch { return false; } });
@@ -103,7 +103,7 @@ export class DocsService {
   async save(projectId: string, requested: string, content: string, expectedSha: string | null): Promise<DocSaveResult> {
     const file = checkDocPath(requested);
     if (Buffer.byteLength(content) > MAX_BYTES) throw new RepositoryError(413, 'Documents are limited to 1 MB');
-    return this.repositories.withProjectLock(projectId, async () => {
+    return this.repositories.workspaces.withProjectLock(projectId, async () => {
       const { docsPath, cwd, root } = await this.target(projectId);
       const repoFile = `${docsPath}/${file}`;
       await this.assertPlainPath(cwd, repoFile);
@@ -128,9 +128,9 @@ export class DocsService {
 
   /** Commits every pending documentation file on the project branch, then pushes best effort. */
   async sync(projectId: string): Promise<DocSyncResult> {
-    return this.repositories.withProjectLock(projectId, async () => {
+    return this.repositories.workspaces.withProjectLock(projectId, async () => {
       const { docsPath, project } = await this.target(projectId);
-      const { branch } = await this.repositories.assertDocsCommittable(projectId);
+      const { branch } = await this.repositories.operations.assertDocsCommittable(projectId);
       const { pending, ahead } = await this.status(projectId);
       if (!pending.length && !ahead) return { branch, commit: null, files: 0, pushed: false };
       const files = pending.map((change) => `${docsPath}/${change.path}`);
@@ -139,10 +139,10 @@ export class DocsService {
         const message = files.length === 1
           ? `docs: ${pending[0].status === 'added' ? 'add' : 'update'} ${pending[0].path}`
           : `docs: update ${files.length} documents`;
-        try { commit = await this.repositories.commitDocs(projectId, files, message); }
-        catch (error) { await this.repositories.unstageDocs(projectId, files); throw error; }
+        try { commit = await this.repositories.operations.commitDocs(projectId, files, message); }
+        catch (error) { await this.repositories.operations.unstageDocs(projectId, files); throw error; }
       }
-      const push = await this.repositories.pushCheckedOutBranch(projectId);
+      const push = await this.repositories.publication.pushCheckedOutBranch(projectId);
       await this.db.$transaction((tx) => recordActivity(tx, {
         projectId, projectName: project.name, entityType: 'project', entityId: projectId, entityTitle: project.name,
         action: 'docs_saved', summary: `Documentation synced: ${files.length} ${files.length === 1 ? 'file' : 'files'}`,

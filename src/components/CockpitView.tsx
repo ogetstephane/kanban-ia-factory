@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Clock3, GitBranch, Layers3, MessageCircleQuestion, PackageCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import type { z } from 'zod';
-import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
+import { releaseApi } from '../data/releaseApi';
 import { useOperation } from '../data/useOperation';
-import type { Project } from '../types/kanban';
-import { agentListSchema, type AgentListQuery, type SessionActionFocus } from '../types/agent';
-import type { Release } from '../types/release';
+import type { Project } from '../../shared/types/kanban';
+import { agentListSchema, type AgentListQuery, type SessionActionFocus } from '../../shared/types/agent';
+import type { Release } from '../../shared/types/release';
 
 type SessionList = z.infer<typeof agentListSchema>;
 type SessionRow = SessionList['items'][number];
@@ -51,8 +52,8 @@ export default function CockpitView({ scopeId, projects, onOpenTicket, onOpenRel
     const load = async () => {
       try {
         const [actionList, releaseList] = await Promise.all([
-          boardApi.agentSessions(query, controller.signal),
-          boardApi.releases(scopeId, controller.signal),
+          agentApi.agentSessions(query, controller.signal),
+          releaseApi.releases(scopeId, controller.signal),
         ]);
         if (!controller.signal.aborted) {
           setSessions(actionList);

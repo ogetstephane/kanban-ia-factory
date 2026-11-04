@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Plus, FolderKanban, Settings, Check, Briefcase } from 'lucide-react';
-import { Project } from '../types/kanban';
+import { Project } from '../../shared/types/kanban';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 
 interface ProjectSwitcherProps {

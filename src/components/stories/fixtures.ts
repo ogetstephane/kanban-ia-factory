@@ -1,6 +1,6 @@
-import type { Feature, KanbanFilters, Project, Task } from '../../types/kanban';
-import type { AgentSession } from '../../types/agent';
-import type { Release } from '../../types/release';
+import type { Feature, KanbanFilters, Project, Task } from '../../../shared/types/kanban';
+import type { AgentSession } from '../../../shared/types/agent';
+import type { Release } from '../../../shared/types/release';
 
 export const project: Project = {
   id: 'storybook-project',
@@ -90,6 +90,7 @@ export const release: Release = {
 };
 
 export const agentSession: AgentSession = {
+  runtimes: [],
   id: 'storybook-session',
   taskId: tasks[0].id,
   projectId: project.id,

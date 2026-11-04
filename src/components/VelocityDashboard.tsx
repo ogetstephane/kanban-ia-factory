@@ -28,7 +28,7 @@ import {
   Zap,
   Info
 } from 'lucide-react';
-import { Task, Feature, KanbanStatus } from '../types/kanban';
+import { Task, Feature, KanbanStatus } from '../../shared/types/kanban';
 import { calculateVelocityDashboardData } from '../utils/velocityMetrics';
 
 interface VelocityDashboardProps {

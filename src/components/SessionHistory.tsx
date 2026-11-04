@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { boardApi } from '../data/boardApi';
-import type { AgentSession } from '../types/agent';
+import { agentApi } from '../data/agentApi';
+import type { AgentSession } from '../../shared/types/agent';
 import { MarkdownPreview } from './MarkdownPreview';
 import WorkflowTimeline, { WorkflowStepPanel } from './WorkflowTimeline';
-import { getAgentWorkflow } from '../utils/agentWorkflow';
-import type { WorkflowStepId } from '../types/workflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
+import type { WorkflowStepId } from '../../shared/types/workflow';
+import SessionAgentDetails from './SessionAgentDetails';
 
 type Attempt = AgentSession['attempts'][number];
 type Snapshot = Attempt['snapshot'];
@@ -55,6 +56,7 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
       <time className="w-full text-xs text-slate-500 sm:w-auto">{new Date(createdAt).toLocaleString()}</time>
     </header>
 
+    <SessionAgentDetails snapshot={snapshot} />
     {!current && <div className="mb-4"><WorkflowTimeline workflow={workflow} label={`Workflow for run ${number}`} /></div>}
     <div className="grid min-w-0 gap-3">
       <WorkflowStepPanel step="plan" state={workflow.plan}>
@@ -133,7 +135,7 @@ export default function SessionHistory({ taskId, session, actions, stepActions }
   const [historyError, setHistoryError] = useState('');
   useEffect(() => {
     const controller = new AbortController();
-    void boardApi.agentHistory(taskId, controller.signal).then((value) => {
+    void agentApi.agentHistory(taskId, controller.signal).then((value) => {
       if (!controller.signal.aborted) { setRuns(value); setHistoryError(''); }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setHistoryError(cause instanceof Error ? cause.message : 'Unable to load previous runs');
@@ -146,6 +148,8 @@ export default function SessionHistory({ taskId, session, actions, stepActions }
     questions: session.questions.filter((question) =>
       !(runs ?? []).some((attempt) => attempt.snapshot.questions.some((previous) => previous.id === question.id))),
     checks: session.checks, delivery: session.delivery, publication: session.publication,
+    context: session.context, runtimes: session.runtimes,
+    sessionInfo: Object.fromEntries(Object.entries(session).filter(([key]) => !['context', 'runtimes', 'attempts'].includes(key))),
   };
   return <section aria-label={`Session timeline for ${taskId}`} className="space-y-4">
     <h2 className="text-sm font-semibold text-slate-200">Run timeline</h2>

@@ -15,7 +15,10 @@ Copilot action also opens the task editor/session area.
 - Set title, description, priority, story points, tags, subtasks, acceptance criteria,
   suggested workflow, blocked reason and parent feature.
 - Assign a release version belonging to the ticket's project.
-- Use Copilot Auto-Spec to propose a description, criteria, subtasks, tags, workflow and points.
+- Use Copilot Auto-Spec with the on-demand `ticket-graphify` skill to propose a
+  description, criteria, subtasks, tags, workflow and points from the draft and
+  project code. Inspect its expandable impact analysis before saving. This uses
+  the selected Copilot model, not the legacy Gemini helper; authentication is required.
 - Inspect the session plan and questions, review the worktree diff, accept human review,
   request feedback/replanning, then preview and explicitly commit or merge local delivery.
 - Require a changed, non-empty Markdown document for human review acceptance. The path is
@@ -38,7 +41,8 @@ delivered. Human review acceptance is blocked until the dedicated page is part o
   `POST /api/board/tasks/:id/move`
 - `PUT /api/board/projects/:projectId/tasks/:id/release`
 - Session review/delivery endpoints under `/api/board/tasks/:id/session`.
-- Copilot helpers: `/api/copilot/generate-description`, `/api/copilot/suggest-workflow`,
+- Ticket drafting: `POST /api/board/projects/:projectId/tasks/assistant`.
+- Legacy Copilot helpers: `/api/copilot/generate-description`, `/api/copilot/suggest-workflow`,
   `/api/copilot/chat`.
 
 Exact schemas, revision conflicts and workflow transitions are in the
@@ -48,6 +52,8 @@ Exact schemas, revision conflicts and workflow transitions are in the
 ## Source files
 
 - [TaskModal.tsx](../../../src/components/TaskModal.tsx)
+- [TaskAutoSpec.tsx](../../../src/components/TaskAutoSpec.tsx) and
+  [useTaskAutoSpec.ts](../../../src/data/useTaskAutoSpec.ts) (Copilot Auto-Spec)
 - [KanbanCard.tsx](../../../src/components/KanbanCard.tsx)
 - [WorkflowAdvisorModal.tsx](../../../src/components/WorkflowAdvisorModal.tsx)
 - [TicketReview.tsx](../../../src/components/TicketReview.tsx)

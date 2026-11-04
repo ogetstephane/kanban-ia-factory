@@ -1,4 +1,4 @@
-import { Task, Feature, KanbanStatus } from '../types/kanban';
+import { Task, Feature, KanbanStatus } from '../../shared/types/kanban';
 
 export interface CumulativeFlowPoint {
   date: string;

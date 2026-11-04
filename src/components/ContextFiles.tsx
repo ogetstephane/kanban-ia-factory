@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import type { ContextFile } from '../types/contextFile';
+import type { ContextFile } from '../../shared/types/contextFile';
 import { useOperation } from '../data/useOperation';
 import { downloadContextFile, readContextFiles } from '../data/contextFiles';
 

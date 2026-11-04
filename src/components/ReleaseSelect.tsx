@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { Release } from '../types/release';
-import { RELEASE_LABELS } from '../types/release';
-import { boardApi } from '../data/boardApi';
+import type { Release } from '../../shared/types/release';
+import { RELEASE_LABELS } from '../../shared/types/release';
+import { releaseApi } from '../data/releaseApi';
 
 export default function ReleaseSelect({ projectId, value, onChange, disabled = false, id = 'task-release' }: {
   projectId: string; value: string; onChange: (value: string) => void; disabled?: boolean; id?: string;
@@ -13,7 +13,7 @@ export default function ReleaseSelect({ projectId, value, onChange, disabled = f
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
-    void boardApi.releases(projectId, controller.signal).then((rows) => {
+    void releaseApi.releases(projectId, controller.signal).then((rows) => {
       if (!controller.signal.aborted) { setReleases(rows); setLoading(false); }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) { setError(cause instanceof Error ? cause.message : 'Unable to load versions'); setLoading(false); }

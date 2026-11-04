@@ -25,8 +25,8 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
   const db = new PrismaClient({ datasourceUrl: databaseUrl });
   const repositories = new RepositoryService(path.join(directory, 'workspaces'), { localRoots: [directory] });
   const source = await createSourceRepository(path.join(directory, 'source'));
-  const cloned = await repositories.clone('project-wiki', { url: source.url });
-  const root = repositories.pathFor('project-wiki');
+  const cloned = await repositories.workspaces.clone('project-wiki', { url: source.url });
+  const root = repositories.workspaces.pathFor('project-wiki');
   git(root, 'config', 'user.name', 'Wiki Test');
   git(root, 'config', 'user.email', 'wiki@example.com');
   const bare = path.join(directory, 'origin.git');
@@ -54,10 +54,12 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
 
   await t.test('wiki assistant validates project and path and never saves proposals', async () => {
     const calls: string[] = [];
+    const argumentCounts: number[] = [];
     const generator: WikiGenerator = {
       async generate(input, signal) {
         assert.equal(signal.aborted, false);
         calls.push(input.content);
+        argumentCounts.push(arguments.length);
         return { content: '# Proposal\n', summary: 'Created an introduction' };
       },
     };
@@ -78,6 +80,7 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { content: '# Proposal\n', summary: 'Created an introduction' });
       assert.deepEqual(calls, [input.content]);
+      assert.deepEqual(argumentCounts, [2], 'Wiki requests do not receive injected graph context');
       assert.deepEqual((await docs.list('project-wiki')).files, []);
       assert.equal((await post('missing-project', input)).status, 404);
       assert.equal((await post('project-wiki', { ...input, path: '../outside.md' })).status, 400);

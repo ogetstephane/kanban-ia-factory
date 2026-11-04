@@ -1,4 +1,4 @@
-import type { AgentContext, AgentQuestionInput } from '../../src/types/agent';
+import type { AgentContext, AgentQuestionInput, AgentRuntime } from '../../shared/types/agent';
 
 export interface AgentRequest {
   context: AgentContext;
@@ -7,6 +7,7 @@ export interface AgentRequest {
   plan: string;
   onContent?: (content: string) => Promise<void>;
   onSession: (id: string) => Promise<void>;
+  onRuntime?: (runtime: AgentRuntime) => Promise<void>;
   ask: (question: AgentQuestionInput) => Promise<string>;
   answers: { question: string; answer: string }[];
   signal?: AbortSignal;
@@ -19,4 +20,5 @@ export interface AgentProvider {
   readonly id: string;
   run(request: AgentRequest): Promise<string>;
   health?(): Promise<{ authenticated: boolean; issue?: string }>;
+  models?(): Promise<Array<{ id: string; name: string }>>;
 }

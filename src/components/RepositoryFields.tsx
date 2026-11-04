@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { FolderGit2, GitBranch, Loader2 } from 'lucide-react';
-import { boardApi } from '../data/boardApi';
+import { gitApi } from '../data/gitApi';
 import { useOperation } from '../data/useOperation';
 
 export interface RepositoryDraft { url: string; branch: string; token: string }
@@ -22,7 +22,7 @@ export const RepositoryFields: React.FC<RepositoryFieldsProps> = ({ value, onCha
 
   useEffect(() => {
     let active = true;
-    boardApi.listLocalRepositories()
+    gitApi.listLocalRepositories()
       .then((local) => { if (active) setLocalFolders(local.folders); })
       .catch(() => undefined);
     return () => { active = false; };
@@ -32,7 +32,7 @@ export const RepositoryFields: React.FC<RepositoryFieldsProps> = ({ value, onCha
   const changeUrl = (url: string) => { onChange({ ...value, url, branch: '', token: '' }); setBranches([]); };
 
   const loadBranches = () => lookup.run(async () => {
-    const remote = await boardApi.listBranches(value.url.trim(), value.token.trim());
+    const remote = await gitApi.listBranches(value.url.trim(), value.token.trim());
     setBranches(remote.branches);
     if (!value.branch && remote.defaultBranch) set({ branch: remote.defaultBranch });
   });

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Plus, Inbox, ListTodo, PlayCircle, Eye, CheckCircle } from 'lucide-react';
-import { KanbanStatus, Task, Feature, Project } from '../types/kanban';
+import { KanbanStatus, Task, Feature, Project } from '../../shared/types/kanban';
 import { KanbanCard } from './KanbanCard';
 import { EpicCard } from './EpicCard';
-import { canCreateTaskIn } from '../utils/kanbanLogic';
-import type { AgentWorkflow } from '../types/workflow';
+import { canCreateTaskIn } from '../../shared/utils/kanbanLogic';
+import type { AgentWorkflow } from '../../shared/types/workflow';
 
 interface KanbanColumnProps {
   status: KanbanStatus;

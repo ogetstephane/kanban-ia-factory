@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Project } from '../types/kanban';
-import type { ProjectStats, ProjectSummary, RepositoryInput } from '../types/board';
+import type { Project } from '../../shared/types/kanban';
+import type { ProjectStats, ProjectSummary, RepositoryInput } from '../../shared/types/board';
 import { boardApi, loadProjects } from './boardApi';
+import { gitApi } from './gitApi';
 
 const emptyStats: ProjectStats = {
   totalTasks: 0, completedTasks: 0, inProgressTasks: 0, completionRate: 0, totalFeatures: 0,
@@ -44,7 +45,7 @@ export function useProjects() {
       return saved;
     },
     switchBranch: async (project: Project, branch: string) => {
-      const saved = await boardApi.switchBranch(project, branch);
+      const saved = await gitApi.switchBranch(project, branch);
       setProjects((previous) => previous.map((item) => item.id === saved.id ? { ...saved, stats: item.stats } : item));
       return saved;
     },

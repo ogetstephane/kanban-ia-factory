@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { z } from 'zod';
-import type { projectHealthSchema } from '../types/agent';
-import { boardApi } from '../data/boardApi';
+import type { projectHealthSchema } from '../../shared/types/agent';
+import { agentApi } from '../data/agentApi';
 import { useOperation } from '../data/useOperation';
 
 export default function ProjectHealth({ projectId }: { projectId: string }) {
@@ -12,7 +12,7 @@ export default function ProjectHealth({ projectId }: { projectId: string }) {
   useEffect(() => {
     const controller = new AbortController();
     setData(null); setError('');
-    void boardApi.projectHealth(projectId, controller.signal).then((value) => {
+    void agentApi.projectHealth(projectId, controller.signal).then((value) => {
       if (!controller.signal.aborted) setData(value);
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to diagnose project');
@@ -37,7 +37,7 @@ export default function ProjectHealth({ projectId }: { projectId: string }) {
           className="block mt-2 px-2 py-1 bg-slate-700 rounded disabled:opacity-40"
           onClick={() => {
             if (window.confirm('Remove this worktree only if it has no ticket changes? The branch and history will be kept.')) void operation.run(async () => {
-              await boardApi.cleanupAgent(worktree.taskId, worktree.sessionId, worktree.updatedAt);
+              await agentApi.cleanupAgent(worktree.taskId, worktree.sessionId, worktree.updatedAt);
               setAttempt((value) => value + 1);
             });
           }}>Clean up unchanged worktree</button>}

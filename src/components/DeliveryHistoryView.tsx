@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, CheckCircle2, Clock3, GitBranch, Search, XCircle } from 'lucide-react';
-import { boardApi } from '../data/boardApi';
-import type { Project } from '../types/kanban';
+import { agentApi } from '../data/agentApi';
+import type { Project } from '../../shared/types/kanban';
 import type { z } from 'zod';
-import { deliveryHistorySchema } from '../types/agent';
+import { deliveryHistorySchema } from '../../shared/types/agent';
 
 type DeliveryHistory = z.infer<typeof deliveryHistorySchema>;
 type DeliveryStatus = '' | 'committing' | 'committed' | 'merging' | 'delivered' | 'failed';
@@ -47,7 +47,7 @@ export default function DeliveryHistoryView({ scopeId, projects, onOpenTicket }:
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
-      void boardApi.deliveryHistory({
+      void agentApi.deliveryHistory({
         projectId: projectId || undefined, status: status || undefined, search: search.trim(), page,
       }, controller.signal).then((result) => {
         if (!controller.signal.aborted) { setData(result); setError(''); }

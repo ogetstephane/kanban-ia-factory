@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Sparkles,
   CheckSquare,
   MoreVertical,
   ArrowRight,
@@ -10,12 +9,12 @@ import {
   Tag,
   AlertCircle
 } from 'lucide-react';
-import { Task, Feature, KanbanStatus, TaskPriority } from '../types/kanban';
-import { KANBAN_STATUSES, canMoveTask, reachableStatuses } from '../utils/kanbanLogic';
+import { Task, Feature, KanbanStatus, TaskPriority } from '../../shared/types/kanban';
+import { KANBAN_STATUSES, canMoveTask, reachableStatuses } from '../../shared/utils/kanbanLogic';
 import ReviewActions from './ReviewActions';
 import WorkflowTimeline from './WorkflowTimeline';
-import { getAgentWorkflow } from '../utils/agentWorkflow';
-import type { AgentWorkflow } from '../types/workflow';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
+import type { AgentWorkflow } from '../../shared/types/workflow';
 
 interface KanbanCardProps {
   task: Task;
@@ -23,9 +22,11 @@ interface KanbanCardProps {
   feature?: Feature;
   projectName?: string;
   onEdit: (task: Task) => void;
-  onDelete: (taskId: string) => void;
+  /** @deprecated Deleting is done from the task page; kept so existing callers compile. */
+  onDelete?: (taskId: string) => void;
   onMoveStatus: (taskId: string, targetStatus: KanbanStatus) => void;
-  onOpenCopilotSpec: (task: Task) => void;
+  /** @deprecated Copilot enhancement is done from the task page; kept so existing callers compile. */
+  onOpenCopilotSpec?: (task: Task) => void;
   onDragStatus: (from: KanbanStatus | null) => void;
   onReview?: (task: Task, ai: boolean) => void;
 }
@@ -160,21 +161,9 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
         </div>
       )}
 
-      {/* Action / Stage Progression Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700/40 text-xs">
-        <div className="flex items-center gap-1">
-          {prevStatus && (
-            <button
-              onClick={() => onMoveStatus(task.id, prevStatus)}
-              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors cursor-pointer"
-              title={`Move to ${prevStatus}`}
-              aria-label={`Move task ${task.title} back to ${prevStatus}`}
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* Quick status dropdown */}
+      {/* Status selector, only when the ticket can move to another status */}
+      {stageOptions.length > 1 && (
+        <div className="flex items-center pt-2 border-t border-slate-700/40 text-xs">
           <select
             value={task.status}
             onChange={(e) => onMoveStatus(task.id, e.target.value as KanbanStatus)}
@@ -187,51 +176,8 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               </option>
             ))}
           </select>
-
-          {nextStatus && (
-            <button
-              onClick={() => onMoveStatus(task.id, nextStatus)}
-              className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 transition-colors cursor-pointer"
-              title={`Move to ${nextStatus}`}
-              aria-label={`Move task ${task.title} forward to ${nextStatus}`}
-            >
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
-
-        <div className="flex items-center gap-1">
-          {/* Copilot spec button */}
-          <button
-            onClick={() => onOpenCopilotSpec(task)}
-            className="p-1 rounded text-slate-400 hover:text-amber-300 hover:bg-amber-400/10 transition-colors cursor-pointer"
-            title="Auto-enhance spec with Copilot"
-            aria-label={`Enhance task ${task.title} with Copilot`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-          </button>
-
-          {/* Edit button */}
-          <button
-            onClick={() => onEdit(task)}
-            className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-indigo-400/10 transition-colors cursor-pointer"
-            title="Edit task details"
-            aria-label={`Edit task ${task.title}`}
-          >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-
-          {/* Delete button */}
-          <button
-            onClick={() => onDelete(task.id)}
-            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-            title="Delete task"
-            aria-label={`Delete task ${task.title}`}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 };

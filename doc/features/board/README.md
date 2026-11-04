@@ -19,8 +19,10 @@ Choose **Board** or **Kanban Board** in the top navigation. Select a project fir
 - Drag epics and standalone tickets between columns where workflow rules permit.
 - Expand an epic to view and open its tickets, or create a ticket directly inside the epic.
 - An epic's status is independent of its tickets; changing it does not change their statuses.
-- Open or delete epic tickets from the expanded card, or open/delete standalone tickets from
-  their own cards; add standalone tickets to an eligible column.
+- Open or delete epic tickets from the expanded card. For standalone tickets, open the card
+  to edit or delete it from the task page; add standalone tickets to an eligible column.
+- Standalone ticket cards show a status selector only when the ticket can move to more than
+  one status (see [board card](../tickets/board-card-task-179.md)).
 - Search ticket titles, descriptions and tags, and filter by priority or feature.
 - Review each column's epic and standalone-ticket count.
 - Each ticket shows the shared agent workflow timeline: Plan, Approval, Execution, Review
@@ -56,7 +58,7 @@ Moves are validated against workflow rules and entity revisions; see the
 - [WorkflowTimeline.tsx](../../../src/components/WorkflowTimeline.tsx)
 - [App.tsx](../../../src/App.tsx)
 - [board.ts route](../../../server/routes/board.ts)
-- [kanban.ts types](../../../src/types/kanban.ts)
+- [kanban.ts types](../../../shared/types/kanban.ts)
 
 ## Related features
 

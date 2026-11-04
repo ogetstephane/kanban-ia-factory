@@ -7,7 +7,7 @@ import {
   calculateProjectStats,
   filterByProject,
 } from './projectLogic';
-import { Project, Task, Feature } from '../types/kanban';
+import { Project, Task, Feature } from '../../shared/types/kanban';
 
 const mockProjects: Project[] = [
   {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
-import { boardApi } from '../data/boardApi';
-import type { Task } from '../types/kanban';
-import type { AgentSession } from '../types/agent';
+import { agentApi } from '../data/agentApi';
+import type { Task } from '../../shared/types/kanban';
+import type { AgentSession } from '../../shared/types/agent';
 import TicketReview from './TicketReview';
 import ReviewValidation from './ReviewValidation';
 
@@ -51,7 +51,7 @@ function TaskReview({ task, ai, epicReview, onValidated, onAccepted }: {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
-    void boardApi.agentSession(task.id).then((value) => {
+    void agentApi.agentSession(task.id).then((value) => {
       if (active) {
         setSession(value);
         if (!value?.workspace && value?.publication?.status !== 'pushed') setError('No agent worktree is available for this ticket.');

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { z } from 'zod';
-import type { AgentSession, deliveryPreviewSchema } from '../types/agent';
+import type { AgentSession, deliveryPreviewSchema } from '../../shared/types/agent';
 import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
+import { releaseApi } from '../data/releaseApi';
 import { useOperation } from '../data/useOperation';
 import ReleaseSelect from './ReleaseSelect';
 
@@ -19,7 +21,7 @@ export default function TicketDelivery({ session, onChange, onTaskChange }: {
   useEffect(() => {
     const controller = new AbortController();
     setPreview(null); setError(''); setAcknowledged(false);
-    void boardApi.delivery(session.taskId, controller.signal).then((value) => {
+    void agentApi.delivery(session.taskId, controller.signal).then((value) => {
       if (!controller.signal.aborted) {
         setPreview(value); setMessage(value.delivery?.message ?? value.suggestedMessage);
       }
@@ -35,13 +37,13 @@ export default function TicketDelivery({ session, onChange, onTaskChange }: {
       ? 'Commit all reviewed changes on the ticket branch? Nothing will be pushed or merged yet.'
       : `Merge into ${preview.targetBranch} in the project clone and mark the ticket Done? The original repository will not be modified.`)) return;
     try {
-      const result = await boardApi.deliver(session.taskId, action, {
+      const result = await agentApi.deliver(session.taskId, action, {
         sessionId: preview.sessionId, updatedAt: preview.updatedAt,
         targetHead: preview.targetHead, ticketHead: preview.ticketHead, tree: preview.tree,
         reviewToken: preview.reviewToken, acknowledgeChecks: acknowledged, message: message.trim(),
       });
       setPreview(result);
-      onChange(await boardApi.agentSession(session.taskId));
+      onChange(await agentApi.agentSession(session.taskId));
       if (result.delivery?.status === 'delivered') onTaskChange?.();
     } catch (cause) {
       setPreview(null);
@@ -62,8 +64,8 @@ export default function TicketDelivery({ session, onChange, onTaskChange }: {
           const board = await boardApi.load(session.projectId!);
           const task = board.tasks.find((item) => item.id === session.taskId);
           if (!task) throw new Error('Ticket not found. Reload before assigning a version.');
-          await boardApi.assignRelease(session.projectId!, task.id, releaseId, task.revision);
-          onChange(await boardApi.agentSession(task.id)); setVersion((n) => n + 1);
+          await releaseApi.assignRelease(session.projectId!, task.id, releaseId, task.revision);
+          onChange(await agentApi.agentSession(task.id)); setVersion((n) => n + 1);
         }); }}>Assign version & reload delivery</button>}
     </div>}
     {(error || operation.error) && <p role="alert" className="text-rose-300 whitespace-pre-wrap">{error || operation.error}</p>}

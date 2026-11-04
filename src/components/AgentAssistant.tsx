@@ -3,7 +3,7 @@ import { Loader2, Sparkles } from 'lucide-react';
 import { ContextFiles } from './ContextFiles';
 import { MarkdownPreview } from './MarkdownPreview';
 import { useOperation } from '../data/useOperation';
-import type { ContextFile } from '../types/contextFile';
+import type { ContextFile } from '../../shared/types/contextFile';
 
 export interface AssistantInput { prompt: string; files: ContextFile[] }
 export interface AssistantProposal { content: string; summary: string }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { releaseEditSchema, releaseUpdateSchema, releasePublishSchema } from '../../src/types/release';
+import { releaseEditSchema, releaseUpdateSchema, releasePublishSchema } from '../../shared/types/release';
 import { EntityError } from '../db/entityStore';
 import { RepositoryError } from '../git/repositoryService';
 import type { ReleaseService } from '../releases/releaseService';
