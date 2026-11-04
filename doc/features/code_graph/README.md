@@ -175,7 +175,7 @@ For a project without a repository, only the skill and supplied draft/attachment
 are available. If Graphify is disabled or fails, source-based analysis remains
 available when there is a repository. The UI explicitly reports graph unavailability.
 Copilot authentication, timeouts, and invalid proposals are errors; this drafting
-path does not silently fall back to Gemini or template specifications.
+path does not silently fall back to template specifications.
 
 The endpoint is `POST /api/board/projects/:projectId/tasks/assistant`; see the
 [API reference](../../api.md#ticket-drafting). The legacy

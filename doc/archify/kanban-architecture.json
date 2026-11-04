@@ -158,8 +158,8 @@
       "dot": "amber",
       "title": "Décomposition IA",
       "items": [
-        "Gemini est optionnel pour la décomposition des fonctionnalités.",
-        "Sans clé ou en cas d'erreur, le serveur utilise des gabarits de repli."
+        "La décomposition des fonctionnalités utilise des réponses déterministes.",
+        "Aucune clé de service d'IA externe n'est nécessaire."
       ]
     }
   ]

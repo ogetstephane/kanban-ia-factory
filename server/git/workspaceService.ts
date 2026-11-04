@@ -25,7 +25,10 @@ export class WorkspaceService {
     readonly localRoots: string[] = [],
   ) {}
 
-  /** Lists git folders under the allowed roots (symlinks, hidden folders and node_modules are skipped). */
+  /**
+   * Lists git folders under the allowed roots (symlinks, hidden folders and node_modules are skipped).
+   * A root that is itself a git folder is listed and still scanned; other repositories are not descended into.
+   */
   async localRepositories(maxDepth = 3, limit = 200): Promise<string[]> {
     const found: string[] = [];
     const walk = async (folder: string, depth: number): Promise<void> => {
@@ -33,7 +36,7 @@ export class WorkspaceService {
       const entries = await readdir(folder, { withFileTypes: true }).catch(() => []);
       if (entries.some((entry) => entry.name === '.git')) {
         found.push(folder);
-        return;
+        if (depth > 0) return;
       }
       if (depth >= maxDepth) return;
       for (const entry of entries) {

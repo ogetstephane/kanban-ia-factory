@@ -80,12 +80,27 @@ test('creates the API without starting background work or calling external AI', 
   const health = await api('GET', '/health');
   assert.equal(health.status, 200);
   assert.equal(health.body.status, 'ok');
-  assert.equal(health.body.hasGeminiKey, false);
+  assert.deepEqual(Object.keys(health.body).sort(), ['status', 'timestamp']);
 
   const breakdown = await api('POST', '/copilot/breakdown', { featureTitle: 'User login' });
   assert.equal(breakdown.status, 200);
   assert.ok(breakdown.body.tasks.length > 0);
   assert.equal((await api('POST', '/copilot/breakdown', {})).status, 400);
+
+  const description = await api('POST', '/copilot/generate-description', { title: 'Improve board loading' });
+  assert.equal(description.status, 200);
+  assert.equal(description.body.title, 'Improve board loading');
+  assert.ok(description.body.acceptanceCriteria.length > 0);
+
+  const workflow = await api('POST', '/copilot/suggest-workflow', {
+    summaryData: { totalTasks: 5, wipCount: 2, reviewQueueCount: 1 },
+  });
+  assert.equal(workflow.status, 200);
+  assert.equal(typeof workflow.body.healthScore, 'number');
+
+  const chat = await api('POST', '/copilot/chat', { message: 'What can you help with?' });
+  assert.equal(chat.status, 200);
+  assert.match(chat.body.reply, /Kanban Flow Copilot/);
 
   const missing = await api('GET', '/does-not-exist');
   assert.equal(missing.status, 404);

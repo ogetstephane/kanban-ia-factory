@@ -18,7 +18,7 @@ Copilot action also opens the task editor/session area.
 - Use Copilot Auto-Spec with the on-demand `ticket-graphify` skill to propose a
   description, criteria, subtasks, tags, workflow and points from the draft and
   project code. Inspect its expandable impact analysis before saving. This uses
-  the selected Copilot model, not the legacy Gemini helper; authentication is required.
+  the selected Copilot model; authentication is required.
 - Inspect the session plan and questions, review the worktree diff, accept human review,
   request feedback/replanning, then preview and explicitly commit or merge local delivery.
 - Require a changed, non-empty Markdown document for human review acceptance. The path is

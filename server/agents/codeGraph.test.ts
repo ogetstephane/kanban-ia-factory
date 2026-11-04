@@ -52,8 +52,8 @@ test('trimGraphReport drops the placeholder navigation list and caps the report'
 
 test('agent graphs are code-only, built outside the worktree without API keys, queryable and disposable', async (t) => {
   const { binary, calls, workspace, cacheDir } = await fakeGraphify(t);
-  process.env.GEMINI_API_KEY = 'secret-for-test';
-  t.after(() => { delete process.env.GEMINI_API_KEY; });
+  process.env.PRIVATE_TEST_KEY = 'secret-for-test';
+  t.after(() => { delete process.env.PRIVATE_TEST_KEY; });
 
   const graph = await new CodeGraph({ binary, cacheDir }).prepare(workspace);
   assert.ok(graph);
@@ -65,7 +65,7 @@ test('agent graphs are code-only, built outside the worktree without API keys, q
   const staging = extract.args[extract.args.indexOf('--out') + 1];
   assert.ok(staging.startsWith(`${cacheDir}${path.sep}`));
   assert.deepEqual(cluster.args, ['cluster-only', staging, '--no-viz', '--no-label']);
-  for (const call of await calls()) assert.ok(!call.env.includes('GEMINI_API_KEY'));
+  for (const call of await calls()) assert.ok(!call.env.includes('PRIVATE_TEST_KEY'));
   assert.deepEqual(await readdir(workspace), [], 'nothing is written into the worktree');
 
   const [output] = await readdir(cacheDir);

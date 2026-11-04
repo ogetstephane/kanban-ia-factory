@@ -1,6 +1,5 @@
 import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
-import { GoogleGenAI } from '@google/genai';
 import path from 'path';
 import { createServer as createHttpServer } from 'node:http';
 import { fileURLToPath } from 'url';
@@ -27,22 +26,6 @@ const repositories = new RepositoryService(path.resolve(process.env.WORKSPACES_D
 });
 const codeGraph = CodeGraph.fromEnv();
 
-// Initialize Gemini SDK with User-Agent header as required
-const apiKey = process.env.GEMINI_API_KEY;
-const isValidKey = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey.trim().length > 10);
-
-let gemini: GoogleGenAI | null = null;
-if (isValidKey && apiKey) {
-  gemini = new GoogleGenAI({
-    apiKey: apiKey.trim(),
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
-  });
-}
-
 const { app, sessions, releases } = createApp({
   db,
   repositories,
@@ -51,7 +34,6 @@ const { app, sessions, releases } = createApp({
   archifyDir: path.resolve(process.env.ARCHIFY_DIR || 'doc/archify'),
   wikiAssistant: new WikiAssistant(),
   taskAssistant: new TaskAssistant(codeGraph),
-  gemini,
 });
 
 // Vite Middleware for development, or static build for production

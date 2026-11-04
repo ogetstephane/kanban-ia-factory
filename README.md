@@ -27,7 +27,7 @@ Without Make:
 
 1. Install dependencies:
    `bun install`
-2. Copy [.env.example](.env.example) to `.env`. Set `GEMINI_API_KEY` if you want live AI responses; without a key, the existing demo responses still work.
+2. Copy [.env.example](.env.example) to `.env`. Built-in assistance uses deterministic responses and needs no external AI key.
 3. Apply the database migrations:
    `npm run db:migrate`
 4. Run the app:

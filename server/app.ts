@@ -1,5 +1,4 @@
 import express, { type Express, type Request, type Response } from 'express';
-import { ThinkingLevel, type GoogleGenAI } from '@google/genai';
 import type { PrismaClient } from '@prisma/client';
 import { BoardStore } from './db/boardStore';
 import { EntityStore } from './db/entityStore';
@@ -32,8 +31,6 @@ export interface AppDependencies {
   wikiAssistant?: WikiGenerator;
   /** The task drafting endpoint answers 503 when omitted. */
   taskAssistant?: TaskGenerator;
-  /** Copilot endpoints use deterministic fallbacks when no Gemini client is supplied. */
-  gemini?: GoogleGenAI | null;
 }
 
 export interface KanbanApp {
@@ -48,7 +45,7 @@ export interface KanbanApp {
  * nor starts background work, so tests can compose it with their own database and agent.
  */
 export function createApp({
-  db, repositories, agentProvider, codeGraph, archifyDir, wikiAssistant, taskAssistant, gemini = null,
+  db, repositories, agentProvider, codeGraph, archifyDir, wikiAssistant, taskAssistant,
 }: AppDependencies): KanbanApp {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
@@ -72,12 +69,11 @@ export function createApp({
   app.get('/api/health', (_req: Request, res: Response) => {
     res.json({
       status: 'ok',
-      hasGeminiKey: gemini !== null,
       timestamp: new Date().toISOString(),
     });
   });
 
-  registerCopilotRoutes(app, gemini);
+  registerCopilotRoutes(app);
 
   app.use('/api', (req: Request, res: Response) => {
     res.status(404).json({ error: `Unknown API route: ${req.method} ${req.originalUrl}` });
@@ -86,91 +82,18 @@ export function createApp({
   return { app, sessions, releases };
 }
 
-async function callWithTimeout<T>(promise: Promise<T>, timeoutMs = 30000): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error('AI request timed out, falling back')), timeoutMs)
-    ),
-  ]);
-}
-
-function registerCopilotRoutes(app: Express, ai: GoogleGenAI | null) {
+function registerCopilotRoutes(app: Express) {
   /**
    * 1. Auto-breakdown a Feature into multiple prioritized Kanban tasks
    */
   app.post('/api/copilot/breakdown', async (req: Request, res: Response) => {
-    const { featureTitle, featureDescription, category } = req.body;
+    const { featureTitle, featureDescription } = req.body;
 
     if (!featureTitle) {
       return res.status(400).json({ error: 'featureTitle is required' });
     }
 
-    // If Gemini API is available and valid, query gemini-3.8-flash with timeout
-    if (ai) {
-      try {
-        const prompt = `You are a senior technical product manager and agile architect.
-Break down the following software feature into 3 to 5 clear, concrete, and prioritized Kanban tasks.
-Feature Title: "${featureTitle}"
-Feature Description: "${featureDescription || 'Not specified'}"
-Feature Category: "${category || 'General'}"
-
-Return ONLY valid raw JSON with this exact schema:
-{
-  "summary": "Brief summary of the feature breakdown approach",
-  "tasks": [
-    {
-      "title": "Clear actionable task title",
-      "description": "Comprehensive task description with context, implementation guidance, and technical notes",
-      "priority": "Critical" | "High" | "Medium" | "Low",
-      "status": "Backlog" | "To Do" | "In Progress",
-      "storyPoints": 1 | 2 | 3 | 5 | 8,
-      "tags": ["frontend", "backend", "api", "design", "security"],
-      "acceptanceCriteria": [
-        "First measurable acceptance criterion",
-        "Second measurable acceptance criterion"
-      ],
-      "subtasks": [
-        "Checklist step 1",
-        "Checklist step 2",
-        "Checklist step 3"
-      ],
-      "suggestedWorkflow": "Specific tip on review checklist, testing, or dependencies"
-    }
-  ]
-}
-Ensure priorities are realistically spread across Critical/High/Medium/Low. Do not wrap in extra markdown if possible.`;
-
-        const response = await callWithTimeout(
-          ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt,
-            config: {
-              responseMimeType: 'application/json',
-              temperature: 0.7,
-              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-            },
-          }),
-          30000
-        );
-
-        const responseText = response.text || '';
-        try {
-          const parsed = JSON.parse(responseText);
-          return res.json(parsed);
-        } catch {
-          // Fall back to clean extraction
-          const match = responseText.match(/\{[\s\S]*\}/);
-          if (match) {
-            return res.json(JSON.parse(match[0]));
-          }
-        }
-      } catch (err: any) {
-        console.warn('Gemini API call failed, falling back to intelligent template:', err?.message);
-      }
-    }
-
-    // High quality fallback breakdown if no key or error
+    // Deterministic breakdown keeps this endpoint available without an external AI service.
     const normalizedTitle = featureTitle.toLowerCase();
     let defaultTasks = [];
 
@@ -280,68 +203,13 @@ Ensure priorities are realistically spread across Critical/High/Medium/Low. Do n
    * 2. Auto-generate or Enhance a Task Description & Acceptance Criteria
    */
   app.post('/api/copilot/generate-description', async (req: Request, res: Response) => {
-    const { title, currentDescription, featureTitle, priority } = req.body;
+    const { title } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: 'Task title is required' });
     }
 
-    if (ai) {
-      try {
-        const prompt = `You are an expert technical product manager and software engineer.
-Enhance and generate an outstanding, professional task specification for a Kanban card.
-Task Title: "${title}"
-Parent Feature: "${featureTitle || 'General backlog'}"
-Priority: "${priority || 'Medium'}"
-User notes / rough description: "${currentDescription || ''}"
-
-Return ONLY valid raw JSON with this exact schema:
-{
-  "title": "${title}",
-  "description": "Rich markdown formatted description detailing the objective, technical background, edge cases, and implementation guidelines.",
-  "acceptanceCriteria": [
-    "Clear, testable Given-When-Then or bullet acceptance criteria",
-    "Another measurable acceptance criterion"
-  ],
-  "subtasks": [
-    "Atomic step 1",
-    "Atomic step 2",
-    "Atomic step 3"
-  ],
-  "suggestedWorkflow": "Concrete recommendations on which stage to start in, dependencies to check, and testing tips.",
-  "estimatedStoryPoints": 1 | 2 | 3 | 5 | 8,
-  "suggestedTags": ["tag1", "tag2", "tag3"]
-}`;
-
-        const response = await callWithTimeout(
-          ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt,
-            config: {
-              responseMimeType: 'application/json',
-              temperature: 0.7,
-              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-            },
-          }),
-          30000
-        );
-
-        const responseText = response.text || '';
-        try {
-          const parsed = JSON.parse(responseText);
-          return res.json(parsed);
-        } catch {
-          const match = responseText.match(/\{[\s\S]*\}/);
-          if (match) {
-            return res.json(JSON.parse(match[0]));
-          }
-        }
-      } catch (err: any) {
-        console.warn('Gemini generate-description failed, using smart fallback:', err?.message);
-      }
-    }
-
-    // Fallback rich description
+    // Provide a useful draft without calling an external AI service.
     return res.json({
       title,
       description: `### Objective\nImplement **${title}** to ensure reliable operation and seamless user experience.\n\n### Technical Scope\n- Review current implementation patterns in the codebase.\n- Implement core functionality with strict TypeScript types.\n- Handle loading states, validation errors, and network timeouts gracefully.\n\n### Implementation Guidelines\n- Keep methods idempotent where applicable.\n- Write unit tests for core logical branches.`,
@@ -368,60 +236,7 @@ Return ONLY valid raw JSON with this exact schema:
   app.post('/api/copilot/suggest-workflow', async (req: Request, res: Response) => {
     const { summaryData } = req.body;
 
-    if (ai) {
-      try {
-        const prompt = `You are an agile agile coach and Kanban workflow optimizer.
-Analyze this Kanban board status:
-${JSON.stringify(summaryData || {}, null, 2)}
-
-Provide actionable workflow suggestions, identify potential bottlenecks (WIP overload, stuck review items, unprioritized backlog), and recommend 3-4 specific productivity actions for the team.
-
-Return ONLY raw JSON with schema:
-{
-  "healthScore": 85,
-  "statusSummary": "Short 1-2 sentence overall diagnosis of the board flow",
-  "bottlenecks": [
-    "Specific bottleneck or risk observed"
-  ],
-  "recommendations": [
-    {
-      "title": "Actionable recommendation title",
-      "action": "Concrete step the team should take right now",
-      "impact": "High" | "Medium" | "Quick Win"
-    }
-  ],
-  "workflowTip": "One punchy principle to maintain optimal Kanban velocity"
-}`;
-
-        const response = await callWithTimeout(
-          ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt,
-            config: {
-              responseMimeType: 'application/json',
-              temperature: 0.6,
-              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-            },
-          }),
-          30000
-        );
-
-        const responseText = response.text || '';
-        try {
-          const parsed = JSON.parse(responseText);
-          return res.json(parsed);
-        } catch {
-          const match = responseText.match(/\{[\s\S]*\}/);
-          if (match) {
-            return res.json(JSON.parse(match[0]));
-          }
-        }
-      } catch (err: any) {
-        console.warn('Gemini suggest-workflow failed, using smart fallback:', err?.message);
-      }
-    }
-
-    // Fallback diagnostic
+    // Provide deterministic workflow diagnostics without an external AI service.
     const wip = summaryData?.wipCount || 0;
     const review = summaryData?.reviewQueueCount || 0;
     const total = summaryData?.totalTasks || 0;
@@ -465,37 +280,9 @@ Return ONLY raw JSON with schema:
    * 4. General Copilot Assistant Chat/Advice endpoint
    */
   app.post('/api/copilot/chat', async (req: Request, res: Response) => {
-    const { message, context } = req.body;
+    const { message } = req.body;
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
-    }
-
-    if (ai) {
-      try {
-        const prompt = `You are a helpful Kanban & Software Engineering Copilot embedded in a Kanban board app.
-Context about the project:
-${JSON.stringify(context || {}, null, 2)}
-
-User Question: "${message}"
-
-Give a concise, helpful, and insightful response with markdown formatting, bullet points where appropriate, and actionable guidance for managing features and tasks.`;
-
-        const response = await callWithTimeout(
-          ai.models.generateContent({
-            model: 'gemini-3.8-flash',
-            contents: prompt,
-            config: {
-              temperature: 0.7,
-              thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-            },
-          }),
-          30000
-        );
-
-        return res.json({ reply: response.text });
-      } catch (err: any) {
-        console.warn('Gemini chat failed, fallback response:', err?.message);
-      }
     }
 
     return res.json({

@@ -118,6 +118,15 @@ test('lists local git folders under the allowed roots without following symlinks
     source.url,
   ]);
   assert.deepEqual(await new RepositoryService(path.join(directory, 'other')).workspaces.localRepositories(), []);
+
+  const repoRoot = path.join(directory, 'repo-root');
+  await mkdir(path.join(repoRoot, '.git'), { recursive: true });
+  await mkdir(path.join(repoRoot, 'child', '.git'), { recursive: true });
+  await mkdir(path.join(repoRoot, 'child', 'inner', '.git'), { recursive: true });
+  assert.deepEqual(
+    await new RepositoryService(path.join(directory, 'other'), { localRoots: [repoRoot] }).workspaces.localRepositories(),
+    [repoRoot, path.join(repoRoot, 'child')],
+  );
 });
 
 test('switches branches offline and refuses with uncommitted changes', async () => {

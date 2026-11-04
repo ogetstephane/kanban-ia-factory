@@ -39,7 +39,6 @@ Defined in `.env` (template: [.env.example](../.env.example)).
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | SQLite connection string. `file:./kanban.db` is relative to `prisma/`, so the file is `prisma/kanban.db`. |
-| `GEMINI_API_KEY` | No | Enables live responses for the existing Gemini endpoints (breakdown/spec/advisor). Independent of Copilot ticket sessions. |
 | `APP_URL` | No | Public URL where the app is hosted. |
 | `WORKSPACES_DIR` | No | Folder where project repositories are cloned. Default: `./workspaces`. |
 | `LOCAL_REPOSITORY_ROOTS` | No | Comma-separated parent folders from which local git folders may be cloned. Empty disables local folders. |

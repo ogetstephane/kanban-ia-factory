@@ -1,9 +1,9 @@
 # Architecture
 
-The app is an Express server that serves a React 19 + Vite frontend, Gemini AI endpoints, and
-a Prisma-backed board API. [server/app.ts](../server/app.ts) (`createApp`) composes the API from
-injected dependencies (database, git workspaces, agent provider, code graph, optional Gemini
-client) without listening or starting background work. [server.ts](../server.ts) is the entry
+The app is an Express server that serves a React 19 + Vite frontend, deterministic Copilot
+assistance endpoints, and a Prisma-backed board API. [server/app.ts](../server/app.ts) (`createApp`)
+composes the API from injected dependencies (database, git workspaces, agent provider, code graph)
+without listening or starting background work. [server.ts](../server.ts) is the entry
 point: it builds the production dependencies from the environment, adds Vite or static file
 serving, listens, then starts and stops the release and agent-session services. Code is split
 into small modules so each change needs only a narrow context.

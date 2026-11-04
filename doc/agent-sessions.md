@@ -42,7 +42,8 @@ stop the session, save the ticket's new model, then regenerate its plan. Changes
 alter the model recorded in previous attempts. A saved model missing from the current
 catalogue is retained and labelled **saved selection**, rather than silently replaced.
 Catalogue failures are shown with **Retry models**; they do not erase a saved choice.
-The separate Gemini Auto-Spec assistant is not affected by ticket agent settings.
+The built-in Auto-Spec helper continues to use its deterministic draft independently
+of ticket agent settings.
 
 ### Uploading task context
 
@@ -61,8 +62,8 @@ prompt; binary files are sent through Copilot SDK blob attachments for planning,
 execution and automated review. Interpretation depends on the selected model/runtime:
 an unreadable or unsupported attachment must be reported explicitly. Attachments are
 reference data, not instructions granting extra permissions. Do not upload secrets or
-files you are not allowed to send to Copilot. Files are not supplied to the separate
-Gemini Auto-Spec endpoint.
+files you are not allowed to send to Copilot. Files are not supplied to the built-in
+deterministic Auto-Spec helper.
 
 ## Planning, questions and approval
 
@@ -425,10 +426,10 @@ Copilot access. The server uses that user's existing authentication.
 
 To use Hydrafusion, set `COPILOT_MODEL=hydrafusion` in `.env` and restart the server.
 This applies to new Copilot runtime sessions for ticket planning, execution, automated
-review, and the wiki assistant. The separate Gemini-powered helpers are unchanged.
+review, and the wiki assistant.
 The authenticated Copilot account/runtime must have access to the selected model.
-Planning and execution use the account's AI quota. No Gemini key is needed for ticket
-sessions; the pre-existing Gemini feature-breakdown endpoints are independent.
+Planning and execution use the account's AI quota. The built-in feature-breakdown
+helpers use deterministic responses and are independent of ticket sessions.
 
 ## Code knowledge graph (Graphify)
 

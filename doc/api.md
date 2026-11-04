@@ -84,7 +84,7 @@ not proof that a particular dependency was verified).
 
 Invalid input returns `400`; an unknown project returns `404`; unavailable Copilot
 authentication/configuration returns `503`; invalid responses or generation failures
-return `502`; rejected model context size returns `413`. There is no Gemini/template
+return `502`; rejected model context size returns `413`. There is no template
 fallback. Graph unavailability does not block drafting but is explicitly reported.
 Disconnecting or cancelling aborts generation. Saving the returned draft remains manual.
 

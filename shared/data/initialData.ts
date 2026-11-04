@@ -397,7 +397,7 @@ export const INITIAL_TASKS: Task[] = [
     priority: 'Critical',
     featureId: 'feat-ai-tools',
     storyPoints: 5,
-    tags: ['agent', 'gemini', 'tools'],
+    tags: ['agent', 'ai', 'tools'],
     subtasks: [
       { id: 'as-1', text: 'Define FunctionDeclaration interfaces', completed: true },
       { id: 'as-2', text: 'Add validation for JSON schema parameters', completed: true },
@@ -437,7 +437,7 @@ export const INITIAL_TASKS: Task[] = [
     storyPoints: 5,
     tags: ['cache', 'performance', 'vector'],
     subtasks: [
-      { id: 'as-5', text: 'Embed prompts with gemini-embedding-2-preview', completed: true },
+      { id: 'as-5', text: 'Embed prompts with the configured embedding model', completed: true },
       { id: 'as-6', text: 'Index vectors in memory with cosine distance threshold 0.94', completed: true },
     ],
     acceptanceCriteria: ['Cache hit returns in under 80ms'],
