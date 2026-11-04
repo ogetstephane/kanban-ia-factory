@@ -1,7 +1,8 @@
 node_modules/
 workspaces/
 dist/
-storybook-static/
-playwright-report/
-test-results/
 doc/archify/generated/
+playwright-report/
+storybook-static/
+test-results/
+prisma/kanban.db
