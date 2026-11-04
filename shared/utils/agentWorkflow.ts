@@ -3,6 +3,7 @@ import type { AgentWorkflow, WorkflowStepState } from '../types/workflow';
 
 type WorkflowSession = Pick<AgentSession, 'status' | 'resumeStatus'> & {
   reviewStatus: string;
+  plan?: string;
   output?: string;
   delivery?: (Partial<Omit<NonNullable<AgentSession['delivery']>, 'status'>> & { status: string }) | null;
   publication?: (Partial<NonNullable<AgentSession['publication']>> & { status: string }) | null;
@@ -17,8 +18,10 @@ export function getAgentWorkflow(session?: WorkflowSession | null): AgentWorkflo
   const reviewing = ['completed', 'delivering'].includes(status) || reviewStatus === 'accepted' || !!delivery || !!publication;
   const executing = reviewing || ['execution_queued', 'executing'].includes(status) || resumeStatus === 'executing' || !!session.output;
   const planned = executing || status === 'awaiting_approval' || resumeStatus === 'awaiting_approval';
-  workflow.plan = planned ? 'completed' : 'active';
-  if (planned) workflow.approval = executing ? 'completed' : 'waiting';
+  // Adaptive sessions that went straight to execution keep the steps visible but skipped.
+  const skipped = executing && session.plan !== undefined && !session.plan.trim();
+  workflow.plan = skipped ? 'skipped' : planned ? 'completed' : 'active';
+  if (planned) workflow.approval = skipped ? 'skipped' : executing ? 'completed' : 'waiting';
   if (executing) workflow.execution = reviewing ? 'completed' : 'active';
   if (reviewing) workflow.review = reviewStatus === 'accepted' ? 'completed' : 'waiting';
   if (reviewStatus === 'accepted') workflow.delivery = 'waiting';

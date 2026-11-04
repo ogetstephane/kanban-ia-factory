@@ -25,6 +25,7 @@
     "test:report": "playwright show-report --host 127.0.0.1",
     "test:agent:live": "COPILOT_LIVE_TEST=1 tsx --test server/agents/copilotProvider.test.ts",
     "test:agent:skills": "COPILOT_SKILL_TEST=1 tsx --test server/agents/graphifySkill.test.ts",
+    "test:agent:graphify": "COPILOT_GRAPHIFY_BENCHMARK=1 tsx --test server/agents/graphifyBenchmark.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

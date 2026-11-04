@@ -187,14 +187,29 @@ highlighted, steps waiting for your input are amber, and upcoming steps stay gre
 are red and stopped phases remain marked as stopped. A completed execution does not complete
 the Review or Delivery steps; those still require their explicit human actions.
 
-Each run is divided into separate step panels. The Plan panel renders the Markdown plan
-and clarifications; Approval contains the approval action; Execution shows live Copilot
-content and check results; Review shows a compact modified-files summary in the Sessions
+Each run is divided into separate step panels. The Plan panel renders live planning
+activity, the Markdown plan and clarifications; Approval contains the approval action;
+Execution shows live execution activity and check results; Review shows AI review
+activity when available and a compact modified-files summary in the Sessions
 view, with **Open diff in full screen** to inspect all files, run an advisory **AI review**,
 and accept the human review. Closing the full-screen view returns to the workflow; the
 separate Changes / Session details sidebar is no longer shown. Delivery contains
 local delivery or review-publication progress. Correction requests, retry and cancellation
 remain current-run controls. Previous attempts retain their own progress and content.
+
+**Copilot agent activity** appears inside the step that produced it: planning in
+**Plan**, execution in **Execution**, and advisory AI review in **Review**.
+Each feed displays only that phase's recorded assistant messages and activity descriptions
+in order alongside tool calls, their status, invoked skills, subagents and provider
+warnings or errors. Approval and Delivery retain their existing controls and progress
+because they do not run a Copilot agent. Expand a tool call to see its reported arguments and results;
+expand **Reasoning** to read any reasoning events the provider actually supplies.
+Streaming fragments are combined with their completed messages rather than displayed
+twice. The activity refreshes with the session every two seconds in both the Sessions
+view and the task editor. It follows the latest activity until you scroll up; use
+**Jump to latest** to resume following. Recorded activity remains available for earlier
+attempts. For older runs without runtime events, the plan and execution report are still shown,
+but missing intermediate steps cannot be reconstructed.
 
 The server retains the last planning/approval/execution phase so a failed or cancelled run
 does not present a partial streamed plan as a completed plan. Older interrupted runs without

@@ -25,6 +25,7 @@ export function agentMessage(request: AgentRequest): MessageOptions {
   return {
     prompt: JSON.stringify({
       phase: request.phase,
+      ...(request.adaptive ? { mode: 'adaptive' } : {}),
       context: { ...request.context, task: { ...request.context.task, contextFiles } },
       approvedPlan: request.plan, feedback: request.feedback,
       previousAnswers: request.answers, reviewDiff: request.reviewDiff,

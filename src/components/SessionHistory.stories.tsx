@@ -18,13 +18,35 @@ type Story = StoryObj<typeof meta>;
 
 export const CompletedSession: Story = {};
 export const Planning: Story = {
-  args: { session: { ...agentSession, status: 'planning', output: '', plan: '# Implementation plan\n\n1. Inspect the code\n2. Add tests' } },
+  args: { session: {
+    ...agentSession, status: 'planning', resumeStatus: 'planning', output: '', plan: '',
+    runtimes: [agentRuntimeSchema.parse({
+      id: 'planning-runtime', phase: 'plan', providerSessionId: 'copilot-plan', status: 'running',
+      startedAt: agentSession.createdAt, endedAt: null, error: '', metadata: {},
+      events: [
+        { id: 'plan-message', type: 'assistant.message_delta', timestamp: agentSession.createdAt, data: { messageId: 'p1', deltaContent: 'I am inspecting the code before drafting the implementation plan.' } },
+        { id: 'plan-tool', type: 'tool.execution_start', timestamp: agentSession.createdAt, data: { toolCallId: 'p2', toolName: 'ticket_read_file', arguments: { path: 'src/App.tsx' } } },
+      ],
+    })],
+  } },
 };
 export const AwaitingApproval: Story = {
   args: { session: { ...agentSession, status: 'awaiting_approval', output: '' } },
 };
 export const Executing: Story = {
-  args: { session: { ...agentSession, status: 'executing', resumeStatus: 'executing' } },
+  args: { session: {
+    ...agentSession, status: 'executing', resumeStatus: 'executing', output: 'I am inspecting the relevant files.',
+    runtimes: [agentRuntimeSchema.parse({
+      id: 'live-runtime', phase: 'execute', providerSessionId: 'copilot-live', status: 'running',
+      startedAt: agentSession.createdAt, endedAt: null, error: '', metadata: {},
+      events: [
+        { id: 'intent', type: 'assistant.intent', timestamp: agentSession.createdAt, data: { intent: 'Locating relevant files' } },
+        { id: 'thinking', type: 'assistant.reasoning', timestamp: agentSession.createdAt, data: { reasoningId: 'r1', content: 'Inspect the session flow before changing it.' } },
+        { id: 'message', type: 'assistant.message_delta', timestamp: agentSession.createdAt, data: { messageId: 'm1', deltaContent: 'I am inspecting the relevant files.' } },
+        { id: 'tool', type: 'tool.execution_start', timestamp: agentSession.createdAt, data: { toolCallId: 't1', toolName: 'ticket_read_file', arguments: { path: 'src/App.tsx' } } },
+      ],
+    })],
+  } },
 };
 export const WithAgentTelemetry: Story = {
   args: {

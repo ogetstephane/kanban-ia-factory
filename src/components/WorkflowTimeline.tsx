@@ -5,13 +5,14 @@ import { WORKFLOW_STEPS, type AgentWorkflow, type WorkflowStepId, type WorkflowS
 const STEP_ICONS = { plan: FileText, approval: ClipboardCheck, execution: Play, review: Eye, delivery: Send };
 const STATE_LABELS: Record<WorkflowStepState, string> = {
   pending: 'Not started', active: 'In progress', waiting: 'Waiting for you',
-  completed: 'Completed', failed: 'Failed', stopped: 'Stopped',
+  completed: 'Completed', skipped: 'Skipped by agent', failed: 'Failed', stopped: 'Stopped',
 };
 const STATE_STYLES: Record<WorkflowStepState, string> = {
   pending: 'border-slate-800 bg-slate-900 text-slate-500',
   active: 'border-indigo-400/60 bg-indigo-500/15 text-indigo-200',
   waiting: 'border-amber-400/50 bg-amber-500/10 text-amber-200',
   completed: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+  skipped: 'border-dashed border-slate-600 bg-slate-900 text-slate-500',
   failed: 'border-rose-500/50 bg-rose-500/10 text-rose-300',
   stopped: 'border-slate-600 bg-slate-800 text-slate-400',
 };

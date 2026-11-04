@@ -26,6 +26,7 @@ The repository currently lacks `.env.example`. Until that template is restored,
 | `make test` | `npm test` | Unit, database integration and script tests. Database tests use isolated temporary SQLite databases. |
 | `make test-agent-live` | `npm run test:agent:live` | Opt-in real Copilot test on disposable files; requires authentication and uses AI quota. |
 | `make test-agent-skills` | `npm run test:agent:skills` | Verify native skill discovery, on-demand loading and rejection of other skills. Requires the Copilot runtime, but makes no model request. |
+| `make test-agent-graphify` | `npm run test:agent:graphify` | Opt-in six-session Copilot benchmark: three planning pairs with/without Graphify tools on the same committed snapshot. Uses AI quota. Results and limitations: [Code graph](features/code_graph/README.md#token-consumption-benchmark). |
 | `make lint` | `npm run lint` | TypeScript type check (`tsc --noEmit`). |
 | `make check` | `lint` + `test` + `build` | Type-check, run the default test suite, and build the frontend. |
 

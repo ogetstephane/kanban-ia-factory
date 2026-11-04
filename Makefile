@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live test-agent-skills lint check \
+.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live test-agent-skills test-agent-graphify lint check \
 	playwright-install test-e2e test-ui test-report db-generate db-migrate db-dev db-studio db-reset clean archify archify-install archify-doctor
 
 NPM ?= npm
@@ -66,6 +66,9 @@ test-agent-live: ## Test real Copilot on disposable files (requires authenticati
 
 test-agent-skills: ## Test native Copilot skill loading without a model request (requires the runtime)
 	$(call vite_run,test:agent:skills)
+
+test-agent-graphify: ## Compare three real Copilot planning pairs with/without Graphify (uses AI quota)
+	$(call vite_run,test:agent:graphify)
 
 lint: ## Type-check the project
 	$(NPM) run lint

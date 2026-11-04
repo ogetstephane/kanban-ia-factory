@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const workflowStepStateSchema = z.enum(['pending', 'active', 'waiting', 'completed', 'failed', 'stopped']);
+export const workflowStepStateSchema = z.enum(['pending', 'active', 'waiting', 'completed', 'skipped', 'failed', 'stopped']);
 export type WorkflowStepState = z.infer<typeof workflowStepStateSchema>;
 
 export const agentWorkflowSchema = z.object({

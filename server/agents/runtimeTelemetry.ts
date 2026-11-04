@@ -70,6 +70,10 @@ export class RuntimeTelemetry {
     if (this.writeError) throw this.writeError;
   }
 
+  setPhase(phase: AgentRuntime['phase']) {
+    this.runtime.phase = phase;
+  }
+
   async finish(error?: unknown) {
     this.runtime.status = error === undefined ? 'completed' : this.request.signal?.aborted ? 'cancelled' : 'failed';
     this.runtime.error = error === undefined ? '' : error instanceof Error ? error.message : String(error);

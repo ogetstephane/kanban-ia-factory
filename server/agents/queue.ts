@@ -3,7 +3,8 @@ import type { Prisma, AgentSession } from '@prisma/client';
 import type { AgentContext } from '../../shared/types/agent';
 import { recordActivity } from '../db/activityLog';
 
-export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSession, context: AgentContext, feedback: string, autoExecute = false) {
+/** `planFirst` forces a read-only planning run (a revised plan was requested); otherwise the next run is adaptive. */
+export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSession, context: AgentContext, feedback: string, autoExecute = false, planFirst = false) {
   const now = new Date().toISOString();
   const questions = await tx.agentQuestion.findMany({ where: { sessionId: row.id }, orderBy: { createdAt: 'asc' } });
   const checks = await tx.agentCheck.findMany({ where: { sessionId: row.id, attempt: row.attempt }, orderBy: { createdAt: 'asc' } });
@@ -26,7 +27,7 @@ export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSessi
   await tx.agentSession.update({ where: { id: row.id }, data: {
     status: 'queued', provider: context.task.agentProvider ?? row.provider,
     autoExecute, context: JSON.parse(JSON.stringify(context)), taskRevision: context.task.revision ?? 0,
-    plan: '', output: '', error: '', resumeStatus: null, providerSessionId: null,
+    plan: '', output: '', error: '', resumeStatus: planFirst ? 'planning' : null, providerSessionId: null,
     attempt: { increment: 1 }, feedback, reviewStatus: 'pending', reviewToken: '', updatedAt: now,
   } });
   await recordActivity(tx, {
@@ -40,7 +41,7 @@ export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSessi
 export async function enqueueTicket(tx: Prisma.TransactionClient, context: AgentContext, provider: string, autoExecute = false) {
   const existing = await tx.agentSession.findUnique({ where: { taskId: context.task.id } });
   if (existing) {
-    await replanTicket(tx, existing, context, 'The ticket was returned to In Progress. Inspect existing changes and prepare a revised plan.', autoExecute);
+    await replanTicket(tx, existing, context, 'The ticket was returned to In Progress. Inspect existing changes before continuing.', autoExecute);
     return;
   }
   const now = new Date().toISOString();

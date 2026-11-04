@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { agentApi } from '../data/agentApi';
 import type { AgentSession } from '../../shared/types/agent';
-import { MarkdownPreview } from './MarkdownPreview';
 import WorkflowTimeline, { WorkflowStepPanel } from './WorkflowTimeline';
 import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
 import type { WorkflowStepId } from '../../shared/types/workflow';
 import SessionAgentDetails from './SessionAgentDetails';
+import SessionAgentActivity from './SessionAgentActivity';
 
 type Attempt = AgentSession['attempts'][number];
 type Snapshot = Attempt['snapshot'];
@@ -38,6 +38,18 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
   const checksPassed = snapshot.checks.filter((check) => check.passed).length;
   const workflow = getAgentWorkflow(snapshot);
   const questionStep = workflow.execution !== 'pending' ? 'execution' : 'plan';
+  const planningActive = current && (
+    snapshot.status === 'queued' || snapshot.status === 'planning'
+    || snapshot.status === 'awaiting_input' && snapshot.resumeStatus === 'planning'
+  );
+  const hasPlanning = planningActive || !!snapshot.plan || snapshot.runtimes.some((runtime) => runtime.phase === 'plan');
+  const executionActive = current && (
+    snapshot.status === 'execution_queued' || snapshot.status === 'executing'
+    || snapshot.status === 'awaiting_input' && snapshot.resumeStatus === 'executing'
+  );
+  const hasExecution = executionActive || !!snapshot.output || snapshot.runtimes.some((runtime) => runtime.phase === 'execute');
+  const reviewRuntimes = snapshot.runtimes.filter((runtime) => runtime.phase === 'review');
+  const reviewActive = current && reviewRuntimes.some((runtime) => runtime.status === 'running');
   const questions = snapshot.questions.length > 0 && <div className="space-y-2">
     {snapshot.questions.map((question) => <div key={question.id} className="rounded-lg border border-slate-700 p-3">
       <p className="font-medium text-amber-200">{question.answer === null ? 'Question for you' : 'Clarification answered'}</p>
@@ -62,12 +74,8 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
       <WorkflowStepPanel step="plan" state={workflow.plan}>
         {snapshot.feedback && <p className="text-xs text-amber-200">Correction request: {snapshot.feedback}</p>}
         <p className="text-slate-500">Read-only implementation plan</p>
-        {(snapshot.plan || current && ['queued', 'planning'].includes(snapshot.status)) && <div>
-          <h5 className="text-xs text-indigo-200">Preview implementation plan</h5>
-          <div className="mt-2 max-h-96 overflow-auto rounded-lg bg-slate-950/70 p-3">
-            {snapshot.plan ? <MarkdownPreview source={snapshot.plan} /> : <p className="text-xs text-slate-500">Waiting for the plan…</p>}
-          </div>
-        </div>}
+        {hasPlanning && <SessionAgentActivity phase="plan" runtimes={snapshot.runtimes} output={snapshot.plan}
+          active={planningActive} live={current && snapshot.status === 'planning'} />}
         {questionStep === 'plan' && questions}
         {current && stepActions?.plan}
       </WorkflowStepPanel>
@@ -78,12 +86,9 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
         {current && stepActions?.approval}
       </WorkflowStepPanel>
       <WorkflowStepPanel step="execution" state={workflow.execution}>
-        {(snapshot.output || current && ['execution_queued', 'executing'].includes(snapshot.status)) ? <div>
-          <h5 className="text-xs text-indigo-200">Copilot agent content</h5>
-          <div className="mt-2 max-h-96 overflow-auto rounded-lg bg-slate-950/70 p-3">
-            {snapshot.output ? <MarkdownPreview source={snapshot.output} /> : <p className="text-xs text-slate-500">Waiting for Copilot…</p>}
-          </div>
-        </div> : <p className="text-slate-500">Execution output will appear here when the approved run starts.</p>}
+        {hasExecution ? <SessionAgentActivity phase="execute" runtimes={snapshot.runtimes} output={snapshot.output}
+          active={executionActive} live={current && snapshot.status === 'executing'} />
+          : <p className="text-slate-500">Execution output will appear here when the approved run starts.</p>}
         {questionStep === 'execution' && questions}
         {current && stepActions?.execution}
         {snapshot.checks.length > 0 && <details>
@@ -99,6 +104,8 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
         </details>}
       </WorkflowStepPanel>
       <WorkflowStepPanel step="review" state={workflow.review}>
+        {reviewRuntimes.length > 0 && <SessionAgentActivity phase="review" runtimes={snapshot.runtimes} output=""
+          active={reviewActive} live={reviewActive} />}
         <p className={workflow.review === 'pending' ? 'text-slate-500' : snapshot.reviewStatus === 'accepted' ? 'text-emerald-300' : undefined}>
           {snapshot.reviewStatus === 'accepted' ? 'Review accepted for this run.' : 'Inspect the code changes and checks before accepting this run.'}
         </p>

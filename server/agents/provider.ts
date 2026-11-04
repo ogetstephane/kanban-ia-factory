@@ -1,10 +1,15 @@
 import type { AgentContext, AgentQuestionInput, AgentRuntime } from '../../shared/types/agent';
 
+export interface PlanApprovalRequest { plan: string; reason: string }
+
 export interface AgentRequest {
   context: AgentContext;
   workspace: string;
   phase: 'plan' | 'execute' | 'review';
   plan: string;
+  /** Execute directly unless the agent judges the ticket complex enough to request plan approval first. */
+  adaptive?: boolean;
+  requestPlanApproval?: (proposal: PlanApprovalRequest) => Promise<void>;
   onContent?: (content: string) => Promise<void>;
   onSession: (id: string) => Promise<void>;
   onRuntime?: (runtime: AgentRuntime) => Promise<void>;

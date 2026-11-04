@@ -4,7 +4,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { agentContextSchema, agentOptionsSchema, agentOverviewSchema, agentSessionSchema, attemptSnapshotSchema, agentListSchema, deliveryHistorySchema, deliveryHistoryQuerySchema, type AgentListQuery, agentListQuerySchema, type AgentQuestionInput, type AgentRuntime } from '../../shared/types/agent';
 import { assignNextRelease, advanceEpicToReviewIfComplete, EntityError, taskData, projectData, featureData } from '../db/entityStore';
 import type { RepositoryService } from '../git/repositoryService';
-import type { AgentProvider } from './provider';
+import type { AgentProvider, PlanApprovalRequest } from './provider';
 import { agentOverview } from '../../shared/utils/agentTelemetry';
 import { enqueueTicket, replanTicket } from './queue';
 import { DeliveryService } from './deliveryService';
@@ -142,7 +142,7 @@ export class SessionService {
     const rows = await this.db.agentSession.findMany({
       where: projectId ? { task: { OR: [{ projectId }, { projectId: null }] } } : {},
       select: {
-        taskId: true, attempt: true, status: true, resumeStatus: true, output: true, reviewStatus: true,
+        taskId: true, attempt: true, status: true, resumeStatus: true, plan: true, output: true, reviewStatus: true,
         deliveries: { select: { attempt: true, status: true, error: true } },
         publications: { select: { attempt: true, status: true, error: true } },
       },
@@ -150,7 +150,7 @@ export class SessionService {
     return agentWorkflowsSchema.parse(Object.fromEntries(rows.map((row) => [row.taskId, getAgentWorkflow({
       status: agentSessionSchema.shape.status.parse(row.status),
       resumeStatus: agentPhaseSchema.parse(row.resumeStatus),
-      output: row.output,
+      plan: row.plan, output: row.output,
       reviewStatus: agentSessionSchema.shape.reviewStatus.parse(row.reviewStatus),
       delivery: row.deliveries.find((item) => item.attempt === row.attempt),
       publication: row.publications.find((item) => item.attempt === row.attempt),
@@ -262,7 +262,7 @@ export class SessionService {
           id: true, taskId: true, provider: true, status: true, taskRevision: true,
           workspace: true, branch: true, baseCommit: true, providerSessionId: true,
           error: true, createdAt: true, updatedAt: true,
-          attempt: true, reviewStatus: true, resumeStatus: true, output: true,
+          attempt: true, reviewStatus: true, resumeStatus: true, plan: true, output: true,
           deliveries: { select: { attempt: true, status: true, error: true } },
           publications: { select: { attempt: true, status: true, error: true } },
           runtimes: { select: { attempt: true, summary: true }, orderBy: { startedAt: 'desc' } },
@@ -288,7 +288,7 @@ export class SessionService {
         ...row, deliveryStatus: row.deliveries.find((delivery) => delivery.attempt === row.attempt)?.status ?? null,
         workflow: getAgentWorkflow({
           status: agentSessionSchema.shape.status.parse(row.status), resumeStatus: agentPhaseSchema.parse(row.resumeStatus),
-          reviewStatus: row.reviewStatus, output: row.output,
+          reviewStatus: row.reviewStatus, plan: row.plan, output: row.output,
           delivery: row.deliveries.find((item) => item.attempt === row.attempt),
           publication: row.publications.find((item) => item.attempt === row.attempt),
         }),
@@ -422,7 +422,7 @@ export class SessionService {
       const context = agentContextSchema.parse({
         task: taskData(task), project: project ? projectData(project) : null, feature: feature ? featureData(feature) : null,
       });
-      await replanTicket(tx, { ...row, reviewStatus: feedback ? 'changes_requested' : row.reviewStatus }, context, feedback ?? row.feedback);
+      await replanTicket(tx, { ...row, reviewStatus: feedback ? 'changes_requested' : row.reviewStatus }, context, feedback ?? row.feedback, false, row.status === 'awaiting_approval');
     });
     return this.get(taskId);
   }
@@ -609,8 +609,11 @@ export class SessionService {
     }
     if (!row) return;
     if (epicFeatureId) this.epicJobs.add(epicFeatureId);
-    const phase = row.status === 'queued' ? 'plan' : 'execute';
+    // Queued tickets execute adaptively: the agent decides whether a plan approval is needed.
+    const phase = row.status === 'queued' && row.resumeStatus === 'planning' ? 'plan' : 'execute';
+    const adaptive = row.status === 'queued' && phase === 'execute';
     const activeStatus = phase === 'plan' ? 'planning' : 'executing';
+    let planRequest: PlanApprovalRequest | undefined;
     try {
       const claimed = await this.db.$transaction(async (tx) => {
         if (epicFeatureId && await tx.agentSession.count({
@@ -625,7 +628,7 @@ export class SessionService {
         });
         if (result.count) await this.recordTaskActivity(tx, row!.taskId, {
           action: 'session_running',
-          summary: phase === 'plan' ? 'Copilot started preparing a plan' : 'Copilot started approved execution',
+          summary: phase === 'plan' ? 'Copilot started preparing a plan' : adaptive ? 'Copilot started adaptive execution' : 'Copilot started approved execution',
           actor: 'Copilot', changes: [{ field: 'Session status', before: row!.status, after: activeStatus }],
         });
         return result;
@@ -649,7 +652,11 @@ export class SessionService {
       let questionFailure: unknown;
       const output = await this.provider.run({
         context, workspace, phase, plan: row.plan,
-        signal, feedback: row.feedback,
+        signal, feedback: row.feedback, adaptive,
+        requestPlanApproval: async (proposal) => {
+          signal.throwIfAborted();
+          planRequest = proposal;
+        },
         onRuntime: this.runtimeRecorder(row),
         onContent: async (content) => {
           signal.throwIfAborted();
@@ -683,7 +690,20 @@ export class SessionService {
       signal.throwIfAborted();
       if (questionFailure) throw questionFailure;
       if (!output.trim()) throw new Error('The agent returned no result');
+      const escalation = planRequest;
       await this.db.$transaction(async (tx) => {
+        if (escalation) {
+          const plan = `${escalation.plan.trim()}\n\n> **Why approval is needed:** ${escalation.reason.trim()}`;
+          const escalated = await tx.agentSession.updateMany({
+            where: { id: row.id, status: activeStatus, attempt: row.attempt },
+            data: { status: 'awaiting_approval', resumeStatus: 'awaiting_approval', plan, output: '', updatedAt: new Date().toISOString() },
+          });
+          if (escalated.count) await this.recordTaskActivity(tx, row.taskId, {
+            action: 'plan_ready', summary: 'Copilot judged the ticket complex; plan is ready for approval', actor: 'Copilot',
+            changes: [{ field: 'Session status', before: activeStatus, after: 'Awaiting approval' }],
+          });
+          return;
+        }
         if (phase === 'execute') await this.current(row, tx);
         const completed = await tx.agentSession.updateMany({
           where: { id: row.id, status: activeStatus, attempt: row.attempt },
