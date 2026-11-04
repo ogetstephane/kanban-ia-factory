@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { activityEventSchema, activityListSchema, activityQuerySchema, activityEntityTypeSchema } from '../../src/types/activity';
+import { activityEventSchema, activityListSchema, activityQuerySchema, activityEntityTypeSchema } from '../../shared/types/activity';
 
 const pageSize = 25;
 

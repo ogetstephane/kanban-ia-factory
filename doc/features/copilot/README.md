@@ -30,13 +30,21 @@ Successful execution automatically moves the ticket to **Review**, and its featu
 it contains only that ticket. This does not accept human review or commit/push/merge changes;
 **Done** still requires delivery or an explicit manual transition.
 The provider abstraction currently uses the Copilot adapter; `COPILOT_MODEL` optionally selects
-the model, with the runtime default when empty. See [Agent sessions](../../agent-sessions.md).
+the model, with the runtime default when empty. Ticket agents and **Copilot Auto-Spec**
+load the shared `ticket-graphify` skill on demand using the SDK's native `skill` tool
+and, when available, read-only `ticket_graph_*` tools. The skill body and graph
+summaries are not injected into initial ticket prompts. The Wiki assistant remains
+tool-free and receives neither. If Graphify is
+unavailable, ticket agents are instructed to notify the user and continue with source-based
+impact analysis.
+See [Code graph](../code_graph/README.md) and [Agent sessions](../../agent-sessions.md).
 
 ## API
 
 - `GET /api/board/agent-sessions`, `GET /api/board/tasks/:id/session`
 - Answer/approve/retry/cancel/review/AI-review/delivery routes below `/api/board/tasks/:id/session`
-- Feature/task helpers are `/api/copilot/breakdown`, `/api/copilot/generate-description`,
+- Ticket drafting uses `POST /api/board/projects/:projectId/tasks/assistant`.
+- Legacy feature/task helpers are `/api/copilot/breakdown`, `/api/copilot/generate-description`,
   `/api/copilot/suggest-workflow` and `/api/copilot/chat`.
 
 ## Source files
@@ -47,7 +55,7 @@ the model, with the runtime default when empty. See [Agent sessions](../../agent
 - [sessionService.ts](../../../server/agents/sessionService.ts)
 - [provider.ts](../../../server/agents/provider.ts)
 - [copilotProvider.ts](../../../server/agents/copilotProvider.ts)
-- [agent.ts types](../../../src/types/agent.ts)
+- [agent.ts types](../../../shared/types/agent.ts)
 
 ## Related features
 

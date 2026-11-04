@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { z } from 'zod';
-import { activityChangesSchema } from '../../src/types/activity';
+import { activityChangesSchema } from '../../shared/types/activity';
 
 type ActivityChange = z.infer<typeof activityChangesSchema>[number];
 type ActivityEntity = 'project' | 'feature' | 'task' | 'release';

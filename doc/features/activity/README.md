@@ -33,7 +33,7 @@ backfilled. Full details are in [Activity history](../../activity-history.md).
 - [ActivityView.tsx](../../../src/components/ActivityView.tsx)
 - [activity.ts route](../../../server/routes/activity.ts)
 - [activityService.ts](../../../server/db/activityService.ts)
-- [activity.ts types](../../../src/types/activity.ts)
+- [activity.ts types](../../../shared/types/activity.ts)
 
 ## Related features
 

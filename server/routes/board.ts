@@ -2,17 +2,18 @@ import { Router, type Request, type Response } from 'express';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import {
-  boardDataSchema, projectSchema, featureSchema, taskSchema, revisionSchema, switchBranchSchema,
+  boardDataSchema, boardInitializationSchema, projectSchema, featureSchema, taskSchema, revisionSchema, switchBranchSchema,
   moveTaskSchema, breakdownSchema, createProjectSchema, repositoryInputSchema, DEFAULT_DOCS_PATH,
-} from '../../src/types/board';
-import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../src/data/initialData';
+} from '../../shared/types/board';
+import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../shared/data/initialData';
 import { BoardStore } from '../db/boardStore';
 import { EntityError, EntityStore } from '../db/entityStore';
-import { RepositoryError, RepositoryService } from '../git/repositoryService';
+import { RepositoryError } from '../git/repositoryService';
+import type { WorkspaceService } from '../git/workspaceService';
 import path from 'node:path';
-import { gitInventorySchema } from '../../src/types/git';
+import { gitInventorySchema } from '../../shared/types/git';
 
-export function createBoardRouter(store: BoardStore, entities: EntityStore, repositories: RepositoryService) {
+export function createBoardRouter(store: BoardStore, entities: EntityStore, workspaces: WorkspaceService) {
   const router = Router();
   router.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -46,10 +47,10 @@ export function createBoardRouter(store: BoardStore, entities: EntityStore, repo
     for (const project of projects) {
       const base = {
         id: project.id, name: project.name, url: project.repositoryUrl!, configuredBranch: project.repositoryBranch,
-        clonePath: repositories.pathFor(project.id),
+        clonePath: workspaces.pathFor(project.id),
       };
       try {
-        const inventory = await repositories.inventory(project.id);
+        const inventory = await workspaces.inventory(project.id);
         result.push({ ...base, ...inventory, error: null, worktrees: inventory.worktrees.map((worktree) => {
           const task = worktree.main ? undefined : project.tasks.find((task) =>
             (task.agentSession?.workspace && path.resolve(task.agentSession.workspace) === path.resolve(worktree.path)) ||
@@ -67,22 +68,40 @@ export function createBoardRouter(store: BoardStore, entities: EntityStore, repo
     return gitInventorySchema.parse({ projects: result });
   }));
   router.post('/initialize', handle(async (req) => {
-    await store.initialize(boardDataSchema.parse(req.body));
+    const input = boardInitializationSchema.parse(req.body);
+    if ('legacy' in input) {
+      const projects = input.legacy.projects ?? INITIAL_PROJECTS;
+      const features = input.legacy.features ?? INITIAL_FEATURES;
+      const tasks = input.legacy.tasks ?? INITIAL_TASKS;
+      const projectId = projects.some((project) => project.id === 'proj-cloud-saas')
+        ? 'proj-cloud-saas' : projects[0].id;
+      const featureIds = new Set(features.map((feature) => feature.id));
+      await store.initialize(boardDataSchema.parse({
+        projects,
+        features: features.map((feature) => ({ ...feature, projectId: feature.projectId || projectId })),
+        tasks: tasks.map((task) => ({
+          ...task, projectId: task.projectId || projectId,
+          featureId: task.featureId && featureIds.has(task.featureId) ? task.featureId : undefined,
+        })),
+      }));
+    } else {
+      await store.initialize(input);
+    }
     return { initialized: true };
   }));
   router.post('/reset', handle(async () => {
     const result = await store.reset({ projects: INITIAL_PROJECTS, features: INITIAL_FEATURES, tasks: INITIAL_TASKS });
-    await repositories.removeAllExcept(INITIAL_PROJECTS.map((project) => project.id))
+    await workspaces.removeAllExcept(INITIAL_PROJECTS.map((project) => project.id))
       .catch((error: unknown) => console.error('Unable to remove workspaces after reset:', error));
     return result;
   }));
   router.post('/repositories/branches', handle((req) => {
     const { url, token } = repositoryInputSchema.parse(req.body);
-    return repositories.branches({ url, token });
+    return workspaces.branches({ url, token });
   }));
   router.get('/repositories/local', handle(async () => ({
-    enabled: repositories.localRoots.length > 0,
-    folders: await repositories.localRepositories(),
+    enabled: workspaces.localRoots.length > 0,
+    folders: await workspaces.localRepositories(),
   })));
   router.get('/projects/:id/board', handle((req) => entities.board(req.params.id)));
   router.post('/projects', handle(async (req) => {
@@ -90,13 +109,13 @@ export function createBoardRouter(store: BoardStore, entities: EntityStore, repo
       repository, repositoryUrl: _url, repositoryBranch: _branch, repositoryCommit: _commit, ...project
     } = createProjectSchema.parse(req.body);
     if (!repository) return entities.createProject({ ...project, docsPath: undefined });
-    const cloned = await repositories.clone(project.id, repository, project.name);
+    const cloned = await workspaces.clone(project.id, repository, project.name);
     try {
       return await entities.createProject({
         ...project, docsPath: project.docsPath ?? DEFAULT_DOCS_PATH, repositoryUrl: cloned.url, repositoryBranch: cloned.branch, repositoryCommit: cloned.commit,
       });
     } catch (error) {
-      await repositories.remove(project.id);
+      await workspaces.remove(project.id);
       throw error;
     }
   }));
@@ -107,19 +126,19 @@ export function createBoardRouter(store: BoardStore, entities: EntityStore, repo
   }));
   router.get('/projects/:id/branches', handle(async (req) => {
     await entities.project(req.params.id);
-    return repositories.workspaceBranches(req.params.id);
+    return workspaces.workspaceBranches(req.params.id);
   }));
   router.put('/projects/:id/branch', handle(async (req) => {
     const { branch, revision } = switchBranchSchema.parse(req.body);
     const project = await entities.checkedProject(req.params.id, revision);
     if (!project.repositoryUrl) throw new EntityError(400, 'This project has no git repository');
-    await repositories.switchBranch(project.id, branch, (switched) =>
+    await workspaces.switchBranch(project.id, branch, (switched) =>
       entities.setProjectBranch(project.id, revision, switched.branch, switched.commit));
     return entities.project(project.id);
   }));
   router.delete('/projects/:id', handle(async (req) => {
     await entities.deleteProject(req.params.id, revisionSchema.parse(req.body).revision);
-    await repositories.remove(req.params.id)
+    await workspaces.remove(req.params.id)
       .catch((error: unknown) => console.error(`Unable to remove workspace of ${req.params.id}:`, error));
   }));
   router.post('/features', handle((req) => entities.createFeature(featureSchema.parse(req.body))));

@@ -1,0 +1,1 @@
+ALTER TABLE "Task" ADD COLUMN "contextFiles" JSONB NOT NULL DEFAULT '[]';

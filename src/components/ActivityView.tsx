@@ -3,9 +3,9 @@ import {
   Activity, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CircleDot,
   Clock3, Eye, Inbox, ListTodo, PlayCircle, Rows3, Search, Box, X,
 } from 'lucide-react';
-import type { Project } from '../types/kanban';
-import type { ActivityEvent, ActivityQuery } from '../types/activity';
-import { boardApi } from '../data/boardApi';
+import type { Project } from '../../shared/types/kanban';
+import type { ActivityEvent, ActivityQuery } from '../../shared/types/activity';
+import { activityApi } from '../data/activityApi';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 
 const entityTypes: Array<{ value: NonNullable<ActivityQuery['entityType']> | ''; label: string }> = [
@@ -117,13 +117,13 @@ export function ActivityView({ scopeId, projects }: { scopeId: string; projects:
   const [entityType, setEntityType] = useState<NonNullable<ActivityQuery['entityType']> | ''>('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [result, setResult] = useState<Awaited<ReturnType<typeof boardApi.activityEvents>>>();
+  const [result, setResult] = useState<Awaited<ReturnType<typeof activityApi.activityEvents>>>();
   const [layout, setLayout] = useState<'list' | 'timeline'>('list');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [historyEvent, setHistoryEvent] = useState<ActivityEvent | null>(null);
   const [historyPage, setHistoryPage] = useState(1);
-  const [history, setHistory] = useState<Awaited<ReturnType<typeof boardApi.activityHistory>>>();
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof activityApi.activityHistory>>>();
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState('');
   const historyKey = historyEvent ? `${historyEvent.entityType}:${historyEvent.entityId}` : '';
@@ -133,7 +133,7 @@ export function ActivityView({ scopeId, projects }: { scopeId: string; projects:
     const controller = new AbortController();
     setLoading(true);
     setError('');
-    void boardApi.activityEvents({
+    void activityApi.activityEvents({
       projectId: scopeId && scopeId !== ALL_PROJECTS ? scopeId : undefined,
       entityType: entityType || undefined,
       search,
@@ -151,7 +151,7 @@ export function ActivityView({ scopeId, projects }: { scopeId: string; projects:
     const controller = new AbortController();
     setHistoryLoading(true);
     setHistoryError('');
-    void boardApi.activityHistory(historyEvent.entityType, historyEvent.entityId, historyPage, controller.signal)
+    void activityApi.activityHistory(historyEvent.entityType, historyEvent.entityId, historyPage, controller.signal)
       .then((response) => setHistory((previous) => previous
         ? { ...response, items: [...previous.items, ...response.items] }
         : response)).catch((requestError: unknown) => {
@@ -198,7 +198,7 @@ export function ActivityView({ scopeId, projects }: { scopeId: string; projects:
 
   const totalPages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   return (
-    <section className="mx-auto max-w-5xl space-y-6">
+    <section className="w-full min-w-0 space-y-6">
       <header className="overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-indigo-500/10 via-slate-900 to-slate-900 p-5 sm:p-7">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">

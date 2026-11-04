@@ -4,8 +4,8 @@ import { TaskModal } from './TaskModal';
 import { useBoard } from '../data/useBoard';
 import { useProjects } from '../data/useProjects';
 import { useOperation } from '../data/useOperation';
-import { sessionActionFocusSchema } from '../types/agent';
-import { canCreateTaskIn, KANBAN_STATUSES } from '../utils/kanbanLogic';
+import { sessionActionFocusSchema } from '../../shared/types/agent';
+import { canCreateTaskIn, KANBAN_STATUSES } from '../../shared/utils/kanbanLogic';
 import { taskReturnPath } from '../utils/routes';
 
 export default function TaskPage() {
@@ -30,15 +30,25 @@ export default function TaskPage() {
 
   const close = () => navigate(returnPath, { replace: true });
 
+  const deleteTask = async () => {
+    if (!task || !window.confirm(`Delete task "${task.title}"? This cannot be undone.`)) return;
+    const deleted = await operation.run(() => board.deleteTask(task.id));
+    if (deleted) close();
+  };
+
   const error = projects.error || board.error;
   const queryError = query.has('status') && !status ? 'Unknown task status in the URL.'
     : query.has('action') && !action.success ? 'Unknown session action in the URL.'
     : board.ready && query.has('featureId') && !board.features.some((item) => item.id === query.get('featureId'))
       ? 'This feature does not exist in this project.' : '';
-  return <main className="min-h-screen bg-slate-950 p-4 text-slate-100">
-    <header className="mx-auto mb-4 flex max-w-6xl items-center justify-between gap-4">
+  return <main className="min-h-screen min-w-0 bg-slate-950 p-4 text-slate-100">
+    <header className="mb-4 flex w-full min-w-0 items-center justify-between gap-4">
       <span>{project?.name ?? 'Task editor'}</span>
-      <Link to={returnPath} replace className="text-indigo-300 underline">Back to workspace</Link>
+      <div className="flex items-center gap-4">
+        {task && <button type="button" onClick={() => { void deleteTask(); }} disabled={operation.pending}
+          className="text-rose-300 underline disabled:opacity-50 cursor-pointer">Delete task</button>}
+        <Link to={returnPath} replace className="text-indigo-300 underline">Back to workspace</Link>
+      </div>
     </header>
     {error ? <div role="alert">{error}<button className="ml-4 underline" onClick={() => { projects.reload(); board.reload(); }}>Retry</button></div>
       : !projects.ready ? <p role="status">Loading projects...</p>

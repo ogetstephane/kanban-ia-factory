@@ -12,8 +12,8 @@ import {
   GitBranch,
   Loader2
 } from 'lucide-react';
-import { Project } from '../types/kanban';
-import type { RepositoryInput } from '../types/board';
+import { Project } from '../../shared/types/kanban';
+import type { RepositoryInput } from '../../shared/types/board';
 import { DEFAULT_PROJECT_COLORS } from '../utils/projectLogic';
 import { useOperation } from '../data/useOperation';
 import { BranchSwitcher } from './BranchSwitcher';

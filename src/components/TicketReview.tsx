@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
-import { LoaderCircle, Sparkles } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { LoaderCircle, Maximize2, Sparkles, X } from 'lucide-react';
 import type { z } from 'zod';
-import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
 import { useOperation } from '../data/useOperation';
-import type { AgentSession, reviewSchema } from '../types/agent';
+import type { AgentSession, reviewSchema } from '../../shared/types/agent';
 import FileDiff from './FileDiff';
 import ReviewValidation from './ReviewValidation';
 
-export default function TicketReview({ session, onChange, autoRunAi = false, epicReview = false, onValidated }: {
+export default function TicketReview({ session, onChange, autoRunAi = false, epicReview = false, onValidated, summaryOnly = false }: {
   session: AgentSession; onChange: (session: AgentSession | null) => void; autoRunAi?: boolean;
-  epicReview?: boolean; onValidated?: () => void;
+  epicReview?: boolean; onValidated?: () => void; summaryOnly?: boolean;
 }) {
   const [review, setReview] = useState<z.infer<typeof reviewSchema> | null>(null);
   const [error, setError] = useState('');
@@ -23,10 +24,25 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
   const [aiError, setAiError] = useState('');
   const operation = useOperation();
   const autoStarted = useRef(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const expand = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (!fullscreen) return;
+    const element = dialog.current!;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    element.showModal();
+    return () => {
+      element.close();
+      document.body.style.overflow = overflow;
+      expand.current?.focus();
+    };
+  }, [fullscreen]);
   useEffect(() => {
     const controller = new AbortController();
     setReview(null); setConfirmed(false); setCriteria([]);
-    void boardApi.reviewAgent(session.taskId, controller.signal).then((value) => {
+    void agentApi.reviewAgent(session.taskId, controller.signal).then((value) => {
       if (!controller.signal.aborted) {
         setReview(value); setError(''); setSelected(value.files[0]?.path ?? '');
         setAiReport((current) => current?.token === value.token ? current : null);
@@ -38,9 +54,9 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
   }, [session.taskId, session.attempt, version]);
   useEffect(() => {
     setFile(null);
-    if (!selected || !review) return;
+    if (!selected || !review || summaryOnly && !fullscreen) return;
     const controller = new AbortController();
-    void boardApi.reviewAgent(session.taskId, controller.signal, selected).then((value) => {
+    void agentApi.reviewAgent(session.taskId, controller.signal, selected).then((value) => {
       if (controller.signal.aborted) return;
       if (value.token !== review.token) throw new Error('Files changed. Reload the diff before continuing.');
       setFile(value.files.find((item) => item.path === selected) ?? null);
@@ -49,11 +65,11 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
       if (!controller.signal.aborted) { setConfirmed(false); setError(cause instanceof Error ? cause.message : 'Unable to load file diff'); }
     });
     return () => controller.abort();
-  }, [selected, review, session.taskId]);
+  }, [selected, review, session.taskId, summaryOnly, fullscreen]);
   const runAiReview = async () => {
     if (!review || aiPending) return;
     setAiPending(true); setAiError('');
-    try { setAiReport(await boardApi.aiReviewAgent(session.taskId, review.token)); }
+    try { setAiReport(await agentApi.aiReviewAgent(session.taskId, review.token)); }
     catch (cause) { setAiError(cause instanceof Error ? cause.message : 'Unable to run the AI review'); }
     finally { setAiPending(false); }
   };
@@ -63,10 +79,10 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
       void runAiReview();
     }
   }, [autoRunAi, review]);
-  return <section aria-label="Ticket code review" className="space-y-3 border border-slate-700 p-3 rounded-lg">
-    <div className="flex justify-between gap-3">
+  const content = <section aria-label="Ticket code review" className="min-w-0 space-y-3 border border-slate-700 p-3 rounded-lg">
+    <div className="flex flex-wrap justify-between gap-3">
       <h4 className="font-semibold">Code review · {review?.files.length ?? 0} changed files</h4>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button type="button" onClick={() => setVersion((value) => value + 1)}>Reload diff</button>
         <button type="button" disabled={!review || aiPending} onClick={() => void runAiReview()}
           className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-40">
@@ -92,7 +108,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
         <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words text-sm text-slate-200">{aiReport.report}</pre>
         <p className="text-xs text-slate-500">The AI review is advisory and does not replace your human review. Reload the diff and run it again after changing files.</p>
       </div>}
-      <FileDiff files={review.files} selected={selected} onSelect={setSelected} baseCommit={review.baseCommit} file={file} error={error} />
+      <FileDiff files={review.files} selected={selected} onSelect={setSelected} baseCommit={review.baseCommit} file={file} error={error} allowFullscreen={!fullscreen} />
       {session.status === 'completed' && session.delivery?.status !== 'delivered' && session.publication?.status !== 'pushed' && (session.reviewStatus === 'pending' || session.reviewToken !== review.token) && <>
         <h4 className="font-medium">Acceptance criteria</h4>
         {review.criteria.map((criterion, index) => <label key={index} className="flex gap-2">
@@ -105,7 +121,7 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
         </label>
         <button type="button" disabled={!!error || !review.documentation?.ready || !confirmed || criteria.length !== review.criteria.length || operation.pending}
           className="bg-emerald-700 px-3 py-2 rounded disabled:opacity-40"
-          onClick={() => { void operation.run(async () => onChange(await boardApi.acceptReview(session.taskId, session.id, session.updatedAt, review.token))); }}>
+          onClick={() => { void operation.run(async () => onChange(await agentApi.acceptReview(session.taskId, session.id, session.updatedAt, review.token))); }}>
           Accept human review
         </button>
       </>}
@@ -113,8 +129,48 @@ export default function TicketReview({ session, onChange, autoRunAi = false, epi
       {!epicReview && session.status === 'completed' && session.publication?.status !== 'pushed' &&
         session.reviewStatus === 'accepted' && session.reviewToken === review.token &&
         <ReviewValidation key={`${session.updatedAt}-${review.token}`} kind="tasks" id={session.taskId} onDone={async () => {
-          onChange(await boardApi.agentSession(session.taskId)); onValidated?.();
+          onChange(await agentApi.agentSession(session.taskId)); onValidated?.();
         }} />}
     </>}
   </section>;
+  if (!summaryOnly) return content;
+  return <>
+    <section aria-label="Modified files summary" className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h5 className="font-medium text-slate-200">Modified files{review ? ` (${review.files.length})` : ''}</h5>
+        <button ref={expand} type="button" disabled={!review} onClick={() => setFullscreen(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 px-3 py-2 hover:bg-slate-600 disabled:opacity-40">
+          <Maximize2 className="h-3.5 w-3.5" />Open diff in full screen
+        </button>
+      </div>
+      {error && <p role="alert" className="text-rose-300">{error}</p>}
+      {!review && !error && <p role="status" className="text-slate-500">Loading modified files…</p>}
+      {error && <button type="button" onClick={() => setVersion((value) => value + 1)}>Reload modified files</button>}
+      {review && (review.files.length ? <>
+        <ul className="space-y-1">
+          {review.files.slice(0, 5).map((entry) => <li key={entry.path} className="flex min-w-0 gap-2">
+            <span className="shrink-0 font-mono text-amber-300">{entry.status}</span>
+            <span className="break-all text-slate-400">{entry.path}</span>
+          </li>)}
+        </ul>
+        {review.files.length > 5 && <p className="text-slate-500">And {review.files.length - 5} more. Open the diff to inspect all files or run an AI review.</p>}
+      </> : <p className="text-slate-500">No modified files.</p>)}
+    </section>
+    {fullscreen && createPortal(<dialog ref={dialog} aria-label="Full-screen code review"
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); setFullscreen(false); }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setFullscreen(false); }
+      }}
+      className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none border-0 bg-slate-950 p-0 text-sm text-slate-100 backdrop:bg-black/70">
+      <div className="flex h-full min-w-0 flex-col">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-700 p-4">
+          <h2 className="font-semibold">Full-screen code review</h2>
+          <button type="button" onClick={() => setFullscreen(false)} className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 hover:bg-slate-700">
+            <X className="h-4 w-4" />Close review
+          </button>
+        </header>
+        <div className="min-h-0 flex-1 overflow-auto p-4">{content}</div>
+      </div>
+    </dialog>, document.body)}
+  </>;
 }

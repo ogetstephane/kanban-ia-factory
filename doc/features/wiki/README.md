@@ -39,7 +39,7 @@ The preview displays raw HTML as text. See the detailed [Wiki guide](../../wiki.
 - [MermaidDiagram.tsx](../../../src/components/MermaidDiagram.tsx)
 - [wiki.ts route](../../../server/routes/wiki.ts)
 - [docsService.ts](../../../server/wiki/docsService.ts)
-- [wiki.ts types](../../../src/types/wiki.ts)
+- [wiki.ts types](../../../shared/types/wiki.ts)
 
 ## Related features
 

@@ -1,20 +1,21 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { access, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Server } from 'node:http';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
-import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../src/data/initialData';
-import { boardDataSchema } from '../../src/types/board';
+import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../shared/data/initialData';
+import { boardDataSchema, taskSchema } from '../../shared/types/board';
 import { createBoardRouter } from '../routes/board';
 import { BoardStore } from './boardStore';
 import { EntityStore } from './entityStore';
 import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
-import { gitInventorySchema } from '../../src/types/git';
+import { gitInventorySchema } from '../../shared/types/git';
 import { ActivityService } from './activityService';
 import { createActivityRouter } from '../routes/activity';
 
@@ -45,7 +46,7 @@ before(async () => {
   repositories = new RepositoryService(path.join(directory, 'workspaces'), { localRoots: [directory] });
   const app = express();
   app.use(express.json());
-  app.use('/api/board', createBoardRouter(store, new EntityStore(db), repositories));
+  app.use('/api/board', createBoardRouter(store, new EntityStore(db), repositories.workspaces));
   app.use('/api/board', createActivityRouter(new ActivityService(db)));
   server = await new Promise<Server>((resolve) => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
@@ -64,7 +65,69 @@ after(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-test('initializes once and keeps seeded order', async () => {
+test('legacy initialization fills only absent collections and preserves migration behavior', async (t) => {
+  const legacyProject = { ...demo.projects[0], id: 'legacy-project' };
+  const legacyFeature = { ...demo.features[0], projectId: undefined };
+  const legacyTask = { ...demo.tasks[0], projectId: undefined, featureId: 'removed-feature' };
+  const cases = [
+    { name: 'no browser data', legacy: {}, expected: demo },
+    { name: 'absent projects and features, explicit empty tasks', legacy: { tasks: [] }, expected: { ...demo, tasks: [] } },
+    { name: 'empty features, absent tasks', legacy: { features: [] },
+      expected: { ...demo, features: [], tasks: demo.tasks.map((task) => ({ ...task, featureId: undefined })) } },
+    { name: 'custom legacy project and dangling feature', legacy: { projects: [legacyProject], features: [legacyFeature], tasks: [legacyTask] },
+      expected: { projects: [legacyProject], features: [{ ...legacyFeature, projectId: legacyProject.id }],
+        tasks: [{ ...legacyTask, projectId: legacyProject.id, featureId: undefined }] } },
+    { name: 'preferred legacy project is not first', legacy: { projects: [...demo.projects].reverse(),
+      features: [{ ...legacyFeature }], tasks: [{ ...legacyTask, featureId: legacyFeature.id }] },
+      expected: { projects: [...demo.projects].reverse(), features: [{ ...legacyFeature, projectId: 'proj-cloud-saas' }],
+        tasks: [{ ...legacyTask, projectId: 'proj-cloud-saas', featureId: legacyFeature.id }] } },
+  ];
+  for (const scenario of cases) {
+    await t.test(scenario.name, async (t) => {
+      t.after(async () => {
+        await db.$transaction([db.task.deleteMany(), db.feature.deleteMany(), db.project.deleteMany(), db.board.deleteMany()]);
+      });
+      assert.equal(await store.read(), null);
+      const response = await fetch(`${url}/initialize`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ legacy: scenario.legacy }),
+      });
+      assert.equal(response.status, 200, await response.text());
+      const stored = await store.read();
+      assert.ok(stored);
+      assert.deepEqual(
+        JSON.parse(JSON.stringify(boardDataSchema.parse(stored))),
+        JSON.parse(JSON.stringify(boardDataSchema.parse(scenario.expected))),
+      );
+      const repeated = await fetch(`${url}/initialize`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ legacy: { tasks: [] } }),
+      });
+      assert.equal(repeated.status, 200);
+      assert.deepEqual(await store.read(), stored);
+    });
+  }
+});
+
+test('invalid initialization never seeds or repairs strict full imports', async () => {
+  const payloads = [
+    {}, { legacy: null }, { legacy: { projects: [] } }, { legacy: { tasks: null } },
+    { legacy: { tasks: {} } }, { legacy: { features: [{ ...demo.features[0], projectId: 'unknown' }] } },
+    { legacy: { tasks: [demo.tasks[0], demo.tasks[0]] } },
+    { legacy: { tasks: [{ ...demo.tasks[0], featureId: demo.features.at(-1)!.id }] } },
+    { ...demo, tasks: [{ ...demo.tasks[0], featureId: 'unknown' }] },
+  ];
+  for (const body of payloads) {
+    const response = await fetch(`${url}/initialize`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 400, JSON.stringify(body));
+    assert.equal((await response.json()).error, 'Invalid entity data');
+    assert.equal(await store.read(), null);
+  }
+});
+
+test('full imports initialize once and keep seeded order', async () => {
   assert.equal(await store.read(), null);
   const init = await fetch(`${url}/initialize`, {
     method: 'POST',
@@ -104,6 +167,81 @@ test('task updates are atomic and guarded by revision conflicts', async () => {
     body: JSON.stringify({ ...firstTask, title: 'Stale write should fail' }),
   });
   assert.equal(stale.status, 409);
+});
+
+test('uploaded context files persist through task API, snapshots, conflict checks, session snapshots and removal', async () => {
+  const files = [
+    { id: randomUUID(), name: 'context.md', mimeType: 'text/markdown', size: 4, data: 'dGVzdA==' },
+    { id: randomUUID(), name: 'design.pdf', mimeType: 'application/pdf', size: 3, data: 'AP8K' },
+  ];
+  const draft = taskSchema.parse({
+    ...demo.tasks[0], id: 'task-context-upload', status: 'To Do', featureId: undefined,
+    contextFiles: files,
+  });
+
+  const send = (method: string, body: unknown, route = `/tasks/${draft.id}`) => fetch(`${url}${route}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const created = await send('POST', draft, '/tasks');
+  assert.equal(created.status, 200);
+  const saved = taskSchema.parse(await created.json());
+  assert.deepEqual(saved.contextFiles, files);
+  const entities = new EntityStore(db);
+  assert.deepEqual((await entities.board(draft.projectId)).tasks.find((task) => task.id === draft.id)!.contextFiles, files);
+  const invalid = await send('PUT', { ...saved, contextFiles: [{ ...files[0], size: 99 }] });
+  assert.equal(invalid.status, 400);
+  const removed = await send('PUT', { ...saved, contextFiles: [files[1]] });
+  assert.equal(removed.status, 200);
+  const updated = taskSchema.parse(await removed.json());
+  const stale = await send('PUT', { ...saved, contextFiles: [] });
+  assert.equal(stale.status, 409);
+  assert.deepEqual((await db.task.findUniqueOrThrow({ where: { id: draft.id } })).contextFiles, [files[1]]);
+  const moved = await send('POST', { revision: updated.revision, status: 'In Progress' }, `/tasks/${draft.id}/move`);
+  assert.equal(moved.status, 200);
+  const session = await db.agentSession.findUniqueOrThrow({ where: { taskId: draft.id } });
+  const context = JSON.parse(JSON.stringify(session.context));
+  assert.deepEqual(context.task.contextFiles, [files[1]]);
+  const running = taskSchema.parse((await entities.board(draft.projectId)).tasks.find((task) => task.id === draft.id));
+  assert.equal((await send('PUT', { ...running, contextFiles: [] })).status, 409);
+  await db.agentSession.update({ where: { id: session.id }, data: { status: 'cancelled' } });
+  const cleared = await send('PUT', { ...running, contextFiles: [] });
+  assert.equal(cleared.status, 200);
+  const final = taskSchema.parse(await cleared.json());
+  assert.deepEqual(final.contextFiles, []);
+  assert.equal((await send('DELETE', { revision: final.revision })).status, 204);
+});
+
+test('ticket agent selections persist through API and board responses and can be reset to the default', async () => {
+  const draft = taskSchema.parse({
+    ...demo.tasks[0], id: 'task-agent-choice', featureId: undefined, status: 'To Do',
+    agentProvider: 'copilot', agentModel: 'ticket-model',
+  });
+  const send = (method: string, body: unknown, route = `/tasks/${draft.id}`) => fetch(`${url}${route}`, {
+    method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const created = await send('POST', draft, '/tasks');
+  assert.equal(created.status, 200);
+  const saved = taskSchema.parse(await created.json());
+  assert.equal(saved.agentProvider, 'copilot');
+  assert.equal(saved.agentModel, 'ticket-model');
+  const board = await new EntityStore(db).board(draft.projectId);
+  assert.equal(board.tasks.find((task) => task.id === saved.id)?.agentModel, 'ticket-model');
+  assert.equal((await send('PUT', { ...saved, agentProvider: 'unsupported' })).status, 400);
+  assert.equal((await send('PUT', { ...saved, agentModel: '' })).status, 400);
+  const reset = await send('PUT', { ...saved, agentModel: undefined });
+  assert.equal(reset.status, 200);
+  const cleared = taskSchema.parse(await reset.json());
+  assert.equal(cleared.agentModel, undefined);
+  assert.equal((await db.task.findUniqueOrThrow({ where: { id: saved.id } })).agentModel, null);
+  assert.equal((await send('PUT', { ...saved, agentModel: 'stale-model' })).status, 409);
+  const selected = await send('PUT', { ...cleared, agentModel: 'next-model' });
+  assert.equal(selected.status, 200);
+  const ready = taskSchema.parse(await selected.json());
+  assert.equal((await send('POST', { revision: ready.revision, status: 'In Progress' }, `/tasks/${ready.id}/move`)).status, 200);
+  const session = await db.agentSession.findUniqueOrThrow({ where: { taskId: ready.id } });
+  assert.equal(session.provider, 'copilot');
+  assert.equal(JSON.parse(JSON.stringify(session.context)).task.agentModel, 'next-model');
+  await db.agentSession.update({ where: { id: session.id }, data: { status: 'cancelled' } });
 });
 
 test('deleting a feature detaches linked tasks without deleting them', async () => {
@@ -180,7 +318,7 @@ test('creating a project with a repository clones it first', async () => {
   assert.equal(created.repositoryUrl, source.url);
   assert.equal(created.repositoryBranch, 'dev');
   assert.equal(created.repositoryCommit, source.devCommit);
-  await access(path.join(repositories.pathFor('proj-git'), 'DEV.md'));
+  await access(path.join(repositories.workspaces.pathFor('proj-git'), 'DEV.md'));
 
   const updated = await fetch(`${url}/projects/proj-git`, json('PUT', {
     ...created, name: 'Renamed', repositoryUrl: 'https://evil.example/repo.git',
@@ -190,7 +328,7 @@ test('creating a project with a repository clones it first', async () => {
 
   const removed = await fetch(`${url}/projects/proj-git`, json('DELETE', { revision: updated.revision }));
   assert.equal(removed.status, 204);
-  await assert.rejects(access(repositories.pathFor('proj-git')));
+  await assert.rejects(access(repositories.workspaces.pathFor('proj-git')));
 });
 
 test('a failed clone does not create the project', async () => {
@@ -201,7 +339,7 @@ test('a failed clone does not create the project', async () => {
   assert.match((await response.json()).error, /Git failed/);
   const projects = await fetch(`${url}/projects`).then((res) => res.json());
   assert.ok(!projects.some((project: { id: string }) => project.id === 'proj-bad'));
-  await assert.rejects(access(repositories.pathFor('proj-bad')));
+  await assert.rejects(access(repositories.workspaces.pathFor('proj-bad')));
 });
 
 test('clients cannot set repository fields without cloning', async () => {
@@ -282,15 +420,15 @@ test('global Git inventory includes real worktrees and ticket links, excludes no
   })).then((res) => res.json());
   await fetch(`${url}/tasks/${task.id}/move`, json('POST', { revision: task.revision, status: 'In Progress' }));
   const session = await db.agentSession.findUniqueOrThrow({ where: { taskId: task.id } });
-  const ticket = await repositories.ticketWorkspace(projectId, session.id, 'main');
+  const ticket = await repositories.workspaces.ticketWorkspace(projectId, session.id, 'main');
   await db.agentSession.update({ where: { id: session.id }, data: { workspace: ticket.workspace, branch: ticket.branch, status: 'completed' } });
-  const orphan = await repositories.ticketWorkspace(projectId, 'orphan-session', 'main');
-  const root = repositories.pathFor(projectId);
+  const orphan = await repositories.workspaces.ticketWorkspace(projectId, 'orphan-session', 'main');
+  const root = repositories.workspaces.pathFor(projectId);
   execFileSync('git', ['switch', 'dev'], { cwd: root, stdio: 'pipe' });
   await fetch(`${url}/projects`, json('POST', {
     ...newProject('proj-inventory-missing'), repository: { url: source.url },
   }));
-  await repositories.remove('proj-inventory-missing');
+  await repositories.workspaces.remove('proj-inventory-missing');
   const response = await fetch(`${url}/repositories/inventory`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'no-store');

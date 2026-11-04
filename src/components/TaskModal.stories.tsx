@@ -24,3 +24,15 @@ export const EditingTask: Story = {};
 export const CreatingTask: Story = {
   args: { task: null, defaultStatus: 'To Do', defaultFeatureId: feature.id },
 };
+
+export const WithContextFiles: Story = {
+  args: {
+    task: {
+      ...tasks[0],
+      contextFiles: [{
+        id: '83b55352-1a04-4fb7-9ec0-72cd6ca7269b', name: 'requirements.md',
+        mimeType: 'text/markdown', size: 12, data: 'IyBSZXF1aXJlZApY',
+      }],
+    },
+  },
+};

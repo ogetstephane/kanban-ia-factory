@@ -7,7 +7,7 @@ import path from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import express from 'express';
 import type { Server } from 'node:http';
-import { featureSchema, taskSchema } from '../../src/types/board';
+import { featureSchema, taskSchema } from '../../shared/types/board';
 import type { AgentRequest, AgentProvider } from './provider';
 import { SessionService } from './sessionService';
 import { WorkspaceTools } from './workspaceTools';
@@ -16,6 +16,9 @@ import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
 import { createAgentRouter } from '../routes/agents';
 import { requiredTicketDocumentationPath } from './ticketDocumentation';
+import { agentWorkflowsSchema } from '../../shared/types/workflow';
+import { RuntimeTelemetry } from './runtimeTelemetry';
+import { attemptSnapshotSchema } from '../../shared/types/agent';
 
 let directory: string;
 let db: PrismaClient;
@@ -31,7 +34,26 @@ let waitExecution = false;
 let recordChecks = false;
 const provider: AgentProvider = {
   id: 'copilot',
+  models: async () => [{ id: 'fixture-model', name: 'Fixture model' }],
   async run(request) {
+    const telemetry = new RuntimeTelemetry(request);
+    try {
+      await telemetry.update({}, 'fake-session');
+      telemetry.event({
+        id: 'fixture-usage', type: 'assistant.usage', timestamp: new Date().toISOString(),
+        ephemeral: true, data: { model: 'fixture-model', inputTokens: 100, outputTokens: 20, cost: 0.5 },
+      });
+      const output = await runFixture(request);
+      await telemetry.finish();
+      return output;
+    } catch (error) {
+      await telemetry.finish(error);
+      throw error;
+    }
+  },
+};
+
+async function runFixture(request: AgentRequest) {
     calls.push(request);
     await request.onSession('fake-session');
     if (failure) throw new Error('Provider unavailable');
@@ -56,14 +78,14 @@ const provider: AgentProvider = {
         await request.recordCheck?.({ script: 'test', passed: false, output: 'One assertion failed' });
         await request.recordCheck?.({ script: 'lint', passed: true, output: 'Lint passed' });
       }
+      await request.onContent?.('Copilot is working on the approved plan.');
       if (waitExecution) await new Promise<void>((_resolve, reject) => {
         request.signal?.addEventListener('abort', () => reject(new Error('Execution cancelled')), { once: true });
         request.signal?.throwIfAborted();
       });
     }
     return request.phase === 'plan' ? 'Read relevant files, implement the ticket, run tests.' : 'Implementation complete; inspect result.txt.';
-  },
-};
+}
 
 before(async () => {
   directory = await mkdtemp(path.join(tmpdir(), 'kanban-agent-test-'));
@@ -75,7 +97,7 @@ before(async () => {
   entities = new EntityStore(db);
   repositories = new RepositoryService(path.join(directory, 'workspaces'), { localRoots: [directory] });
   const source = await createSourceRepository(path.join(directory, 'source'));
-  const cloned = await repositories.clone('project-agent', { url: source.url });
+  const cloned = await repositories.workspaces.clone('project-agent', { url: source.url });
   await entities.createProject({
     id: 'project-agent', revision: 0, name: 'Test project', description: 'Small context', color: '#6366f1',
     repositoryUrl: cloned.url, repositoryBranch: cloned.branch, repositoryCommit: cloned.commit,
@@ -124,14 +146,21 @@ test('transition queues exactly one durable session and planning cannot execute 
   await sessions.tick();
   const plan = (await sessions.get(task.id))!;
   assert.equal(plan.status, 'awaiting_approval');
+  assert.equal(plan.resumeStatus, 'awaiting_approval');
+  assert.equal(plan.plan, 'Read relevant files, implement the ticket, run tests.');
   assert.equal(plan.providerSessionId, 'fake-session');
+  assert.equal(plan.context?.task.id, task.id);
+  assert.equal(plan.runtimes.length, 1);
+  assert.equal(plan.runtimes[0].phase, 'plan');
+  assert.equal(plan.runtimes[0].status, 'completed');
+  assert.equal(plan.runtimes[0].events[0].data.inputTokens, 100);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].phase, 'plan');
   assert.equal(calls[0].context.task.id, task.id);
   assert.ok(!('tasks' in calls[0].context));
   assert.equal(await readFile(path.join(plan.workspace!, 'README.md'), 'utf8'), '# main\n');
   assert.ok(plan.branch?.startsWith('kanban/'));
-  assert.equal((await repositories.ticketWorkspace('project-agent', plan.id, 'main')).workspace, plan.workspace);
+  assert.equal((await repositories.workspaces.ticketWorkspace('project-agent', plan.id, 'main')).workspace, plan.workspace);
   await assert.rejects(readFile(path.join(plan.workspace!, 'result.txt')));
   await sessions.tick();
   assert.equal(calls.length, 1);
@@ -141,17 +170,59 @@ test('transition queues exactly one durable session and planning cannot execute 
   await sessions.tick();
   const done = (await sessions.get(task.id))!;
   assert.equal(done.status, 'completed');
+  assert.equal(done.resumeStatus, 'executing');
   assert.equal(calls[1].phase, 'execute');
   assert.equal(calls[1].plan, plan.plan);
   assert.equal(await readFile(path.join(done.workspace!, 'result.txt'), 'utf8'), 'implemented');
-  await assert.rejects(readFile(path.join(repositories.pathFor('project-agent'), 'result.txt')));
-  assert.equal((await repositories.workspaceBranches('project-agent')).current, 'main');
+  await assert.rejects(readFile(path.join(repositories.workspaces.pathFor('project-agent'), 'result.txt')));
+  assert.equal((await repositories.workspaces.workspaceBranches('project-agent')).current, 'main');
   const reviewed = await db.task.findUniqueOrThrow({ where: { id: task.id } });
   assert.equal(reviewed.status, 'Review');
   assert.equal(reviewed.revision, task.revision! + 1);
   assert.equal(done.reviewStatus, 'pending');
   await entities.moveTask(task.id, { revision: reviewed.revision, status: 'Review' });
   assert.equal(await db.agentSession.count({ where: { taskId: task.id } }), 1);
+});
+
+test('agent options expose integrated providers and their model catalogue over HTTP', async () => {
+  const response = await fetch(`${api}/agent-options`);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(body.providers[0].models, [{ id: 'fixture-model', name: 'Fixture model' }]);
+  assert.equal(body.providers[0].id, 'copilot');
+  assert.equal(body.providers[0].defaultModel, process.env.COPILOT_MODEL || null);
+});
+
+test('ticket-selected models reach planning, execution and review and can change on a new attempt', async () => {
+  const now = new Date().toISOString();
+  const task = await entities.createTask(taskSchema.parse({
+    id: 'agent-model-selection', projectId: 'project-agent', title: 'Choose a model',
+    description: '', status: 'To Do', priority: 'Medium', tags: [], acceptanceCriteria: [],
+    subtasks: [], order: 0, storyPoints: 1, createdAt: now, updatedAt: now,
+    agentProvider: 'copilot', agentModel: 'chosen-model',
+  }));
+  await entities.moveTask(task.id, { revision: task.revision!, status: 'In Progress' });
+  await sessions.tick();
+  const plan = (await sessions.get(task.id))!;
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'chosen-model');
+  assert.equal(plan.runtimes[0].metadata.requestedModel, 'chosen-model');
+  await sessions.approve(task.id, plan.id, plan.updatedAt);
+  await sessions.tick();
+  const done = (await sessions.get(task.id))!;
+  assert.equal(calls.at(-1)?.phase, 'execute');
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'chosen-model');
+  const review = await sessions.review(task.id);
+  await sessions.aiReview(task.id, review.token);
+  assert.equal(calls.at(-1)?.phase, 'review');
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'chosen-model');
+  const current = (await entities.board('project-agent')).tasks.find((item) => item.id === task.id)!;
+  await entities.updateTask({ ...current, agentModel: 'revised-model' });
+  await sessions.retry(task.id, done.id, 'Use the revised model', (await sessions.get(task.id))!.updatedAt);
+  await sessions.tick();
+  const revised = (await sessions.get(task.id))!;
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'revised-model');
+  assert.equal((await sessions.history(task.id))[0].snapshot.context?.task.agentModel, 'chosen-model');
+  await sessions.cancel(task.id, revised.id);
 });
 
 test('an epic auto-executes tickets sequentially and enters review after every ticket is done', async () => {
@@ -351,7 +422,8 @@ test('session HTTP endpoints validate filters and require the exact plan version
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.status, 'awaiting_approval');
-  assert.equal('context' in body, false);
+  assert.equal(body.context.task.id, task.id);
+  assert.equal(body.runtimes[0].events[0].data.inputTokens, 100);
   const approve = (value: unknown) => fetch(`${api}/tasks/${task.id}/session/approve`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value),
   });
@@ -364,6 +436,11 @@ test('session HTTP endpoints validate filters and require the exact plan version
   assert.equal((await fetch(`${api}/agent-sessions?priority=Unknown`)).status, 400);
   const list = await fetch(`${api}/agent-sessions?search=agent-http&status=completed`).then((res) => res.json());
   assert.equal(list.total, 1);
+  assert.equal('context' in list.items[0], false, 'session summaries must remain compact');
+  assert.equal('runtimes' in list.items[0], false, 'raw telemetry belongs only in session details');
+  assert.equal(list.items[0].agent.provider, 'copilot');
+  assert.equal(list.items[0].agent.model, 'fixture-model');
+  assert.equal(list.items[0].agent.phase, 'execute');
   await db.agentDelivery.create({ data: {
     id: 'delivery-agent-http', sessionId: row.id, attempt: row.attempt, status: 'failed',
     targetBranch: 'main', targetHead: 'a'.repeat(40), ticketHead: 'b'.repeat(40), tree: 'c'.repeat(40),
@@ -381,18 +458,48 @@ test('session HTTP endpoints validate filters and require the exact plan version
 
 test('restart marks interrupted sessions failed without replaying them', async () => {
   await db.agentSession.updateMany({ where: { taskId: 'agent-failure' }, data: { status: 'executing' } });
+  const session = (await sessions.get('agent-failure'))!;
+  const runtime = session.runtimes.at(-1)!;
+  await db.agentRuntime.update({ where: { id: runtime.id }, data: { status: 'running', endedAt: null } });
   await sessions.start();
   await sessions.stop();
   assert.equal((await sessions.get('agent-failure'))?.status, 'failed');
   assert.match((await sessions.get('agent-failure'))!.error, /restarted/);
+  const recovered = (await sessions.get('agent-failure'))!.runtimes.find((item) => item.id === runtime.id)!;
+  assert.equal(recovered.status, 'failed');
+  assert.ok(recovered.endedAt);
+  assert.match(recovered.error, /Telemetry may be incomplete/);
+  assert.deepEqual(recovered.events, runtime.events);
 });
 
 test('workspace tools reject escapes, hidden credentials and writes through symlinks', async () => {
   const root = path.join(directory, 'source');
+  await writeFile(path.join(root, '.copilotignore'), [
+    'dist/',
+    'storybook-static/',
+    'doc/archify/generated/',
+    'tsconfig.tsbuildinfo',
+  ].join('\n'));
   const tools = new WorkspaceTools(root);
   await assert.rejects(tools.read('../test.db'), /relative workspace/);
   await assert.rejects(tools.read('.git/config'), /relative workspace/);
   await assert.rejects(tools.write('.env', 'secret'), /relative workspace/);
+  await mkdir(path.join(root, 'dist'));
+  await mkdir(path.join(root, 'storybook-static'));
+  await mkdir(path.join(root, 'doc/archify/generated'), { recursive: true });
+  await writeFile(path.join(root, 'dist/generated.txt'), 'IgnoredNeedle');
+  await writeFile(path.join(root, 'storybook-static/generated.txt'), 'IgnoredNeedle');
+  await writeFile(path.join(root, 'doc/archify/generated/report.md'), 'IgnoredNeedle');
+  await writeFile(path.join(root, 'tsconfig.tsbuildinfo'), 'IgnoredNeedle');
+  await assert.rejects(tools.read('dist/generated.txt'), /\.copilotignore/);
+  await assert.rejects(tools.write('storybook-static/new.html', 'generated'), /\.copilotignore/);
+  await assert.rejects(tools.read('doc/archify/generated/report.md'), /\.copilotignore/);
+  await assert.rejects(tools.read('tsconfig.tsbuildinfo'), /\.copilotignore/);
+  const rootEntries = await tools.list('.');
+  assert.ok(!rootEntries.some((entry) => ['dist', 'storybook-static'].includes(entry.name)));
+  assert.ok(!rootEntries.some((entry) => entry.name === 'tsconfig.tsbuildinfo'));
+  const ignoredSearch = await tools.search('.', 'IgnoredNeedle');
+  assert.equal(ignoredSearch.matches.length, 0);
   const { symlink } = await import('node:fs/promises');
   await symlink(path.join(directory, 'test.db'), path.join(root, 'outside'));
   await assert.rejects(tools.read('outside'), /leaves the ticket/);
@@ -409,6 +516,17 @@ test('workspace tools reject escapes, hidden credentials and writes through syml
   assert.ok(search.matches.some((match) =>
     match.path === 'large-source.ts' && match.line === 601 && match.text.includes('Needle 601')));
   assert.equal(search.truncated, false);
+  assert.deepEqual(await tools.search('./', 'Needle 601'), search);
+  await mkdir(path.join(root, 'path-fixture'));
+  await tools.write('./path-fixture/./source.ts', 'export const SearchNeedle = true;\n');
+  assert.match(await tools.read('./path-fixture/./source.ts'), /SearchNeedle/);
+  assert.deepEqual(await tools.list('./path-fixture'), [{ name: 'source.ts', directory: false }]);
+  assert.equal((await tools.search('./path-fixture/.', 'SearchNeedle')).matches[0]?.path, 'path-fixture/source.ts');
+  for (const invalid of ['../source', './path-fixture/../', './.git', './node_modules', path.resolve(root)]) {
+    await assert.rejects(tools.search(invalid, 'Needle'), /relative workspace/);
+  }
+  await assert.rejects(tools.read('./.git/config'), /relative workspace/);
+  await assert.rejects(tools.write('./.env', 'secret'), /relative workspace/);
   await writeFile(path.join(root, '.agent-private'), 'HiddenNeedle');
   assert.equal((await tools.search('.', 'HiddenNeedle')).matches.length, 0);
   await writeFile(path.join(root, 'long-line.txt'), 'x'.repeat(150_000));
@@ -445,7 +563,7 @@ test('review lazily previews tracked, deleted, untracked, binary and symlink cha
   await unlink(path.join(row.workspace!, 'README.md'));
   review = await sessions.review(task.id, 'README.md');
   assert.equal(review.files.find((file) => file.path === 'README.md')!.status, 'D');
-  assert.equal(await readFile(path.join(repositories.pathFor('project-agent'), 'README.md'), 'utf8'), '# main\n');
+  assert.equal(await readFile(path.join(repositories.workspaces.pathFor('project-agent'), 'README.md'), 'utf8'), '# main\n');
   await writeFile(path.join(row.workspace!, 'long.txt'), 'x'.repeat(128_001));
   const long = (await sessions.review(task.id, 'long.txt')).files.find((file) => file.path === 'long.txt')!;
   assert.equal(long.patch.length, 128_000);
@@ -487,6 +605,9 @@ test('structured checks, snapshot-bound human review and correction attempts rem
   assert.equal(aiReview.token, review.token);
   assert.ok(aiReview.report.length > 0);
   assert.equal(calls.at(-1)?.phase, 'review');
+  const reviewedRuntimes = (await sessions.get(task.id))!.runtimes;
+  assert.deepEqual(reviewedRuntimes.map((runtime) => runtime.phase), ['plan', 'execute', 'review']);
+  assert.equal(reviewedRuntimes.at(-1)?.events[0].data.cost, 0.5);
   assert.equal(await readFile(path.join(row.workspace!, documentationPath), 'utf8'), `# ${task.title}\n\nDocuments the implementation.\n`);
   await assert.rejects(sessions.acceptReview(task.id, row.id, '2020-01-01T00:00:00.000Z', review.token), /execution changed/);
   const accepted = (await sessions.acceptReview(task.id, row.id, row.updatedAt, review.token))!;
@@ -505,15 +626,21 @@ test('structured checks, snapshot-bound human review and correction attempts rem
   assert.equal(corrected.workspace, row.workspace);
   assert.equal(corrected.reviewStatus, 'pending');
   assert.equal(corrected.checks.length, 0, 'old check results must not validate a new attempt');
+  assert.equal(corrected.runtimes.length, 0, 'old runtime usage must not be charged to a new attempt');
   assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'In Progress');
   const history = await sessions.history(task.id);
   assert.equal(history.length, 1);
-  const snapshot = history[0].snapshot as { output: string; checks: { passed: boolean }[] };
+  const snapshot = attemptSnapshotSchema.parse(history[0].snapshot);
   assert.equal(snapshot.output, row.output);
   assert.equal(snapshot.checks.length, 2);
+  assert.deepEqual(snapshot.runtimes, reviewedRuntimes);
+  assert.equal(snapshot.sessionInfo?.workspace, row.workspace);
+  assert.equal(snapshot.context?.task.id, task.id);
   await sessions.tick();
   row = (await sessions.get(task.id))!;
   assert.equal(row.status, 'awaiting_approval');
+  assert.equal(row.runtimes.length, 1);
+  assert.equal(row.runtimes[0].phase, 'plan');
   assert.equal(calls.at(-1)?.feedback, 'Fix the failing assertion');
   assert.equal(await readFile(path.join(row.workspace!, 'result.txt'), 'utf8'), 'Edited after opening diff', 'planning retains changes without executing');
   assert.equal((await sessions.list({ search: task.id, actionable: 'true' })).total, 1);
@@ -559,12 +686,11 @@ test('cancelling execution preserves partial files and does not report completio
   const job = sessions.tick();
   for (let attempt = 0; attempt < 100; attempt++) {
     row = (await sessions.get(task.id))!;
-    if (row.status === 'executing' && row.workspace) {
-      try { if (await readFile(path.join(row.workspace, 'result.txt'), 'utf8') === 'implemented') break; }
-      catch (error) { if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error; }
-    }
+    if (row.status === 'executing' && row.output) break;
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  assert.equal(row.output, 'Copilot is working on the approved plan.');
+  assert.equal(await readFile(path.join(row.workspace!, 'result.txt'), 'utf8'), 'implemented');
   await sessions.cancel(task.id, row.id);
   await job;
   waitExecution = false;
@@ -651,4 +777,49 @@ test('cleanup refuses ticket changes and only removes stopped unchanged worktree
   assert.equal(replanned.baseCommit, row.baseCommit);
   assert.equal(replanned.attempt, 2);
   assert.equal((await sessions.history(task.id)).length, 1);
+});
+
+test('board workflow summaries are scoped, compact, complete and match session progress', async () => {
+  const tasks = [];
+  for (let index = 0; index < 26; index++) tasks.push(await startTicket(`workflow-${index}`));
+  const scopedResponse = await fetch(`${api}/agent-workflows?projectId=project-agent`);
+  assert.equal(scopedResponse.status, 200);
+  const scoped = agentWorkflowsSchema.parse(await scopedResponse.json());
+  for (const task of tasks) {
+    assert.deepEqual(scoped[task.id], {
+      plan: 'active', approval: 'pending', execution: 'pending', review: 'pending', delivery: 'pending',
+    });
+    assert.deepEqual(Object.keys(scoped[task.id]), ['plan', 'approval', 'execution', 'review', 'delivery']);
+  }
+  assert.ok(Object.keys(scoped).length >= 26, 'board summaries are not limited to one sessions page');
+  assert.deepEqual(await sessions.workflows(), scoped);
+  const now = new Date().toISOString();
+  await entities.createProject({
+    id: 'workflow-other-project', revision: 0, name: 'Other project', description: '', color: '#6366f1',
+    createdAt: now, updatedAt: now,
+  });
+  const otherTask = await entities.createTask(taskSchema.parse({
+    ...tasks[0], id: 'workflow-other-task', revision: 0, projectId: 'workflow-other-project', status: 'To Do',
+  }));
+  await entities.moveTask(otherTask.id, { revision: otherTask.revision, status: 'In Progress' });
+  const otherWorkflows = await sessions.workflows('workflow-other-project');
+  assert.ok(otherWorkflows[otherTask.id]);
+  assert.ok(tasks.every((task) => !(task.id in otherWorkflows)));
+  assert.ok(!(otherTask.id in await sessions.workflows('project-agent')));
+  assert.ok(otherTask.id in await sessions.workflows());
+  assert.equal((await fetch(`${api}/agent-workflows?projectId=missing`)).status, 404);
+  assert.equal((await fetch(`${api}/agent-workflows?projectId=`)).status, 400);
+  const task = tasks[0];
+  await db.agentSession.update({ where: { taskId: task.id }, data: {
+    status: 'executing', resumeStatus: 'executing', plan: 'Private implementation plan', output: 'Private agent output',
+  } });
+  const executing = (await sessions.workflows('project-agent'))[task.id];
+  assert.deepEqual(executing, {
+    plan: 'completed', approval: 'completed', execution: 'active', review: 'pending', delivery: 'pending',
+  });
+  const listed = (await sessions.list({ search: task.id })).items.find((item) => item.taskId === task.id);
+  assert.deepEqual(listed?.workflow, executing);
+  assert.ok(!JSON.stringify(executing).includes('Private'));
+  await db.agentSession.updateMany({ where: { taskId: { in: tasks.map((item) => item.id) } }, data: { status: 'cancelled' } });
+  await db.agentSession.update({ where: { taskId: otherTask.id }, data: { status: 'cancelled' } });
 });

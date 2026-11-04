@@ -1,4 +1,4 @@
-import { DEFAULT_DOCS_PATH, docsPathSchema } from '../../src/types/board';
+import { DEFAULT_DOCS_PATH, docsPathSchema } from '../../shared/types/board';
 
 function slug(value: string) {
   return value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()

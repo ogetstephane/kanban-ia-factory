@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, AgentSession } from '@prisma/client';
-import type { AgentContext } from '../../src/types/agent';
+import type { AgentContext } from '../../shared/types/agent';
 import { recordActivity } from '../db/activityLog';
 
 export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSession, context: AgentContext, feedback: string, autoExecute = false) {
@@ -10,15 +10,22 @@ export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSessi
   await tx.agentAttempt.create({ data: {
     id: randomUUID(), sessionId: row.id, number: row.attempt, createdAt: now,
     snapshot: JSON.parse(JSON.stringify({
-      status: row.status, plan: row.plan, output: row.output, error: row.error,
+      status: row.status, resumeStatus: row.resumeStatus, plan: row.plan, output: row.output, error: row.error,
       feedback: row.feedback, reviewStatus: row.reviewStatus, reviewToken: row.reviewToken,
       context: row.context, questions, checks,
+      sessionInfo: {
+        id: row.id, taskId: row.taskId, provider: row.provider, autoExecute: row.autoExecute,
+        taskRevision: row.taskRevision, workspace: row.workspace, branch: row.branch,
+        baseCommit: row.baseCommit, providerSessionId: row.providerSessionId,
+        createdAt: row.createdAt, updatedAt: row.updatedAt, attempt: row.attempt,
+      },
       delivery: await tx.agentDelivery.findUnique({ where: { sessionId_attempt: { sessionId: row.id, attempt: row.attempt } } }),
       publication: await tx.reviewPublication.findUnique({ where: { sessionId_attempt: { sessionId: row.id, attempt: row.attempt } } }),
     })),
   } });
   await tx.agentSession.update({ where: { id: row.id }, data: {
-    status: 'queued', autoExecute, context: JSON.parse(JSON.stringify(context)), taskRevision: context.task.revision ?? 0,
+    status: 'queued', provider: context.task.agentProvider ?? row.provider,
+    autoExecute, context: JSON.parse(JSON.stringify(context)), taskRevision: context.task.revision ?? 0,
     plan: '', output: '', error: '', resumeStatus: null, providerSessionId: null,
     attempt: { increment: 1 }, feedback, reviewStatus: 'pending', reviewToken: '', updatedAt: now,
   } });

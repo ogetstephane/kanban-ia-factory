@@ -1,16 +1,19 @@
 import type { PrismaClient, Prisma, AgentSession as DbSession } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { agentContextSchema, agentSessionSchema, agentListSchema, deliveryHistorySchema, deliveryHistoryQuerySchema, type AgentListQuery, agentListQuerySchema, type AgentQuestionInput } from '../../src/types/agent';
+import { agentContextSchema, agentOptionsSchema, agentOverviewSchema, agentSessionSchema, attemptSnapshotSchema, agentListSchema, deliveryHistorySchema, deliveryHistoryQuerySchema, type AgentListQuery, agentListQuerySchema, type AgentQuestionInput, type AgentRuntime } from '../../shared/types/agent';
 import { assignNextRelease, advanceEpicToReviewIfComplete, EntityError, taskData, projectData, featureData } from '../db/entityStore';
 import type { RepositoryService } from '../git/repositoryService';
 import type { AgentProvider } from './provider';
+import { agentOverview } from '../../shared/utils/agentTelemetry';
 import { enqueueTicket, replanTicket } from './queue';
 import { DeliveryService } from './deliveryService';
 import { ReviewPublicationService } from './reviewPublicationService';
 import { BranchFinishService } from '../git/branchFinishService';
 import { recordActivity } from '../db/activityLog';
 import { requiredTicketDocumentationPath } from './ticketDocumentation';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
+import { agentPhaseSchema, agentWorkflowsSchema } from '../../shared/types/workflow';
 
 export class SessionService {
   private timer?: ReturnType<typeof setInterval>;
@@ -44,10 +47,25 @@ export class SessionService {
     });
   }
 
+  async options() {
+    if (!this.provider.models) throw new EntityError(503, 'This agent provider does not expose a model catalogue.');
+    return agentOptionsSchema.parse({
+      providers: [{
+        id: this.provider.id, name: 'GitHub Copilot',
+        defaultModel: process.env.COPILOT_MODEL || null,
+        models: await this.provider.models(),
+      }],
+    });
+  }
+
   async start() {
     await this.delivery.recover();
     await this.publication.recover();
     await this.finish.recover();
+    await this.db.agentRuntime.updateMany({
+      where: { status: 'running' },
+      data: { status: 'failed', endedAt: new Date().toISOString(), error: 'Server restarted during the runtime. Telemetry may be incomplete.' },
+    });
     await this.db.$transaction(async (tx) => {
       for (const project of await tx.project.findMany({ select: { id: true } })) await assignNextRelease(tx, project.id);
     });
@@ -110,13 +128,65 @@ export class SessionService {
       publications: true,
       task: true,
     } });
-    return row ? agentSessionSchema.parse({ ...row, projectId: row.task.projectId, releaseId: row.task.releaseId, checks: row.checks.filter((check) => check.attempt === row.attempt), delivery: row.deliveries.find((item) => item.attempt === row.attempt) ?? null, publication: row.publications.find((item) => item.attempt === row.attempt) ?? null }) : null;
+    if (!row) return null;
+    const runtimes = await this.db.agentRuntime.findMany({
+      where: { sessionId: row.id, attempt: row.attempt }, orderBy: { startedAt: 'asc' },
+    });
+    return agentSessionSchema.parse({ ...row, runtimes, projectId: row.task.projectId, releaseId: row.task.releaseId, checks: row.checks.filter((check) => check.attempt === row.attempt), delivery: row.deliveries.find((item) => item.attempt === row.attempt) ?? null, publication: row.publications.find((item) => item.attempt === row.attempt) ?? null });
+  }
+
+  async workflows(projectId?: string) {
+    if (projectId && !await this.db.project.findUnique({ where: { id: projectId }, select: { id: true } })) {
+      throw new EntityError(404, 'Project not found');
+    }
+    const rows = await this.db.agentSession.findMany({
+      where: projectId ? { task: { OR: [{ projectId }, { projectId: null }] } } : {},
+      select: {
+        taskId: true, attempt: true, status: true, resumeStatus: true, output: true, reviewStatus: true,
+        deliveries: { select: { attempt: true, status: true, error: true } },
+        publications: { select: { attempt: true, status: true, error: true } },
+      },
+    });
+    return agentWorkflowsSchema.parse(Object.fromEntries(rows.map((row) => [row.taskId, getAgentWorkflow({
+      status: agentSessionSchema.shape.status.parse(row.status),
+      resumeStatus: agentPhaseSchema.parse(row.resumeStatus),
+      output: row.output,
+      reviewStatus: agentSessionSchema.shape.reviewStatus.parse(row.reviewStatus),
+      delivery: row.deliveries.find((item) => item.attempt === row.attempt),
+      publication: row.publications.find((item) => item.attempt === row.attempt),
+    })])));
   }
 
   async history(taskId: string) {
     const session = await this.db.agentSession.findUnique({ where: { taskId }, select: { id: true } });
     if (!session) throw new EntityError(404, 'Session not found');
-    return this.db.agentAttempt.findMany({ where: { sessionId: session.id }, orderBy: { number: 'desc' }, select: { number: true, snapshot: true, createdAt: true } });
+    const [attempts, runtimes] = await this.db.$transaction([
+      this.db.agentAttempt.findMany({ where: { sessionId: session.id }, orderBy: { number: 'desc' }, select: { number: true, snapshot: true, createdAt: true } }),
+      this.db.agentRuntime.findMany({ where: { sessionId: session.id }, orderBy: { startedAt: 'asc' } }),
+    ]);
+    return attempts.map((attempt) => ({
+      ...attempt,
+      snapshot: {
+        ...attemptSnapshotSchema.parse(attempt.snapshot),
+        runtimes: runtimes.filter((runtime) => runtime.attempt === attempt.number),
+      },
+    }));
+  }
+
+  private runtimeRecorder(row: DbSession) {
+    return async (runtime: AgentRuntime) => {
+      const data = {
+        ...runtime,
+        metadata: JSON.parse(JSON.stringify(runtime.metadata)),
+        events: JSON.parse(JSON.stringify(runtime.events)),
+        summary: agentOverview(runtime),
+      };
+      await this.db.agentRuntime.upsert({
+        where: { id: runtime.id },
+        create: { ...data, sessionId: row.id, attempt: row.attempt },
+        update: data,
+      });
+    };
   }
 
   async deliveryHistory(input: unknown) {
@@ -192,8 +262,10 @@ export class SessionService {
           id: true, taskId: true, provider: true, status: true, taskRevision: true,
           workspace: true, branch: true, baseCommit: true, providerSessionId: true,
           error: true, createdAt: true, updatedAt: true,
-          attempt: true, reviewStatus: true,
-          deliveries: { select: { attempt: true, status: true } },
+          attempt: true, reviewStatus: true, resumeStatus: true, output: true,
+          deliveries: { select: { attempt: true, status: true, error: true } },
+          publications: { select: { attempt: true, status: true, error: true } },
+          runtimes: { select: { attempt: true, summary: true }, orderBy: { startedAt: 'desc' } },
           task: { select: {
             title: true, status: true, priority: true, projectId: true, featureId: true,
             project: { select: { name: true } }, feature: { select: { title: true } },
@@ -214,9 +286,17 @@ export class SessionService {
     return agentListSchema.parse({
       items: rows.map((row) => ({
         ...row, deliveryStatus: row.deliveries.find((delivery) => delivery.attempt === row.attempt)?.status ?? null,
+        workflow: getAgentWorkflow({
+          status: agentSessionSchema.shape.status.parse(row.status), resumeStatus: agentPhaseSchema.parse(row.resumeStatus),
+          reviewStatus: row.reviewStatus, output: row.output,
+          delivery: row.deliveries.find((item) => item.attempt === row.attempt),
+          publication: row.publications.find((item) => item.attempt === row.attempt),
+        }),
         taskTitle: row.task.title, taskStatus: row.task.status, priority: row.task.priority,
         projectId: row.task.projectId, projectName: row.task.project?.name ?? null,
         featureId: row.task.featureId, featureTitle: row.task.feature?.title ?? null,
+        agent: agentOverviewSchema.nullable().catch(null).parse(
+          row.runtimes.find((runtime) => runtime.attempt === row.attempt && runtime.summary)?.summary ?? null),
       })),
       total, page: query.page, pageSize, projects, features, actionCount,
     });
@@ -266,7 +346,7 @@ export class SessionService {
         signal.throwIfAborted();
         const resumed = await this.db.agentSession.updateMany({
           where: { id: row.id, status: 'awaiting_input', attempt: row.attempt },
-          data: { status: resumeStatus, resumeStatus: null, updatedAt: new Date().toISOString() },
+          data: { status: resumeStatus, resumeStatus, updatedAt: new Date().toISOString() },
         });
         if (!resumed.count) throw new Error('Session is no longer waiting for an answer');
         return result.answer;
@@ -305,7 +385,7 @@ export class SessionService {
       await this.current(row, tx);
       const updated = await tx.agentSession.updateMany({
         where: { id: row.id, status: 'awaiting_approval', updatedAt: planUpdatedAt },
-        data: { status: 'execution_queued', updatedAt: new Date().toISOString() },
+        data: { status: 'execution_queued', resumeStatus: 'executing', updatedAt: new Date().toISOString() },
       });
       if (updated.count !== 1) throw new EntityError(409, 'This session is not awaiting approval');
       await this.recordTaskActivity(tx, taskId, {
@@ -381,7 +461,7 @@ export class SessionService {
       featureTitle: row.task.feature?.title,
     });
     return {
-      ...await this.repositories.ticketReview(row.task.projectId, row.id, row.baseCommit, previewPath, documentationPath, includePatches),
+      ...await this.repositories.operations.ticketReview(row.task.projectId, row.id, row.baseCommit, previewPath, documentationPath, includePatches),
       criteria: row.task.acceptanceCriteria,
     };
   }
@@ -403,6 +483,7 @@ export class SessionService {
         files: review.files.map(({ path, status, patch, binary, truncated }) => ({ path, status, patch, binary, truncated })),
       }),
       onSession: async () => undefined,
+      onRuntime: this.runtimeRecorder(row),
       ask: async () => { throw new Error('Automated review cannot ask questions'); },
       answers: [],
     });
@@ -443,7 +524,7 @@ export class SessionService {
     let repository: { branch: string; commit: string; scripts: string[] } | null = null;
     if (!project.repositoryUrl) issues.push('No repository is associated with this project');
     else {
-      try { repository = await this.repositories.health(projectId); }
+      try { repository = await this.repositories.workspaces.health(projectId); }
       catch (error) {
         console.error('Project repository diagnostic failed:', error);
         issues.push(error instanceof Error ? error.message : 'Repository diagnostic failed');
@@ -478,7 +559,7 @@ export class SessionService {
       const row = await tx.agentSession.findFirst({ where: { id: sessionId, taskId, updatedAt }, include: { task: true } });
       if (!row?.task.projectId || !row.baseCommit || !row.workspace) throw new EntityError(409, 'Worktree changed or is unavailable');
       if (!['completed', 'failed', 'cancelled'].includes(row.status) || this.jobs.has(row.id)) throw new EntityError(409, 'Only stopped sessions can be cleaned up');
-      await this.repositories.cleanupTicket(row.task.projectId, row.id, row.baseCommit);
+      await this.repositories.operations.cleanupTicket(row.task.projectId, row.id, row.baseCommit);
       await tx.agentSession.update({ where: { id: row.id }, data: { workspace: null, updatedAt: new Date().toISOString() } });
       await this.recordTaskActivity(tx, taskId, {
         action: 'worktree_cleaned', summary: 'Removed the stopped session worktree',
@@ -540,7 +621,7 @@ export class SessionService {
         })) return { count: 0 };
         const result = await tx.agentSession.updateMany({
           where: { id: row!.id, status: row!.status },
-          data: { status: activeStatus, error: '', updatedAt: new Date().toISOString() },
+          data: { status: activeStatus, resumeStatus: activeStatus, error: '', updatedAt: new Date().toISOString() },
         });
         if (result.count) await this.recordTaskActivity(tx, row!.taskId, {
           action: 'session_running',
@@ -559,7 +640,7 @@ export class SessionService {
       if (!context.project?.repositoryUrl || !context.project.repositoryBranch) {
         throw new Error('Associate a git repository with commits to the project before executing a ticket');
       }
-      const prepared = await this.repositories.ticketWorkspace(context.project.id, row.id, context.project.repositoryBranch, context.task.title);
+      const prepared = await this.repositories.workspaces.ticketWorkspace(context.project.id, row.id, context.project.repositoryBranch, context.task.title);
       const workspace = prepared.workspace;
       await this.db.agentSession.update({
         where: { id: row.id }, data: { ...prepared, baseCommit: row.baseCommit ?? prepared.baseCommit, updatedAt: new Date().toISOString() },
@@ -569,6 +650,14 @@ export class SessionService {
       const output = await this.provider.run({
         context, workspace, phase, plan: row.plan,
         signal, feedback: row.feedback,
+        onRuntime: this.runtimeRecorder(row),
+        onContent: async (content) => {
+          signal.throwIfAborted();
+          await this.db.agentSession.updateMany({
+            where: { id: row.id, status: activeStatus, attempt: row.attempt },
+            data: { [phase === 'plan' ? 'plan' : 'output']: content, updatedAt: new Date().toISOString() },
+          });
+        },
         recordCheck: async (result) => {
           signal.throwIfAborted();
           await this.db.agentCheck.create({ data: {
@@ -600,6 +689,7 @@ export class SessionService {
           where: { id: row.id, status: activeStatus, attempt: row.attempt },
           data: {
             status: phase === 'plan' ? (row.autoExecute ? 'execution_queued' : 'awaiting_approval') : 'completed',
+            resumeStatus: phase === 'plan' && !row.autoExecute ? 'awaiting_approval' : 'executing',
             ...(phase === 'plan' ? { plan: output } : { output }),
             updatedAt: new Date().toISOString(),
           },

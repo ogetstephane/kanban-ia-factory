@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { z } from 'zod';
-import { agentQuestionSchema } from '../types/agent';
+import { agentQuestionSchema } from '../../shared/types/agent';
 
 type Question = z.infer<typeof agentQuestionSchema>;
 

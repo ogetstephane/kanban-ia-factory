@@ -63,7 +63,7 @@ stateDiagram-v2
 ## Where the rules apply
 
 The rules live in one place, `WORKFLOW_TRANSITIONS` in
-[src/utils/kanbanLogic.ts](../src/utils/kanbanLogic.ts), and are used by:
+[shared/utils/kanbanLogic.ts](../shared/utils/kanbanLogic.ts), and are used by:
 
 | Place | Behavior |
 |-------|----------|

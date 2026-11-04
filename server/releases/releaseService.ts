@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
 import type { z } from 'zod';
-import { releaseEditSchema, releaseUpdateSchema, releasePublishSchema, releaseDetailSchema, releaseSchema, releasePreviewSchema } from '../../src/types/release';
+import { releaseEditSchema, releaseUpdateSchema, releasePublishSchema, releaseDetailSchema, releaseSchema, releasePreviewSchema } from '../../shared/types/release';
 import { assignNextRelease, checkReleaseAssignment, ensureNoActiveSessions, EntityError, taskData } from '../db/entityStore';
 import type { RepositoryService } from '../git/repositoryService';
 import { activityChanges, recordActivity } from '../db/activityLog';
@@ -148,16 +148,16 @@ export class ReleaseService {
     const project = await this.db.project.findUniqueOrThrow({ where: { id: projectId } });
     const branch = row.targetBranch ?? project.repositoryBranch;
     if (!branch) throw new EntityError(409, 'The project has no target branch');
-    const target = await this.repositories.releaseTarget(projectId, branch);
+    const target = await this.repositories.publication.releaseTarget(projectId, branch);
     if (row.remoteUrl && row.remoteUrl !== target.remoteUrl) throw new EntityError(409, 'Origin changed since publication was prepared. Restore the original remote before retrying.');
     const commit = row.targetCommit ?? target.commit;
     for (const task of row.tasks) {
-      if (!await this.repositories.containsDeliveryMerge(projectId, ticketInfo(task).mergeHash!, commit)) {
+      if (!await this.repositories.operations.containsDeliveryMerge(projectId, ticketInfo(task).mergeHash!, commit)) {
         throw new EntityError(409, `The release target does not contain the delivery of ticket "${task.title}"`);
       }
     }
     const tag = `v${row.version}`;
-    const existing = await this.repositories.releaseTag(projectId, tag);
+    const existing = await this.repositories.operations.releaseTag(projectId, tag);
     if (existing && existing !== commit) throw new EntityError(409, `Tag ${tag} already exists on a different object; choose another version`);
     return releasePreviewSchema.parse({
       releaseId: id, revision: row.revision, ...target, commit, tag, ticketCount: row.tasks.length, alreadyTagged: !!existing,
@@ -172,7 +172,7 @@ export class ReleaseService {
   }
 
   private async performPublish(projectId: string, id: string, input: z.infer<typeof releasePublishSchema>) {
-    return this.repositories.withProjectLock(projectId, async () => {
+    return this.repositories.workspaces.withProjectLock(projectId, async () => {
       const previous = await this.row(projectId, id);
       if (previous.status === 'published') {
         if (previous.targetCommit !== input.commit || previous.remoteUrl !== input.remoteUrl || previous.targetBranch !== input.branch) {
@@ -199,9 +199,9 @@ export class ReleaseService {
         });
       });
       try {
-        const tagHash = await this.repositories.createReleaseTag(projectId, preview.tag, preview.commit);
+        const tagHash = await this.repositories.operations.createReleaseTag(projectId, preview.tag, preview.commit);
         await this.db.release.update({ where: { id }, data: { tagHash } });
-        await this.repositories.pushReleaseTag(projectId, preview.tag, preview.commit, preview.remoteUrl);
+        await this.repositories.publication.pushReleaseTag(projectId, preview.tag, preview.commit, preview.remoteUrl);
         const now = new Date().toISOString();
         await this.db.$transaction(async (tx) => {
           await tx.release.update({ where: { id }, data: {

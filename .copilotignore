@@ -1,0 +1,16 @@
+# Literal rules only: no globs or negation. Bare names match at any depth;
+# paths containing "/" are relative to the workspace root. A trailing "/"
+# excludes a directory and all of its descendants.
+.agents/
+.copilot/
+.github/
+e2e/
+playwright-report/
+node_modules/
+workspaces/
+dist/
+storybook-static/
+doc/archify/generated/
+
+# TypeScript incremental build cache.
+tsconfig.tsbuildinfo

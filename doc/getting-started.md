@@ -44,3 +44,6 @@ Defined in `.env` (template: [.env.example](../.env.example)).
 | `WORKSPACES_DIR` | No | Folder where project repositories are cloned. Default: `./workspaces`. |
 | `LOCAL_REPOSITORY_ROOTS` | No | Comma-separated parent folders from which local git folders may be cloned. Empty disables local folders. |
 | `COPILOT_MODEL` | No | Model for Copilot ticket sessions; empty uses the runtime default. Authenticate Copilot as the server user. See [agent sessions](./agent-sessions.md). |
+| `GRAPHIFY_ENABLED` | No | `false` disables Graphify generation and ticket graph tools. Agents notify the user and continue with source-based analysis. Enabled by default when Graphify is installed. See [agent sessions](./agent-sessions.md#code-knowledge-graph-graphify). |
+| `GRAPHIFY_BIN` | No | Path to the `graphify` executable when it is not on the server's `PATH`. |
+| `GRAPHIFY_CACHE_DIR` | No | Where code graphs are stored. Default: `$TMPDIR/kanban-graphify`. |

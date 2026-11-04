@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { KanbanCard } from './KanbanCard';
-import { feature, tasks } from './stories/fixtures';
+import { agentSession, feature, tasks } from './stories/fixtures';
+import { getAgentWorkflow } from '../../shared/utils/agentWorkflow';
 
 const meta = {
   title: 'Components/KanbanCard',
@@ -22,3 +23,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {};
+export const ExecutingWorkflow: Story = {
+  args: { workflow: getAgentWorkflow({ ...agentSession, status: 'executing' }) },
+};
+export const AwaitingApproval: Story = {
+  args: { workflow: getAgentWorkflow({ ...agentSession, status: 'awaiting_approval', output: '' }) },
+};
+export const SingleStatus: Story = {
+  args: { task: { ...tasks[0], status: 'Done' } },
+};

@@ -12,8 +12,8 @@ import {
   Layers,
   ArrowRight
 } from 'lucide-react';
-import { Task, WorkflowMetrics } from '../types/kanban';
-import { calculateWorkflowMetrics } from '../utils/kanbanLogic';
+import { Task, WorkflowMetrics } from '../../shared/types/kanban';
+import { calculateWorkflowMetrics } from '../../shared/utils/kanbanLogic';
 
 interface WorkflowAdvisorModalProps {
   isOpen: boolean;

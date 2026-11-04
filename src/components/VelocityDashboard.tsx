@@ -28,7 +28,7 @@ import {
   Zap,
   Info
 } from 'lucide-react';
-import { Task, Feature, KanbanStatus } from '../types/kanban';
+import { Task, Feature, KanbanStatus } from '../../shared/types/kanban';
 import { calculateVelocityDashboardData } from '../utils/velocityMetrics';
 
 interface VelocityDashboardProps {
@@ -66,7 +66,7 @@ export const VelocityDashboard: React.FC<VelocityDashboardProps> = ({
   const selectedFeature = features.find((f) => f.id === activeFeatureId);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+    <div className="w-full min-w-0 space-y-6 pb-12">
       {/* Header and Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-lg">
         <div>

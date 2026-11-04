@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { z } from 'zod';
-import type { publicationPreviewSchema } from '../types/agent';
-import { boardApi } from '../data/boardApi';
+import type { publicationPreviewSchema } from '../../shared/types/agent';
+import { gitApi } from '../data/gitApi';
 import { useOperation } from '../data/useOperation';
 
 export default function ReviewValidation({ kind, id, onDone }: {
@@ -16,7 +16,7 @@ export default function ReviewValidation({ kind, id, onDone }: {
   useEffect(() => {
     const controller = new AbortController();
     setPreview(null); setError(''); setConfirmed(false);
-    void boardApi.reviewPublication(kind, id, controller.signal).then((value) => {
+    void gitApi.reviewPublication(kind, id, controller.signal).then((value) => {
       if (!controller.signal.aborted) setPreview(value);
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to prepare review validation');
@@ -39,7 +39,7 @@ export default function ReviewValidation({ kind, id, onDone }: {
       </label>
       <button type="button" disabled={!confirmed || operation.pending} className="rounded bg-emerald-700 px-3 py-2 disabled:opacity-40"
         onClick={() => { void operation.run(async () => {
-          await boardApi.publishReview(kind, id, { ...preview, acknowledgeChecks: confirmed });
+          await gitApi.publishReview(kind, id, { ...preview, acknowledgeChecks: confirmed });
           setDone(true);
           await onDone();
         }); }}>

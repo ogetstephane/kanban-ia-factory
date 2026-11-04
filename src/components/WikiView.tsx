@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, BookOpen, CheckCircle2, CloudUpload, Columns2, Eye, ChevronDown, ChevronRight, FilePlus2, FileText, Folder, FolderPlus, GitCommitHorizontal,
-  Loader2, Pencil, Save, Search,
+  Loader2, Pencil, Save, Search, Sparkles,
 } from 'lucide-react';
-import type { Project } from '../types/kanban';
-import type { DocFile, DocStatus, DocSyncResult } from '../types/wiki';
-import { boardApi } from '../data/boardApi';
+import type { Project } from '../../shared/types/kanban';
+import type { DocFile, DocStatus, DocSyncResult } from '../../shared/types/wiki';
+import { wikiApi } from '../data/wikiApi';
 import { MarkdownPreview } from './MarkdownPreview';
+import { AgentAssistant } from './AgentAssistant';
 
 type Mode = 'edit' | 'split' | 'preview';
 interface OpenDocument { path: string; content: string; sha: string | null }
@@ -22,7 +23,8 @@ export function WikiView({ project }: { project: Project }) {
   const [filter, setFilter] = useState('');
   const [current, setCurrent] = useState<OpenDocument | null>(null);
   const [draft, setDraft] = useState('');
-  const [mode, setMode] = useState<Mode>('split');
+  const [mode, setMode] = useState<Mode>('preview');
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -37,7 +39,7 @@ export function WikiView({ project }: { project: Project }) {
 
   const loadFiles = useCallback(async (signal?: AbortSignal) => {
     try {
-      const [listing, nextStatus] = await Promise.all([boardApi.wikiFiles(project.id, signal), boardApi.wikiStatus(project.id, signal)]);
+      const [listing, nextStatus] = await Promise.all([wikiApi.wikiFiles(project.id, signal), wikiApi.wikiStatus(project.id, signal)]);
       setStatus(nextStatus);
       setFiles(listing.files); setDocsPath(listing.docsPath); setBranch(listing.branch); setListError('');
     } catch (requestError) {
@@ -54,6 +56,10 @@ export function WikiView({ project }: { project: Project }) {
   }, [loadFiles]);
 
   useEffect(() => {
+    setAssistantOpen(false);
+  }, [project.id, current?.path]);
+
+  useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); };
     window.addEventListener('beforeunload', warn);
@@ -66,7 +72,7 @@ export function WikiView({ project }: { project: Project }) {
     if (path === current?.path || !confirmDiscard()) return;
     setOpening(true); setError(''); setConflict(false); setResult(null);
     try {
-      const doc = await boardApi.wikiFile(project.id, path);
+      const doc = await wikiApi.wikiFile(project.id, path);
       setCurrent(doc); setDraft(doc.content);
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to open this document'));
@@ -77,7 +83,7 @@ export function WikiView({ project }: { project: Project }) {
     if (!current) return;
     setOpening(true); setError(''); setConflict(false);
     try {
-      const doc = await boardApi.wikiFile(project.id, current.path);
+      const doc = await wikiApi.wikiFile(project.id, current.path);
       setCurrent(doc); setDraft(doc.content);
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to reload this document'));
@@ -116,7 +122,7 @@ export function WikiView({ project }: { project: Project }) {
     if (!current || saving || !dirty) return;
     setSaving(true); setError(''); setConflict(false);
     try {
-      const saved = await boardApi.saveWikiFile(project.id, current.path, draft, current.sha);
+      const saved = await wikiApi.saveWikiFile(project.id, current.path, draft, current.sha);
       setCurrent({ path: current.path, content: draft, sha: saved.sha });
       setResult(null);
       await loadFiles();
@@ -130,7 +136,7 @@ export function WikiView({ project }: { project: Project }) {
     if (syncing || saving) return;
     setSyncing(true); setError(''); setConflict(false);
     try {
-      setResult(await boardApi.syncWiki(project.id));
+      setResult(await wikiApi.syncWiki(project.id));
       await loadFiles();
     } catch (requestError) {
       setError(errorMessage(requestError, 'Unable to sync the documentation'));
@@ -165,7 +171,7 @@ export function WikiView({ project }: { project: Project }) {
   const modes: Array<[Mode, string, typeof Pencil]> = [['edit', 'Edit', Pencil], ['split', 'Split', Columns2], ['preview', 'Preview', Eye]];
 
   return (
-    <section className="mx-auto max-w-7xl space-y-4">
+    <section className="w-full min-w-0 space-y-4">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-gradient-to-br from-emerald-500/10 via-slate-900 to-slate-900 p-5">
         <div className="flex items-center gap-3">
           <span className="rounded-2xl border border-emerald-400/20 bg-emerald-400/10 p-2.5 text-emerald-200"><BookOpen className="h-5 w-5" /></span>
@@ -279,6 +285,11 @@ export function WikiView({ project }: { project: Project }) {
                     {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                     {saving ? 'Saving…' : 'Save'}
                   </button>
+                  <button type="button" onClick={() => setAssistantOpen((open) => !open)}
+                    aria-expanded={assistantOpen} aria-controls="wiki-ai-assistant"
+                    className={`inline-flex items-center gap-1.5 rounded-lg border px-3.5 py-1.5 text-xs font-semibold ${assistantOpen ? 'border-indigo-400/40 bg-indigo-400/15 text-indigo-100' : 'border-slate-700 text-indigo-200 hover:bg-indigo-400/10'}`}>
+                    <Sparkles className="h-3.5 w-3.5" />AI assistant
+                  </button>
                 </div>
               </div>
 
@@ -295,6 +306,12 @@ export function WikiView({ project }: { project: Project }) {
                   </span>
                 </div>
               )}
+
+              <div id="wiki-ai-assistant" hidden={!assistantOpen} className="p-3">
+                <AgentAssistant key={`${project.id}:${current.path}`} content={draft} disabled={saving || syncing}
+                  onGenerate={(input, signal) => wikiApi.assistWiki(project.id, { ...input, path: current.path, content: draft }, signal)}
+                  onApply={(content) => { setDraft(content); setMode('split'); setError(''); setResult(null); }} />
+              </div>
 
               <div className={`grid min-h-[50vh] ${mode === 'split' ? 'xl:grid-cols-2 xl:divide-x xl:divide-slate-800' : ''}`}>
                 {mode !== 'preview' && (

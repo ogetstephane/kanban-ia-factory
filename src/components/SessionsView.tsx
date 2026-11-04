@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import type { z } from 'zod';
-import { agentListSchema, agentListQuerySchema, agentStatusSchema, type AgentListQuery } from '../types/agent';
-import { boardApi } from '../data/boardApi';
+import { agentListSchema, agentListQuerySchema, agentStatusSchema, type AgentListQuery } from '../../shared/types/agent';
+import { agentApi } from '../data/agentApi';
 import TaskAgentSession, { SESSION_LABELS } from './TaskAgentSession';
+import AgentOverviewSummary from './AgentOverviewSummary';
 import { ALL_PROJECTS } from '../utils/projectLogic';
+import WorkflowTimeline from './WorkflowTimeline';
 const ProjectHealth = lazy(() => import('./ProjectHealth'));
 
 const fieldClass = 'min-w-0 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 outline-none focus:border-indigo-400';
@@ -32,7 +34,7 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
     setLoading(true);
     const load = async () => {
       try {
-        const result = await boardApi.agentSessions(filters, controller.signal);
+        const result = await agentApi.agentSessions(filters, controller.signal);
         if (!controller.signal.aborted) { setData(result); setError(''); }
       } catch (cause) {
         if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load sessions');
@@ -46,7 +48,7 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
 
   const selectedRow = data?.items.find((item) => item.taskId === selected) ?? data?.items[0];
   return (
-    <section className="mx-auto w-full max-w-[1700px] min-w-0 space-y-4 text-slate-100" aria-label="Agent sessions">
+    <section className="w-full min-w-0 space-y-4 text-slate-100" aria-label="Agent sessions">
       <header className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-800 pb-4">
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-300">Workspace</p>
@@ -117,6 +119,8 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
                 </span>
                 <span className="mt-1.5 block truncate pl-4 text-xs text-slate-400">{item.projectName ?? 'No project'}{item.featureTitle ? ` · ${item.featureTitle}` : ''}</span>
                 <span className="mt-1 block pl-4 text-[11px] text-slate-500">{SESSION_LABELS[item.status]} · {new Date(item.updatedAt).toLocaleDateString()}</span>
+                {item.agent && <div className="mt-2 pl-4"><AgentOverviewSummary agent={item.agent} compact /></div>}
+                {item.workflow && <div className="mt-3"><WorkflowTimeline workflow={item.workflow} compact label={`Agent workflow for ${item.taskTitle}`} /></div>}
               </button>;
             })}
           </div>
@@ -140,6 +144,7 @@ export default function SessionsView({ initialProjectId }: { initialProjectId: s
                 <span className={`h-2 w-2 rounded-full ${statusColor(selectedRow.status)}`} />
                 {SESSION_LABELS[selectedRow.status]}
               </span>
+              <div className="w-full border-t border-slate-800 pt-3"><AgentOverviewSummary agent={selectedRow.agent} /></div>
             </header>
             <TaskAgentSession key={selectedRow.taskId} taskId={selectedRow.taskId} workspaceLayout />
           </> : <div className="flex min-h-64 items-center justify-center rounded-lg border border-dashed border-slate-800 p-8 text-center">

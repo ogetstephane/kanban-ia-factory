@@ -6,7 +6,7 @@ import {
   generateCumulativeFlowData,
   calculateVelocityDashboardData
 } from './velocityMetrics';
-import { Task } from '../types/kanban';
+import { Task } from '../../shared/types/kanban';
 
 const testTasks: Task[] = [
   {

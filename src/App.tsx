@@ -1,7 +1,7 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { BrowserRouter, Link, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { Project, Feature, Task, KanbanFilters, KanbanStatus } from './types/kanban';
+import { Project, Feature, Task, KanbanFilters, KanbanStatus } from '../shared/types/kanban';
 import { ALL_PROJECTS, createProject, deleteProject, filterByProject } from './utils/projectLogic';
 import { Navbar } from './components/Navbar';
 import { FeatureBar } from './components/FeatureBar';
@@ -16,7 +16,7 @@ import { useProjects } from './data/useProjects';
 import { useBoard } from './data/useBoard';
 import { useOperation } from './data/useOperation';
 import { calculateProjectStats } from './utils/projectLogic';
-import type { SessionActionFocus } from './types/agent';
+import type { SessionActionFocus } from '../shared/types/agent';
 import { isViewMode, taskEditorPath, viewPath, type ViewMode } from './utils/routes';
 
 const KanbanBoard = lazy(() => import('./components/KanbanBoard'));
@@ -27,6 +27,8 @@ const CockpitView = lazy(() => import('./components/CockpitView'));
 const DeliveryHistoryView = lazy(() => import('./components/DeliveryHistoryView'));
 const ActivityView = lazy(() => import('./components/ActivityView').then((module) => ({ default: module.ActivityView })));
 const WikiView = lazy(() => import('./components/WikiView'));
+const CodeGraphView = lazy(() => import('./components/CodeGraphView'));
+const ArchifyView = lazy(() => import('./components/ArchifyView'));
 const STORAGE_ACTIVE_PROJECT_KEY = 'kanban_flow_active_project_id_v1';
 type ProjectAction = { kind: 'task'; status: KanbanStatus } | { kind: 'feature' } | { kind: 'breakdown' };
 
@@ -82,7 +84,9 @@ function Workspace() {
   const allProjects = activeProjectId === ALL_PROJECTS;
   const hasGitRepository = projects.some((project) => (allProjects || project.id === activeProjectId) && project.repositoryUrl);
   const wikiProject = projects.find((project) => project.id === activeProjectId && project.repositoryUrl && project.docsPath);
-  const viewMode = (selectedViewMode === 'git' && !hasGitRepository) || (selectedViewMode === 'wiki' && !wikiProject) ? 'board' : selectedViewMode;
+  const codeGraphProject = projects.find((project) => project.id === activeProjectId && project.repositoryUrl);
+  const viewMode = (selectedViewMode === 'git' && !hasGitRepository) || (selectedViewMode === 'wiki' && !wikiProject)
+    || (selectedViewMode === 'code-graph' && !codeGraphProject) ? 'board' : selectedViewMode;
   useEffect(() => {
     if (!projectsState.ready || projects.length === 0) return;
     if (params.view && !isViewMode(params.view)) return;
@@ -130,8 +134,22 @@ function Workspace() {
     }
   }, [activeProjectId, board.ready, currentProjectTasks, currentProjectFeatures, projects, updateStats]);
 
-  const persistenceStatus = projectOps.pending || boardOps.pending ? 'Saving changes...' : 'All changes saved';
+  const saving = projectOps.pending || boardOps.pending;
   const persistenceError = projectOps.error || boardOps.error || projectsState.error || board.error;
+  const wasSaving = useRef(false);
+  const [showSavedToast, setShowSavedToast] = useState(false);
+  useEffect(() => {
+    const finishedSaving = wasSaving.current && !saving;
+    wasSaving.current = saving;
+    if (saving || persistenceError) {
+      setShowSavedToast(false);
+      return;
+    }
+    if (!finishedSaving) return;
+    setShowSavedToast(true);
+    const timer = setTimeout(() => setShowSavedToast(false), 3000);
+    return () => clearTimeout(timer);
+  }, [saving, persistenceError]);
 
   const handleSelectProject = (projectId: string) => {
     setGitOpenError('');
@@ -306,7 +324,13 @@ function Workspace() {
   const activeProjectTasks = currentProjectTasks;
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
-      <p role="status" className="px-4 py-1 text-xs text-slate-400">{persistenceStatus}</p>
+      {(saving || showSavedToast) && <div className="fixed bottom-4 right-4 z-[60] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-slate-100 shadow-xl">
+        <p role="status">{saving ? 'Saving changes...' : 'All changes saved'}</p>
+        {!saving && <button type="button" onClick={() => setShowSavedToast(false)}
+          aria-label="Dismiss save notification" className="rounded p-1 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <X className="h-4 w-4" />
+        </button>}
+      </div>}
       <Navbar
         projects={projects}
         activeProjectId={activeProjectId}
@@ -339,7 +363,7 @@ function Workspace() {
 
       {['board', 'analytics'].includes(viewMode) && (filters.search || filters.priority !== 'All' || filters.featureId !== 'All') && (
         <div className="border-b border-slate-800 bg-slate-900/60 px-4 py-2.5 sm:px-6">
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2">
+          <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
             <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Filtering by</span>
             {filters.search && <button type="button" onClick={() => handleFilterChange({ search: '' })}
               aria-label={`Remove search filter ${filters.search}`}
@@ -367,7 +391,7 @@ function Workspace() {
         </div>
       )}
 
-      <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-x-auto">
+      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-x-auto">
         {viewMode === 'cockpit' ? (
           <Suspense fallback={<p role="status">Loading cockpit...</p>}>
             <CockpitView key={`${activeProjectId}:${releaseRefresh}`} scopeId={activeProjectId} projects={projects}
@@ -380,6 +404,7 @@ function Workspace() {
         ) : viewMode === 'board' ? (
           <Suspense fallback={<p role="status">Loading board view...</p>}>
             <KanbanBoard
+              projectId={activeProjectId}
               tasks={activeProjectTasks}
               features={activeProjectFeatures}
               projects={allProjects ? projects : undefined}
@@ -408,6 +433,14 @@ function Workspace() {
         ) : viewMode === 'wiki' && wikiProject ? (
           <Suspense fallback={<p role="status">Loading wiki...</p>}>
             <WikiView key={wikiProject.id} project={wikiProject} />
+          </Suspense>
+        ) : viewMode === 'code-graph' && codeGraphProject ? (
+          <Suspense fallback={<p role="status">Loading code graph...</p>}>
+            <CodeGraphView key={codeGraphProject.id} project={codeGraphProject} />
+          </Suspense>
+        ) : viewMode === 'diagrams' ? (
+          <Suspense fallback={<p role="status">Loading diagrams...</p>}>
+            <ArchifyView />
           </Suspense>
         ) : viewMode === 'releases' ? (
           <Suspense fallback={<p role="status">Loading releases...</p>}>

@@ -1,6 +1,0 @@
-{
-  "name": "Kanban Flow Copilot",
-  "description": "Smart Kanban workspace with AI Copilot for feature writing, automated task breakdown, prioritization, and workflow stage tracking.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

@@ -11,6 +11,7 @@ interface Props {
   baseCommit: string;
   file: { path: string; patch: string; binary: boolean; truncated: boolean } | null;
   error: string;
+  allowFullscreen?: boolean;
 }
 
 const numberClass = 'w-14 select-none border-r border-slate-800 px-2 py-0.5 text-right align-top text-slate-500 tabular-nums';
@@ -26,7 +27,7 @@ function LineContent({ line, wrap }: { line: DiffLine | null; wrap: boolean }) {
   </td>;
 }
 
-export default function FileDiff({ files, selected, onSelect, baseCommit, file, error }: Props) {
+export default function FileDiff({ files, selected, onSelect, baseCommit, file, error, allowFullscreen = true }: Props) {
   const [fullscreen, setFullscreen] = useState(false);
   const [mode, setMode] = useState<'split' | 'unified'>('split');
   const [wrap, setWrap] = useState(false);
@@ -82,10 +83,10 @@ export default function FileDiff({ files, selected, onSelect, baseCommit, file, 
         <button type="button" className={`${buttonClass} ${wrap ? 'bg-slate-700' : ''}`} aria-pressed={wrap} onClick={() => setWrap((value) => !value)}>
           <WrapText className="h-4 w-4" />Wrap lines
         </button>
-        <button ref={fullscreen ? undefined : expand} type="button" className={buttonClass} onClick={() => setExpanded(!fullscreen)}>
+        {allowFullscreen && <button ref={fullscreen ? undefined : expand} type="button" className={buttonClass} onClick={() => setExpanded(!fullscreen)}>
           {fullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           {fullscreen ? 'Exit full screen' : 'Full screen'}
-        </button>
+        </button>}
       </div>
     </div>
     <div className="flex items-center gap-2 border-b border-slate-800 p-2 text-xs">

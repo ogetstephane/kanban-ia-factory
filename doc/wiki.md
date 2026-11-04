@@ -4,6 +4,9 @@ The **Wiki** view edits the Markdown files of a project's documentation folder a
 git. It appears only when the selected project has a git repository; it is not available in the
 "Show all" scope.
 
+The wiki opens in **Preview** mode by default. Select **Edit** or **Split** to edit
+Markdown. Applying an AI proposal switches to **Split** for reviewing the draft.
+
 ## Documentation folder
 
 - Set when creating a project that has a repository (default `doc`) and editable later from
@@ -27,6 +30,50 @@ project branch, it appears in the Wiki's folder tree. Use Wiki **Save** and **Sy
 The optional AI review can inspect this document alongside the code diff.
 
 ## Saving and syncing
+
+### Agent assistant
+
+Open an existing page, or use **New page** to choose a path for a new document.
+Click **AI assistant** next to **Save** to show the assistant above the page content,
+before the Markdown editor and preview.
+It is hidden by default on each page; click the button again to hide it without
+losing its prompt, attachments or proposal while staying on that page.
+The **Agent assistant** accepts an **Assistant prompt** and optional
+context files (any type, including PDFs and images; up to 10 files, 1 MiB each and
+3 MiB total). Describe the page to create or improvements to make, then select
+**Generate proposal**.
+
+Wiki generation has a separate conservative context limit: **100,000 bytes combined**
+for the UTF-8 page path, draft and prompt plus all attached file bytes. The upload
+limits alone do not guarantee a request fits the model's token budget. The browser
+and server reject oversized context before calling Copilot; reduce attachments or
+shorten the draft. Nothing is silently truncated or summarized. Binary attachment
+processing may expand beyond this estimate; a model-budget rejection also shows
+guidance to reduce context. Custom repository/user instructions are not loaded
+into wiki writing sessions.
+
+Copilot receives the current unsaved Markdown draft, page path, prompt and attachments.
+Review the proposed content and change summary, then **Apply to editor** or
+**Discard proposal**. Applying replaces only the editor draft: it does not write a
+file, commit or push. Use **Save** and **Sync** explicitly afterward.
+If you edit the draft while generation is running or before applying, application
+is blocked until you generate a fresh proposal. Switching pages discards the
+assistant prompt, files and proposal and cancels any active generation.
+
+The reusable `AgentAssistant` component accepts generation/application callbacks
+and current content. Attached files are transient, not stored with the wiki page.
+Text is supplied directly; binary files use Copilot SDK attachments. Do not attach
+secrets or files you cannot share with Copilot. Unsupported attachment formats must
+be reported in the proposal summary.
+
+The server user must be authenticated with Copilot CLI. `COPILOT_MODEL` optionally
+selects the model. Generation has a two-minute response timeout and a cancel button.
+Authentication, runtime and invalid-output errors are displayed; there is no demo
+fallback. Runtime failures include the underlying error message (up to 1,000
+characters) in the assistant panel; the full error is logged in the server terminal.
+The writing session has no tools or approved permissions and cannot
+modify the repository. The endpoint validates the project and Markdown path before
+requesting a proposal.
 
 Saving and syncing are separate steps.
 
@@ -90,5 +137,6 @@ branch, short commit and whether it was pushed. Document contents are not stored
 | `GET` | `/projects/:id/wiki/status` | | `{ pending: [{ path, status }], ahead }` (`ahead` is `null` when unknown or origin is local) |
 | `PUT` | `/projects/:id/wiki/file` | `{ path, content, expectedSha }` (`null` for a new file) | `{ path, sha, unchanged }`; writes only, no commit |
 | `POST` | `/projects/:id/wiki/sync` | `{}` | `{ branch, commit, files, pushed, pushError? }` |
+| `POST` | `/projects/:id/wiki/assistant` | `{ path, content, prompt, files: [{ id, name, mimeType, size, data }] }` (base64 data) | `{ content, summary }`; proposal only, no write |
 
 Paths are relative to the documentation folder. Apply the migration with `make db-migrate`.

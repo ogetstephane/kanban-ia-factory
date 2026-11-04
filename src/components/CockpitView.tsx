@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, ArrowRight, CheckCircle2, Clock3, GitBranch, Layers3, MessageCircleQuestion, PackageCheck, ShieldCheck, Sparkles } from 'lucide-react';
 import type { z } from 'zod';
-import { boardApi } from '../data/boardApi';
+import { agentApi } from '../data/agentApi';
+import { releaseApi } from '../data/releaseApi';
 import { useOperation } from '../data/useOperation';
-import type { Project } from '../types/kanban';
-import { agentListSchema, type AgentListQuery, type SessionActionFocus } from '../types/agent';
-import type { Release } from '../types/release';
+import type { Project } from '../../shared/types/kanban';
+import { agentListSchema, type AgentListQuery, type SessionActionFocus } from '../../shared/types/agent';
+import type { Release } from '../../shared/types/release';
 
 type SessionList = z.infer<typeof agentListSchema>;
 type SessionRow = SessionList['items'][number];
@@ -51,8 +52,8 @@ export default function CockpitView({ scopeId, projects, onOpenTicket, onOpenRel
     const load = async () => {
       try {
         const [actionList, releaseList] = await Promise.all([
-          boardApi.agentSessions(query, controller.signal),
-          boardApi.releases(scopeId, controller.signal),
+          agentApi.agentSessions(query, controller.signal),
+          releaseApi.releases(scopeId, controller.signal),
         ]);
         if (!controller.signal.aborted) {
           setSessions(actionList);
@@ -76,7 +77,7 @@ export default function CockpitView({ scopeId, projects, onOpenTicket, onOpenRel
     (release.deliveredCount < release.ticketCount || !!release.error));
   const actionCount = sessions?.actionCount ?? 0;
   const selectedProjectName = scopeId === 'All' ? 'All projects' : scopedProjects[0]?.name ?? 'Project';
-  return <section aria-label="Project cockpit" className="mx-auto max-w-7xl space-y-7 pb-10 text-slate-100">
+  return <section aria-label="Project cockpit" className="w-full min-w-0 space-y-7 pb-10 text-slate-100">
     <header className="relative isolate overflow-hidden rounded-3xl border border-indigo-400/20 bg-gradient-to-br from-indigo-950 via-slate-900 to-slate-950 p-6 shadow-2xl shadow-indigo-950/30 sm:p-9">
       <div className="pointer-events-none absolute -right-20 -top-32 -z-10 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-36 left-1/3 -z-10 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />

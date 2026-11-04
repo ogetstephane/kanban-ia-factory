@@ -1,4 +1,4 @@
-import { Project, Feature, Task } from '../types/kanban';
+import { Project, Feature, Task } from '../../shared/types/kanban';
 
 export const ALL_PROJECTS = 'All';
 

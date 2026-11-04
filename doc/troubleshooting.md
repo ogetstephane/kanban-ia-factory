@@ -18,6 +18,21 @@ Node 22 (`npx --package=node@22`). If you call the npm scripts directly, upgrade
 ## `EADDRINUSE: address already in use :::3000`
 
 Another dev server is already running. Stop it (Ctrl+C in its terminal) before starting a new one.
+To run another instance, choose a different application port: `PORT=3001 make dev`.
+
+## `WebSocket server error: Port 24678 is already in use`
+
+The application's Vite HMR WebSocket now shares the Express HTTP server and its
+`PORT` (3000 by default), instead of opening Vite's separate default port 24678.
+Restart this application's dev server to use the updated configuration; other
+projects can keep using port 24678. `DISABLE_HMR=true` still disables hot reload
+and file watching.
+
+## Vite native config warning about `__dirname`
+
+The Vite config uses `import.meta.dirname`, which works with Vite's native config
+loader on Node 22.12+. Restart with `make dev` after updating; there is no need to
+suppress the warning with `VITE_CONFIG_NATIVE_IGNORE_WARNING`.
 
 ## Starting the production app
 

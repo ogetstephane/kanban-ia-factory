@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { z } from 'zod';
-import { RELEASE_LABELS, releaseEditSchema, versionSchema, type Release, type releaseDetailSchema, type releasePreviewSchema } from '../types/release';
-import type { Project, Task } from '../types/kanban';
+import { RELEASE_LABELS, releaseEditSchema, versionSchema, type Release, type releaseDetailSchema, type releasePreviewSchema } from '../../shared/types/release';
+import type { Project, Task } from '../../shared/types/kanban';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 import { boardApi } from '../data/boardApi';
+import { releaseApi } from '../data/releaseApi';
 import { useOperation } from '../data/useOperation';
 
 type Detail = z.infer<typeof releaseDetailSchema>;
@@ -40,7 +41,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
       void operation.run(async () => {
         const parsed = releaseEditSchema.parse({ version, status });
         if (status === 'cancelled' && !window.confirm('Cancel this release? Its tickets can be reassigned to another version.')) return;
-        await boardApi.updateRelease(release.projectId, release.id, { ...parsed, revision: release.revision });
+        await releaseApi.updateRelease(release.projectId, release.id, { ...parsed, revision: release.revision });
         onRefresh();
       });
     }}>
@@ -58,7 +59,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
       <button type="button" disabled={operation.pending} className="rounded bg-rose-900 px-3 py-2 text-sm disabled:opacity-40"
         onClick={() => { void operation.run(async () => {
           if (!window.confirm('Cancel this failed publication? Any local or remote tag is kept, even if the remote already accepted it. This release cannot be retried after cancellation; its tickets can be reassigned.')) return;
-          await boardApi.updateRelease(release.projectId, release.id, { version: release.version, status: 'cancelled', revision: release.revision });
+          await releaseApi.updateRelease(release.projectId, release.id, { version: release.version, status: 'cancelled', revision: release.revision });
           onRefresh();
         }); }}>Cancel failed publication (keep tags)</button>}
     <div className="space-y-2">
@@ -76,7 +77,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
         </div>
         {membershipMutable && <button type="button" disabled={operation.pending} className="text-xs text-slate-400 underline"
           onClick={() => { void operation.run(async () => {
-            await boardApi.assignRelease(release.projectId, ticket.id, null, ticket.revision); onRefresh();
+            await releaseApi.assignRelease(release.projectId, ticket.id, null, ticket.revision); onRefresh();
           }); }}>Remove from release</button>}
       </div>)}
       {mutable && <>
@@ -90,7 +91,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
           <button type="button" className={buttonClass} disabled={operation.pending || !ticketId} onClick={() => { void operation.run(async () => {
             const task = candidates.find((item) => item.id === ticketId);
             if (!task) throw new Error('Select a ticket first');
-            await boardApi.assignRelease(release.projectId, task.id, release.id, task.revision ?? 0); onRefresh();
+            await releaseApi.assignRelease(release.projectId, task.id, release.id, task.revision ?? 0); onRefresh();
           }); }}>Attach to v{release.version}</button>
         </div>}
       </>}
@@ -98,7 +99,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
     {release.status === 'in_progress' && !release.publishing && <div className="space-y-3 border-t border-slate-700 pt-4">
       {release.deliveredCount !== release.ticketCount && <p className="text-amber-200">Publication blocked: all attached tickets must be delivered locally. Moving a ticket to Done manually is not enough.</p>}
       <button type="button" disabled={operation.pending || release.deliveredCount !== release.ticketCount} className={buttonClass}
-        onClick={() => { void operation.run(async () => { setPreview(null); setPreview(await boardApi.releasePreview(release.projectId, release.id)); }); }}>
+        onClick={() => { void operation.run(async () => { setPreview(null); setPreview(await releaseApi.releasePreview(release.projectId, release.id)); }); }}>
         {release.targetCommit ? 'Prepare publication retry' : 'Prepare tag publication'}
       </button>
       {preview && <div className="space-y-3 rounded border border-amber-500/30 p-3 text-sm">
@@ -106,7 +107,7 @@ function ReleaseDetail({ release, onRefresh, onOpenTask }: {
         <p>{preview.alreadyTagged ? 'The existing local tag will be reused.' : 'A local tag will be created.'} Only this tag will be pushed.</p>
         <button type="button" disabled={operation.pending} className="rounded bg-emerald-700 px-3 py-2 disabled:opacity-40" onClick={() => { void operation.run(async () => {
           if (!window.confirm(`Create and push tag ${preview.tag} to ${preview.remoteUrl}? No branch will be pushed.`)) return;
-          try { await boardApi.publishRelease(release.projectId, release.id, preview); }
+          try { await releaseApi.publishRelease(release.projectId, release.id, preview); }
           finally { setPreview(null); onRefresh(); }
         }); }}>Create tag & push release</button>
       </div>}
@@ -135,7 +136,7 @@ export default function ReleasesView({ projectId, projects, onOpenTask, refreshK
   }, [focusReleaseId, releases]);
   useEffect(() => {
     const controller = new AbortController();
-    void boardApi.releases(projectId, controller.signal).then((rows) => {
+    void releaseApi.releases(projectId, controller.signal).then((rows) => {
       if (!controller.signal.aborted) { setReleases(rows); setError(''); }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load releases');
@@ -146,14 +147,14 @@ export default function ReleasesView({ projectId, projects, onOpenTask, refreshK
     setDetail(null); setDetailError('');
     if (!selected || !selectedProjectId) return;
     const controller = new AbortController();
-    void boardApi.release(selectedProjectId, selected, controller.signal).then((row) => {
+    void releaseApi.release(selectedProjectId, selected, controller.signal).then((row) => {
       if (!controller.signal.aborted) setDetail(row);
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setDetailError(cause instanceof Error ? cause.message : 'Unable to load release');
     });
     return () => controller.abort();
   }, [selectedProjectId, selected, attempt, refreshKey]);
-  return <section aria-label="Project releases" className="mx-auto max-w-7xl space-y-5 text-slate-200">
+  return <section aria-label="Project releases" className="w-full min-w-0 space-y-5 text-slate-200">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div><h1 className="text-2xl font-bold">Releases</h1><p className="text-sm text-slate-400">Project versions, ticket scope and Git tag publication.</p></div>
       <button type="button" className={buttonClass} onClick={refresh}>Refresh releases</button>
@@ -165,7 +166,7 @@ export default function ReleasesView({ projectId, projects, onOpenTask, refreshK
         const result = versionSchema.safeParse(version);
         if (!result.success) throw new Error(result.error.issues[0].message);
         if (!projects.some((project) => project.id === creationProjectId)) throw new Error('Choose a project for this release.');
-        await boardApi.createRelease(creationProjectId, { version: result.data, status: 'upcoming' });
+        await releaseApi.createRelease(creationProjectId, { version: result.data, status: 'upcoming' });
         refresh();
         setVersion('');
       });

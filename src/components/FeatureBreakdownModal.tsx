@@ -10,7 +10,7 @@ import {
   ArrowRight,
   ListPlus
 } from 'lucide-react';
-import { Feature, Task, TaskPriority, KanbanStatus } from '../types/kanban';
+import { Feature, Task, TaskPriority, KanbanStatus } from '../../shared/types/kanban';
 
 interface ProposedTask {
   title: string;

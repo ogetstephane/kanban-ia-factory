@@ -41,7 +41,7 @@ tests. See [Git repositories](../../git-repositories.md) for source and workspac
 - [ProjectManagerModal.tsx](../../../src/components/ProjectManagerModal.tsx)
 - [BranchSwitcher.tsx](../../../src/components/BranchSwitcher.tsx)
 - [ProjectHealth.tsx](../../../src/components/ProjectHealth.tsx)
-- [repositoryService.ts](../../../server/git/repositoryService.ts)
+- [workspaceService.ts](../../../server/git/workspaceService.ts)
 - [board.ts route](../../../server/routes/board.ts)
 
 ## Related features

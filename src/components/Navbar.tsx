@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Sparkles, Plus, Activity, Search, RotateCcw, LayoutGrid, TrendingUp, Gauge, History, ChevronDown, X } from 'lucide-react';
-import { Feature, KanbanFilters, TaskPriority, KanbanStatus, Project } from '../types/kanban';
-import { TASK_PRIORITIES } from '../utils/kanbanLogic';
+import { Feature, KanbanFilters, TaskPriority, KanbanStatus, Project } from '../../shared/types/kanban';
+import { TASK_PRIORITIES } from '../../shared/utils/kanbanLogic';
 import { ProjectSwitcher } from './ProjectSwitcher';
 import { ALL_PROJECTS } from '../utils/projectLogic';
+import type { ViewMode } from '../utils/routes';
 
 interface NavbarProps {
   projects: Project[];
@@ -13,8 +14,8 @@ interface NavbarProps {
   onOpenProjectManagerModal: () => void;
   features: Feature[];
   filters: KanbanFilters;
-  viewMode: 'cockpit' | 'board' | 'analytics' | 'sessions' | 'delivery-history' | 'activity' | 'wiki' | 'releases' | 'git';
-  onViewModeChange: (mode: 'cockpit' | 'board' | 'analytics' | 'sessions' | 'delivery-history' | 'activity' | 'wiki' | 'releases' | 'git') => void;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
   onFilterChange: (filters: Partial<KanbanFilters>) => void;
   onOpenBreakdownModal: (featureId?: string) => void;
   onOpenAdvisorModal: () => void;
@@ -44,10 +45,11 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const hasWiki = projects.some((project) => project.id === activeProjectId && project.repositoryUrl && project.docsPath);
+  const hasCodeGraph = projects.some((project) => project.id === activeProjectId && project.repositoryUrl);
   const hasGitRepository = projects.some((project) => (activeProjectId === ALL_PROJECTS || project.id === activeProjectId) && project.repositoryUrl);
   return (
     <header className="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full min-w-0 px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3">
           {/* Logo, Brand & Project Switcher */}
           <div className="flex items-center gap-3">
@@ -122,6 +124,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${viewMode === 'wiki' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Wiki</button>}
             {hasGitRepository && <button onClick={() => onViewModeChange('git')} aria-label="Switch to Git repositories view"
               className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${viewMode === 'git' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Git</button>}
+            {hasCodeGraph && <button onClick={() => onViewModeChange('code-graph')} aria-label="Switch to Code graph view"
+              className={`px-3 py-1 rounded-lg font-medium cursor-pointer whitespace-nowrap ${viewMode === 'code-graph' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Code graph</button>}
+            <button onClick={() => onViewModeChange('diagrams')} aria-label="Switch to Archify diagrams view"
+              className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${viewMode === 'diagrams' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Diagrams</button>
             <button
               onClick={() => onViewModeChange('analytics')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
@@ -173,6 +179,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'wiki' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Wiki</button>}
             {hasGitRepository && <button onClick={() => onViewModeChange('git')}
               className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'git' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Git</button>}
+            {hasCodeGraph && <button onClick={() => onViewModeChange('code-graph')}
+              className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'code-graph' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Code graph</button>}
+            <button onClick={() => onViewModeChange('diagrams')}
+              className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'diagrams' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Diagrams</button>
             <button
               onClick={() => onViewModeChange('analytics')}
               className={`shrink-0 px-3 py-1.5 rounded-lg font-medium text-center transition-all cursor-pointer ${
@@ -187,8 +197,8 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       <div aria-label="Board filters and actions"
-        className={`${['releases', 'git', 'cockpit', 'delivery-history', 'activity', 'wiki'].includes(viewMode) ? 'hidden sm:block' : 'block'} border-t border-slate-800/70 bg-slate-950/35 shadow-inner shadow-black/10`}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
+        className={`${['releases', 'git', 'cockpit', 'delivery-history', 'activity', 'wiki', 'code-graph', 'diagrams'].includes(viewMode) ? 'hidden sm:block' : 'block'} border-t border-slate-800/70 bg-slate-950/35 shadow-inner shadow-black/10`}>
+        <div className="flex w-full min-w-0 flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:px-8">
           {['board', 'analytics'].includes(viewMode) && <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 md:flex md:items-center">
             <div className="relative col-span-2 min-w-0 md:flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
@@ -219,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </select>
           </div>}
 
-          <div className={`${['releases', 'git', 'cockpit', 'delivery-history', 'activity', 'wiki'].includes(viewMode) ? 'hidden sm:flex' : 'flex'} flex-wrap items-center justify-between gap-2 border-t border-slate-800/70 pt-3 lg:ml-auto lg:justify-end lg:border-0 lg:pt-0`}>
+          <div className={`${['releases', 'git', 'cockpit', 'delivery-history', 'activity', 'wiki', 'code-graph', 'diagrams'].includes(viewMode) ? 'hidden sm:flex' : 'flex'} flex-wrap items-center justify-between gap-2 border-t border-slate-800/70 pt-3 lg:ml-auto lg:justify-end lg:border-0 lg:pt-0`}>
             <details className="group relative" open={aiMenuOpen} onToggle={(event) => setAiMenuOpen(event.currentTarget.open)}>
               <summary className="flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-indigo-400/40 hover:bg-slate-800 [&::-webkit-details-marker]:hidden">
                 <Sparkles className="h-4 w-4 text-indigo-300" /><span>AI tools</span>

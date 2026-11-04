@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ArrowDownToLine, ArrowRight, CheckCircle2, Clock3, GitBranch, Search, XCircle } from 'lucide-react';
-import { boardApi } from '../data/boardApi';
-import type { Project } from '../types/kanban';
+import { agentApi } from '../data/agentApi';
+import type { Project } from '../../shared/types/kanban';
 import type { z } from 'zod';
-import { deliveryHistorySchema } from '../types/agent';
+import { deliveryHistorySchema } from '../../shared/types/agent';
 
 type DeliveryHistory = z.infer<typeof deliveryHistorySchema>;
 type DeliveryStatus = '' | 'committing' | 'committed' | 'merging' | 'delivered' | 'failed';
@@ -47,7 +47,7 @@ export default function DeliveryHistoryView({ scopeId, projects, onOpenTicket }:
     const controller = new AbortController();
     const timer = setTimeout(() => {
       setLoading(true);
-      void boardApi.deliveryHistory({
+      void agentApi.deliveryHistory({
         projectId: projectId || undefined, status: status || undefined, search: search.trim(), page,
       }, controller.signal).then((result) => {
         if (!controller.signal.aborted) { setData(result); setError(''); }
@@ -60,7 +60,7 @@ export default function DeliveryHistoryView({ scopeId, projects, onOpenTicket }:
     return () => { controller.abort(); clearTimeout(timer); };
   }, [projectId, status, search, page]);
 
-  return <section aria-label="Delivery history" className="mx-auto max-w-7xl space-y-6 pb-10 text-slate-100">
+  return <section aria-label="Delivery history" className="w-full min-w-0 space-y-6 pb-10 text-slate-100">
     <header className="overflow-hidden rounded-3xl border border-emerald-400/15 bg-gradient-to-br from-emerald-950/70 via-slate-900 to-slate-950 p-6 sm:p-8">
       <div className="flex items-start gap-4">
         <div className="rounded-2xl bg-emerald-300/10 p-3 text-emerald-200"><ArrowDownToLine className="h-6 w-6" /></div>

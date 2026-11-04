@@ -138,5 +138,9 @@ Project edits and ticket/release context changes are blocked while Finish is run
 | Reset demo data | Workspaces of removed projects are deleted. |
 
 Repository fields (`repositoryUrl`, `repositoryBranch`, `repositoryCommit`) are stored on the
-`Project` model. The implementation is in
-[server/git/repositoryService.ts](../server/git/repositoryService.ts).
+`Project` model. Clones, worktrees and branch switches are implemented in
+[server/git/workspaceService.ts](../server/git/workspaceService.ts).
+[server/git/repositoryService.ts](../server/git/repositoryService.ts) composes it with
+[gitOperationsService.ts](../server/git/gitOperationsService.ts) (docs and ticket commits,
+delivery merges, release tags) and [gitPublicationService.ts](../server/git/gitPublicationService.ts)
+(pushes).

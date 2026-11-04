@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Feature, Task, KanbanStatus } from '../types/kanban';
-import type { ProjectBoard } from '../types/board';
+import type { Feature, Task, KanbanStatus } from '../../shared/types/kanban';
+import type { ProjectBoard } from '../../shared/types/board';
 import { boardApi } from './boardApi';
 
 const emptyBoard: ProjectBoard = { features: [], tasks: [] };

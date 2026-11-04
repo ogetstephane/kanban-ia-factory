@@ -1,11 +1,13 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
-import type { Feature, Project, Task, KanbanFilters, KanbanStatus } from '../types/kanban';
-import { KANBAN_STATUSES, canMoveTask, filterTasks } from '../utils/kanbanLogic';
+import type { Feature, Project, Task, KanbanFilters, KanbanStatus } from '../../shared/types/kanban';
+import { KANBAN_STATUSES, canMoveTask, filterTasks } from '../../shared/utils/kanbanLogic';
 import { useOperation } from '../data/useOperation';
 import { KanbanColumn } from './KanbanColumn';
+import { useAgentWorkflows } from '../data/useAgentWorkflows';
 const BoardReview = lazy(() => import('./BoardReview'));
 
 interface Props {
+  projectId?: string;
   tasks: Task[];
   features: Feature[];
   projects?: Project[];
@@ -18,8 +20,9 @@ interface Props {
   onReviewValidated?: () => void;
 }
 
-export default function KanbanBoard({ tasks, features, projects, filters, onMoveTask, onMoveFeature, onDeleteTask, onEditTask, onAddTask, onReviewValidated }: Props) {
+export default function KanbanBoard({ projectId, tasks, features, projects, filters, onMoveTask, onMoveFeature, onDeleteTask, onEditTask, onAddTask, onReviewValidated }: Props) {
   const operation = useOperation();
+  const { workflows, error: workflowError } = useAgentWorkflows(projectId);
   const [dragFrom, setDragFrom] = useState<KanbanStatus | null>(null);
   const [review, setReview] = useState<{ title: string; tasks: Task[]; ai: boolean; featureId?: string } | null>(null);
   const featuresMap = useMemo(() => new Map(features.map((feature) => [feature.id, feature])), [features]);
@@ -58,7 +61,8 @@ export default function KanbanBoard({ tasks, features, projects, filters, onMove
   return (
     <>
       {operation.error && <p role="alert" className="text-rose-300 mb-3">{operation.error}</p>}
-      <div aria-busy={operation.pending} className={`max-w-[1700px] mx-auto min-h-[calc(100vh-230px)] flex gap-4 sm:gap-6 pb-6 ${operation.pending ? 'pointer-events-none opacity-70' : ''}`}>
+      {workflowError && <p role="alert" className="mb-3 text-sm text-rose-300">Unable to refresh agent workflows: {workflowError}</p>}
+      <div role="region" aria-label="Kanban columns" aria-busy={operation.pending} className={`grid w-full min-w-0 grid-cols-1 gap-4 pb-6 sm:grid-cols-2 lg:min-h-[calc(100vh-230px)] lg:grid-cols-5 ${operation.pending ? 'pointer-events-none opacity-70' : ''}`}>
         {KANBAN_STATUSES.map((status) => (
           <KanbanColumn
             key={status} status={status}
@@ -67,6 +71,7 @@ export default function KanbanBoard({ tasks, features, projects, filters, onMove
             featureTasks={featureTasks}
             featuresMap={featuresMap}
             projects={projects}
+            workflows={workflows}
             dropState={dragFrom === null || dragFrom === status ? 'idle' : canMoveTask(dragFrom, status) ? 'allowed' : 'forbidden'}
             onDragTask={setDragFrom}
             onMoveTask={(id, target, index) => { void operation.run(() => onMoveTask(id, target, index)); }}

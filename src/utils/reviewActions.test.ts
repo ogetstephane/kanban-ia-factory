@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { KanbanCard } from '../components/KanbanCard';
 import { EpicCard } from '../components/EpicCard';
 import FileDiff from '../components/FileDiff';
-import { featureSchema, taskSchema } from '../types/board';
+import { featureSchema, taskSchema } from '../../shared/types/board';
 import PublishedWork from '../components/PublishedWork';
 
 const now = '2026-10-28T17:00:00Z';
@@ -18,14 +18,23 @@ const noop = () => undefined;
 
 test('Review cards offer separate human and AI actions, other stages do not', () => {
   const props = {
-    task, onEdit: noop, onDelete: noop, onMoveStatus: noop,
-    onOpenCopilotSpec: noop, onDragStatus: noop, onReview: noop,
+    task, onEdit: noop, onMoveStatus: noop, onDragStatus: noop, onReview: noop,
   };
   const review = renderToStaticMarkup(createElement(KanbanCard, props));
   assert.match(review, /Manually review Review ticket/);
   assert.match(review, /AI review Review ticket/);
   const active = renderToStaticMarkup(createElement(KanbanCard, { ...props, task: { ...task, status: 'In Progress' } }));
   assert.doesNotMatch(active, /Manually review/);
+});
+
+test('cards show only a status selector, and only when several statuses are reachable', () => {
+  const props = { task: { ...task, status: 'To Do' as const }, onEdit: noop, onMoveStatus: noop, onDragStatus: noop };
+  const todo = renderToStaticMarkup(createElement(KanbanCard, props));
+  assert.match(todo, /Current stage of Review ticket/);
+  assert.doesNotMatch(todo, /Edit task|Delete task|Enhance task|Move task/);
+  const done = renderToStaticMarkup(createElement(KanbanCard, { ...props, task: { ...task, status: 'Done' as const } }));
+  assert.doesNotMatch(done, /<select/);
+  assert.doesNotMatch(done, /border-t/);
 });
 
 test('Review epics expose both review actions without expanding their children', () => {

@@ -1,6 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
-import { boardSnapshotSchema, type BoardData, type BoardSnapshot } from '../../src/types/board';
-import { ensureNoActiveSessions } from './entityStore';
+import { boardSnapshotSchema, type BoardData, type BoardSnapshot } from '../../shared/types/board';
+import { ensureNoActiveSessions, projectData, featureData, taskData } from './entityStore';
 
 async function readBoard(tx: Prisma.TransactionClient): Promise<BoardSnapshot | null> {
   const board = await tx.board.findUnique({ where: { id: 'board' } });
@@ -14,18 +14,9 @@ async function readBoard(tx: Prisma.TransactionClient): Promise<BoardSnapshot | 
   return boardSnapshotSchema.parse({
     revision: board.revision,
     releases: await tx.release.findMany({ orderBy: { createdAt: 'asc' } }),
-    projects: projects.map((project) => ({
-      ...project, icon: project.icon ?? undefined, category: project.category ?? undefined,
-      docsPath: project.docsPath ?? undefined,
-    })),
-    features: features.map((feature) => ({
-      ...feature, projectId: feature.projectId ?? undefined, targetDate: feature.targetDate ?? undefined,
-    })),
-    tasks: tasks.map((task) => ({
-      ...task, projectId: task.projectId ?? undefined, featureId: task.featureId ?? undefined,
-      suggestedWorkflow: task.suggestedWorkflow ?? undefined,
-      releaseId: task.releaseId ?? undefined,
-    })),
+    projects: projects.map(projectData),
+    features: features.map(featureData),
+    tasks: tasks.map(taskData),
   });
 }
 
@@ -49,6 +40,8 @@ async function writeBoard(tx: Prisma.TransactionClient, data: BoardData) {
     const values = {
       ...fields, position, projectId: task.projectId ?? null, featureId: task.featureId ?? null,
       suggestedWorkflow: task.suggestedWorkflow ?? null,
+      agentModel: task.agentModel ?? null,
+      contextFiles: task.contextFiles ?? [],
     };
     await tx.task.upsert({ where: { id: task.id }, create: values, update: values });
     await tx.subtask.deleteMany({ where: { taskId: task.id } });

@@ -15,6 +15,7 @@ Each page describes user-facing behavior and links to implementation and API det
 | Releases | Project versions, assignments and tag publication | [Releases](releases/README.md) |
 | Wiki | Repository Markdown editor and folder tree | [Wiki](wiki/README.md) |
 | Git | Read-only local repository and worktree inventory | [Git](git/README.md) |
+| Code graph | Graphify knowledge-graph visualization and report | [Code graph](code_graph/README.md) |
 | Analytics | Velocity, flow and bottleneck dashboard | [Analytics](analytics/README.md) |
 
 ## Cross-cutting features
@@ -40,6 +41,9 @@ flowchart TD
     Delivery --> Releases[Release tag publication]
     Projects --> Git[Git inventory]
     Projects --> Wiki[Wiki documentation]
+    Projects --> CodeGraph[Graphify code graph]
+    CodeGraph --> Sessions
+    CodeGraph --> Wiki
     Board --> Analytics[Velocity and workflow analytics]
     Projects --> Activity[Activity history]
     Board --> Activity

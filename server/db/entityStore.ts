@@ -3,10 +3,17 @@ import { z } from 'zod';
 import {
   DEFAULT_DOCS_PATH, projectSchema, featureSchema, taskSchema, type ProjectSummary, type ProjectStats,
   moveTaskSchema, breakdownSchema,
-} from '../../src/types/board';
-import { canCreateTaskIn, canMoveTask, CREATION_STATUSES, moveTask, transitionError } from '../../src/utils/kanbanLogic';
+} from '../../shared/types/board';
+import { canCreateTaskIn, canMoveTask, CREATION_STATUSES, moveTask, transitionError } from '../../shared/utils/kanbanLogic';
 import { enqueueTicket } from '../agents/queue';
 import { activityChanges, recordActivity } from './activityLog';
+import { contextFilesSchema } from '../../shared/types/contextFile';
+
+function contextFileChanges(before: unknown, after: unknown) {
+  if (JSON.stringify(before ?? []) === JSON.stringify(after ?? [])) return [];
+  const names = (value: unknown) => contextFilesSchema.parse(value ?? []).map((file) => file.name).join(', ') || null;
+  return [{ field: 'Context files', before: names(before), after: names(after) }];
+}
 
 type Project = z.infer<typeof projectSchema>;
 type Feature = z.infer<typeof featureSchema>;
@@ -26,6 +33,7 @@ export const taskData = (value: DbTask) => taskSchema.parse({
   ...value, projectId: value.projectId ?? undefined, featureId: value.featureId ?? undefined,
   releaseId: value.releaseId ?? undefined,
   suggestedWorkflow: value.suggestedWorkflow ?? undefined,
+  agentModel: value.agentModel ?? undefined,
 });
 
 export class EntityError extends Error {
@@ -118,7 +126,7 @@ async function queueExecution(tx: Prisma.TransactionClient, previous: string, ta
   const feature = task.featureId ? await tx.feature.findUnique({ where: { id: task.featureId } }) : null;
   await enqueueTicket(tx, {
     task, project: project ? projectData(project) : null, feature: feature ? featureData(feature) : null,
-  }, provider, autoExecute);
+  }, task.agentProvider ?? provider, autoExecute);
 }
 
 export async function advanceEpicToReviewIfComplete(tx: Prisma.TransactionClient, featureId: string) {
@@ -178,7 +186,7 @@ async function createTask(tx: Prisma.TransactionClient, task: Task, provider: st
     action: 'created', summary: 'Ticket created', changes: activityChanges(null, created, [
       { key: 'title', label: 'Title' }, { key: 'status', label: 'Status' },
       { key: 'priority', label: 'Priority' }, { key: 'storyPoints', label: 'Story points' },
-    ]),
+    ]).concat(contextFileChanges([], created.contextFiles)),
   });
   if (feature?.status === 'In Progress') await queueExecution(tx, '', created, provider, true);
   return created;
@@ -459,6 +467,7 @@ export class EntityStore {
           ...fields, featureId: task.featureId ?? null,
           releaseId: task.releaseId ?? null,
           suggestedWorkflow: task.suggestedWorkflow ?? null, revision: { increment: 1 },
+          agentModel: task.agentModel ?? null,
           subtasks: {
             deleteMany: {},
             create: subtasks.map((subtask, position) => ({ ...subtask, position })),
@@ -476,7 +485,8 @@ export class EntityStore {
         { key: 'title', label: 'Title' }, { key: 'status', label: 'Status' },
         { key: 'priority', label: 'Priority' }, { key: 'featureId', label: 'Feature' },
         { key: 'releaseId', label: 'Release' }, { key: 'storyPoints', label: 'Story points' },
-      ]);
+        { key: 'agentProvider', label: 'Agent provider' }, { key: 'agentModel', label: 'Agent model' },
+      ]).concat(contextFileChanges(existing!.contextFiles, saved.contextFiles));
       if (changes.length) await recordActivity(tx, {
         projectId: saved.projectId, entityType: 'task', entityId: saved.id, entityTitle: saved.title,
         action: existing!.status !== saved.status ? 'status_changed' : 'updated',

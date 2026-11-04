@@ -2,7 +2,7 @@
 
 All board endpoints are under `/api/board` and defined in
 [server/routes/board.ts](../server/routes/board.ts). Request bodies are JSON validated by the
-zod schemas in [src/types/board.ts](../src/types/board.ts). Responses are sent with
+zod schemas in [shared/types/board.ts](../shared/types/board.ts). Responses are sent with
 `Cache-Control: no-store`.
 
 ## Projects and board
@@ -65,11 +65,35 @@ an epic's status does not update linked tickets or queue a Copilot session.
 position in the column; omit it to append. Status changes must follow the
 [task workflow](./workflow.md) (`422` otherwise); new tasks start in `Backlog` or `To Do`.
 
+### Ticket drafting
+
+`POST /projects/:projectId/tasks/assistant` proposes a specification for an unsaved
+new or existing ticket. It does not create/update a task or queue a ticket workflow.
+The server resolves the owning project's clone; callers cannot choose a filesystem path.
+
+Input is validated by [taskDraft.ts](../shared/types/taskDraft.ts): `title` is required;
+`currentDescription`, `featureTitle`, `priority`, `agentModel`, `acceptanceCriteria`,
+`subtasks` (text array), `suggestedWorkflow`, `tags`, and `contextFiles` supply the draft.
+Attachments follow the existing task upload limits and are forwarded to Copilot.
+
+The read-only Copilot SDK session loads the shared `ticket-graphify` skill on demand.
+The response contains `title`, `description`, `acceptanceCriteria`, `subtasks`,
+`suggestedWorkflow`, `estimatedStoryPoints` (1, 2, 3, 5 or 8), `suggestedTags`,
+`impactAnalysis` (Markdown), and `graphAvailable` (whether this run had a graph,
+not proof that a particular dependency was verified).
+
+Invalid input returns `400`; an unknown project returns `404`; unavailable Copilot
+authentication/configuration returns `503`; invalid responses or generation failures
+return `502`; rejected model context size returns `413`. There is no Gemini/template
+fallback. Graph unavailability does not block drafting but is explicitly reported.
+Disconnecting or cancelling aborts generation. Saving the returned draft remains manual.
+
 ## Agent sessions
 
 | Method | Path | Body / query | Response |
 |--------|------|--------------|----------|
 | `GET` | `/agent-sessions` | `projectId?`, `featureId?`, `status?`, `priority?`, `search?`, `page?`, `actionable=true|cockpit?` | `{ items, total, actionCount, page, pageSize, projects, features }` (metadata only) |
+| `GET` | `/agent-workflows` | `projectId?` | Object keyed by ticket ID with `plan`, `approval`, `execution`, `review`, `delivery` states; all scoped runs, without plans, agent output, paths or context |
 | `GET` | `/delivery-history` | `projectId?`, `status?`, `search?`, `page?` | `{ items, total, page, pageSize }`, newest delivery attempts first |
 | `GET` | `/tasks/:id/session` | — | Session with plan, questions, current-attempt checks, review state, output and errors, or `null` |
 | `POST` | `/tasks/:id/session/approve` | `{ sessionId, updatedAt }` (version of the plan read) | Session queued for approved execution |
@@ -90,6 +114,10 @@ position in the column; omit it to append. Status changes must follow the
 Entering In Progress queues a session in the task's own transaction. An already answered
 question, stale plan, duplicate approval or mutation of an active session's context returns
 `409`. See [agent sessions](./agent-sessions.md) for states, trust boundaries and runtime limits.
+Workflow states are `pending`, `active`, `waiting`, `completed`, `failed` or `stopped`.
+Session-list metadata includes the same `workflow` object. The board polls the compact
+workflow endpoint every two seconds; omitted tickets have no agent run and display pending
+steps. Project-scoped results include unassigned tickets, like the project board.
 The lazy Cockpit uses `actionable=cockpit` to list waiting questions, plan approvals, failed
 sessions, pending human reviews, and accepted reviews awaiting local delivery; its summaries
 include only the current delivery status, never plans, reports or question contents.
@@ -166,6 +194,7 @@ See [releases](./releases.md) for credentials and recovery.
 |--------|------|------|-------------|
 | `POST` | `/breakdown` | `{ feature, tasks }` | Create the feature if needed plus all tasks in one transaction. |
 | `POST` | `/initialize` | `{ projects, features, tasks, releases? }` | Seed an empty database (legacy import); release links must match included project releases. |
+| `POST` | `/initialize` | `{ legacy: { projects?, features?, tasks? } }` | Import old browser storage; the server fills absent collections with demo data and normalizes legacy project/feature links. `{ legacy: {} }` selects the full demo seed. Explicit empty arrays are preserved (projects must remain nonempty); invalid data returns 400. |
 | `POST` | `/reset` | — | Replace everything with the demo dataset. |
 
 ## Errors

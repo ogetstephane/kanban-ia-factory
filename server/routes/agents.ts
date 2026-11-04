@@ -2,13 +2,16 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { EntityError } from '../db/entityStore';
 import type { SessionService } from '../agents/sessionService';
-import { agentListQuerySchema, deliveryHistoryQuerySchema, deliveryRequestSchema, publicationRequestSchema } from '../../src/types/agent';
+import { agentListQuerySchema, deliveryHistoryQuerySchema, deliveryRequestSchema, publicationRequestSchema } from '../../shared/types/agent';
 import { RepositoryError } from '../git/repositoryService';
-import { finishRequestSchema } from '../../src/types/git';
+import { finishRequestSchema } from '../../shared/types/git';
 
 export function createAgentRouter(sessions: SessionService) {
   const router = Router();
   router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+  router.get('/agent-options', async (_req, res, next) => {
+    try { res.json(await sessions.options()); } catch (error) { next(error); }
+  });
   for (const kind of ['tasks', 'features'] as const) {
     router.get(`/${kind}/:id/finish`, async (req, res, next) => {
       try { res.json(await sessions.finish.preview(kind, req.params.id)); } catch (error) { next(error); }
@@ -30,6 +33,12 @@ export function createAgentRouter(sessions: SessionService) {
   });
   router.get('/agent-sessions', async (req, res, next) => {
     try { res.json(await sessions.list(agentListQuerySchema.parse(req.query))); } catch (error) { next(error); }
+  });
+  router.get('/agent-workflows', async (req, res, next) => {
+    try {
+      const { projectId } = z.object({ projectId: z.string().min(1).optional() }).parse(req.query);
+      res.json(await sessions.workflows(projectId));
+    } catch (error) { next(error); }
   });
   router.get('/delivery-history', async (req, res, next) => {
     try { res.json(await sessions.deliveryHistory(deliveryHistoryQuerySchema.parse(req.query))); } catch (error) { next(error); }

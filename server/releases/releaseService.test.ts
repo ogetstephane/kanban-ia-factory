@@ -7,8 +7,8 @@ import path from 'node:path';
 import express from 'express';
 import type { Server } from 'node:http';
 import { PrismaClient } from '@prisma/client';
-import { taskSchema } from '../../src/types/board';
-import { versionSchema, releaseDetailSchema } from '../../src/types/release';
+import { taskSchema } from '../../shared/types/board';
+import { versionSchema, releaseDetailSchema } from '../../shared/types/release';
 import { EntityStore } from '../db/entityStore';
 import { RepositoryService } from '../git/repositoryService';
 import { createSourceRepository } from '../git/testRepository';
@@ -16,7 +16,7 @@ import { SessionService } from '../agents/sessionService';
 import { createReleaseRouter } from '../routes/releases';
 import { ReleaseService } from './releaseService';
 import { BoardStore } from '../db/boardStore';
-import { boardDataSchema } from '../../src/types/board';
+import { boardDataSchema } from '../../shared/types/board';
 import { requiredTicketDocumentationPath } from '../agents/ticketDocumentation';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', cwd.endsWith('.git') ? ['--git-dir', cwd, ...args] : args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -32,8 +32,8 @@ async function fixture(t: TestContext) {
   const entities = new EntityStore(db);
   const repositories = new RepositoryService(path.join(directory, 'workspaces'), { localRoots: [directory] });
   const source = await createSourceRepository(path.join(directory, 'source'));
-  const cloned = await repositories.clone('project-release', { url: source.url });
-  const root = repositories.pathFor('project-release');
+  const cloned = await repositories.workspaces.clone('project-release', { url: source.url });
+  const root = repositories.workspaces.pathFor('project-release');
   git(root, 'config', 'user.name', 'Release Test');
   git(root, 'config', 'user.email', 'release@example.com');
   const bare = path.join(directory, 'origin.git');
@@ -174,8 +174,8 @@ test('delivery requires a release but assigning it does not invalidate the accep
   const row = await f.db.task.findUniqueOrThrow({ where: { id: task.id } });
   await f.releases.assign('project-release', row.id, f.release.id, row.revision);
   assert.equal((await f.sessions.delivery.preview(row.id)).reviewToken, review.token);
-  const original = f.repositories.createTicketCommit.bind(f.repositories);
-  f.repositories.createTicketCommit = async (...args) => {
+  const original = f.repositories.operations.createTicketCommit.bind(f.repositories.operations);
+  f.repositories.operations.createTicketCommit = async (...args) => {
     const release = await f.releases.detail('project-release', f.release.id);
     await assert.rejects(f.releases.update('project-release', release.id, { version: release.version, status: 'cancelled', revision: release.revision }), /Wait for ticket delivery/);
     return original(...args);
@@ -188,8 +188,8 @@ test('failed push retains the exact local tag/commit, freezes membership and ver
   const f = await fixture(t);
   await f.deliver();
   const preview = await f.progress();
-  const original = f.repositories.pushReleaseTag.bind(f.repositories);
-  f.repositories.pushReleaseTag = async () => { throw new Error('Temporary remote outage'); };
+  const original = f.repositories.publication.pushReleaseTag.bind(f.repositories.publication);
+  f.repositories.publication.pushReleaseTag = async () => { throw new Error('Temporary remote outage'); };
   await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /Temporary remote outage/);
   const failed = await f.releases.detail('project-release', f.release.id);
   assert.equal(failed.status, 'in_progress');
@@ -201,7 +201,7 @@ test('failed push retains the exact local tag/commit, freezes membership and ver
   await assert.rejects(f.releases.assign('project-release', task.id, null, task.revision), /pinned/);
   await writeFile(path.join(f.root, 'later.txt'), 'Later independent work\n');
   git(f.root, 'add', '.'); git(f.root, 'commit', '-m', 'Later work');
-  f.repositories.pushReleaseTag = original;
+  f.repositories.publication.pushReleaseTag = original;
   const retry = await f.releases.preview('project-release', f.release.id);
   assert.equal(retry.commit, preview.commit);
   assert.equal(retry.alreadyTagged, true);
@@ -213,13 +213,13 @@ test('restart after remote success reconciles without rewriting the tag', async 
   const f = await fixture(t);
   await f.deliver();
   const preview = await f.progress();
-  const original = f.repositories.pushReleaseTag.bind(f.repositories);
-  f.repositories.pushReleaseTag = async (...args) => { await original(...args); throw new Error('Disconnect after remote accepted'); };
+  const original = f.repositories.publication.pushReleaseTag.bind(f.repositories.publication);
+  f.repositories.publication.pushReleaseTag = async (...args) => { await original(...args); throw new Error('Disconnect after remote accepted'); };
   await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /Disconnect after remote/);
   await f.db.release.update({ where: { id: f.release.id }, data: { publishing: true } });
   await f.releases.recover();
   assert.match((await f.releases.detail('project-release', f.release.id)).error, /Server restarted/);
-  f.repositories.pushReleaseTag = original;
+  f.repositories.publication.pushReleaseTag = original;
   const retry = await f.releases.preview('project-release', f.release.id);
   assert.equal((await f.releases.publish('project-release', f.release.id, retry)).status, 'published');
 });
@@ -228,7 +228,7 @@ test('a failed publication can be cancelled without deleting tags, and its ticke
   const f = await fixture(t);
   await f.deliver();
   const preview = await f.progress();
-  f.repositories.pushReleaseTag = async () => { throw new Error('Remote tag already reserved'); };
+  f.repositories.publication.pushReleaseTag = async () => { throw new Error('Remote tag already reserved'); };
   await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /reserved/);
   const failed = await f.releases.detail('project-release', f.release.id);
   const cancelled = await f.releases.update('project-release', f.release.id, { revision: failed.revision, version: failed.version, status: 'cancelled' });
@@ -255,7 +255,7 @@ test('local origin, multiple push destinations, stale heads and missing merge an
   await writeFile(path.join(f.root, 'later.txt'), 'later\n');
   git(f.root, 'add', '.'); git(f.root, 'commit', '-m', 'Later');
   await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /target changed/);
-  await f.repositories.switchBranch('project-release', 'dev');
+  await f.repositories.workspaces.switchBranch('project-release', 'dev');
   await f.db.project.update({ where: { id: 'project-release' }, data: { repositoryBranch: 'dev' } });
   await assert.rejects(f.releases.preview('project-release', f.release.id), /does not contain/);
   assert.equal(git(f.root, 'tag', '--list'), '');
@@ -329,8 +329,8 @@ test('concurrent publication does not duplicate writes and blocks ticket mutatio
   await f.deliver();
   const preview = await f.progress();
   let pushes = 0;
-  const original = f.repositories.pushReleaseTag.bind(f.repositories);
-  f.repositories.pushReleaseTag = async (...args) => {
+  const original = f.repositories.publication.pushReleaseTag.bind(f.repositories.publication);
+  f.repositories.publication.pushReleaseTag = async (...args) => {
     pushes++;
     const task = await f.db.task.findUniqueOrThrow({ where: { id: 'ticket-release' } });
     await assert.rejects(f.entities.deleteTask(task.id, task.revision), /tag is being published/);

@@ -1,0 +1,166 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Kanban IA Factory — architecture",
+    "locale": "fr",
+    "translations": {
+      "page.title": "Diagramme {title}",
+      "diagram.description.architecture": "Diagramme d'architecture généré par Archify.",
+      "legend.title": "Légende",
+      "node.focus": "Centrer sur {label}",
+      "node.context.architecture": "Composant d'architecture",
+      "legend.architecture.frontend": "Interface",
+      "legend.architecture.backend": "Serveur",
+      "legend.architecture.database": "Base de données",
+      "legend.architecture.external": "Externe",
+      "viewer.kind.frontend": "Interface",
+      "viewer.kind.backend": "Serveur",
+      "viewer.kind.database": "Base de données",
+      "viewer.kind.external": "Externe",
+      "viewer.toolbar.actions": "Actions du diagramme",
+      "viewer.theme.toggle": "Changer de thème",
+      "viewer.theme.dark": "Sombre",
+      "viewer.theme.light": "Clair",
+      "viewer.motion.live": "Animé",
+      "viewer.motion.still": "Statique",
+      "viewer.present.present": "Présenter",
+      "viewer.export.button": "Exporter",
+      "viewer.export.diagram": "Exporter le diagramme",
+      "viewer.finder.title": "Rechercher un élément",
+      "viewer.common.close": "Fermer",
+      "viewer.common.copyLink": "Copier le lien"
+    },
+    "output": "doc/archify/generated/kanban-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/ogetstephane/kanban-ia-factory.git",
+      "revision": "3684cc97ce8e81b24b6c67a82d636c10afb5911e"
+    }
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "external",
+      "label": "Navigateur",
+      "sublabel": "poste utilisateur",
+      "pos": [40, 40],
+      "size": [130, 64],
+      "sources": [
+        { "path": "index.html", "line": 13, "end_line": 15 }
+      ]
+    },
+    {
+      "id": "frontend",
+      "type": "frontend",
+      "label": "Interface React",
+      "sublabel": "tableau et vues",
+      "pos": [260, 40],
+      "size": [150, 64],
+      "sources": [
+        { "path": "src/main.tsx", "line": 1, "end_line": 5 },
+        { "path": "src/data/apiClient.ts", "line": 9, "end_line": 14 }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "API Express",
+      "sublabel": "routes et services",
+      "pos": [560, 40],
+      "size": [170, 64],
+      "sources": [
+        { "path": "server/app.ts", "line": 50, "end_line": 87 },
+        { "path": "server/db/entityStore.ts", "line": 234, "end_line": 241 },
+        { "path": "server/app.ts", "line": 98, "end_line": 163 }
+      ]
+    },
+    {
+      "id": "database",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "Prisma · données et sessions",
+      "pos": [950, 40],
+      "size": [180, 64],
+      "sources": [
+        { "path": "prisma/schema.prisma", "line": 5, "end_line": 8 },
+        { "path": "prisma/schema.prisma", "line": 92, "end_line": 116 },
+        { "path": "prisma/schema.prisma", "line": 123, "end_line": 131 }
+      ]
+    },
+    {
+      "id": "sessions",
+      "type": "backend",
+      "label": "Sessions et Git",
+      "sublabel": "orchestration des tickets",
+      "pos": [560, 260],
+      "size": [170, 64],
+      "sources": [
+        { "path": "server/agents/sessionService.ts", "line": 585, "end_line": 601 },
+        { "path": "server/agents/sessionService.ts", "line": 632, "end_line": 642 },
+        { "path": "server/git/repositoryService.ts", "line": 405, "end_line": 431 }
+      ]
+    },
+    {
+      "id": "provider",
+      "type": "backend",
+      "label": "CopilotProvider",
+      "sublabel": "GitHub Copilot SDK",
+      "pos": [950, 260],
+      "size": [180, 64],
+      "sources": [
+        { "path": "server/agents/copilotProvider.ts", "line": 1, "end_line": 4 },
+        { "path": "server/agents/copilotProvider.ts", "line": 32, "end_line": 33 },
+        { "path": "server/agents/copilotProvider.ts", "line": 97, "end_line": 108 }
+      ]
+    },
+    {
+      "id": "worktree",
+      "type": "external",
+      "label": "Worktree Git",
+      "sublabel": "répertoire du ticket",
+      "pos": [950, 480],
+      "size": [180, 64],
+      "sources": [
+        { "path": "server/git/repositoryService.ts", "line": 405, "end_line": 431 },
+        { "path": "server/agents/workspaceTools.ts", "line": 15, "end_line": 28 }
+      ]
+    }
+  ],
+  "connections": [
+    { "id": "open-ui", "from": "browser", "to": "frontend", "label": "affiche", "variant": "emphasis" },
+    { "id": "http-api", "from": "frontend", "to": "api", "label": "HTTP /api/board", "variant": "emphasis" },
+    { "id": "board-data", "from": "api", "to": "database", "label": "requêtes Prisma" },
+    { "id": "ticket-sessions", "from": "api", "to": "sessions", "label": "sessions de tickets" },
+    { "id": "session-state", "from": "sessions", "to": "database", "label": "état des sessions" },
+    { "id": "run-copilot", "from": "sessions", "to": "provider", "label": "plan / exécution", "variant": "dashed" },
+    { "id": "prepare-worktree", "from": "sessions", "to": "worktree", "label": "prépare" },
+    { "id": "workspace-tools", "from": "provider", "to": "worktree", "label": "outils fichier" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Périmètre",
+      "items": [
+        "Vue synthétique du code au commit 3684cc9 ; les changements non commités ne sont pas représentés.",
+        "Les vues Wiki et Releases sont regroupées dans les services de l'API."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Agent de ticket",
+      "items": [
+        "Le service prépare un worktree et lance une session Copilot pour le ticket.",
+        "Après le plan, l'exécution attend une approbation, sauf en mode automatique."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Décomposition IA",
+      "items": [
+        "Gemini est optionnel pour la décomposition des fonctionnalités.",
+        "Sans clé ou en cas d'erreur, le serveur utilise des gabarits de repli."
+      ]
+    }
+  ]
+}

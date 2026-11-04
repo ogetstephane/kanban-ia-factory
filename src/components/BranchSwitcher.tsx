@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { GitBranch, Loader2 } from 'lucide-react';
-import type { Project } from '../types/kanban';
-import { boardApi } from '../data/boardApi';
+import type { Project } from '../../shared/types/kanban';
+import { gitApi } from '../data/gitApi';
 import { useOperation } from '../data/useOperation';
 
 interface BranchSwitcherProps {
@@ -21,7 +21,7 @@ export const BranchSwitcher: React.FC<BranchSwitcherProps> = ({ project, onSwitc
     let active = true;
     setBranches(null);
     setLoadError('');
-    boardApi.projectBranches(project.id).then((result) => {
+    gitApi.projectBranches(project.id).then((result) => {
       if (active) { setBranches(result.branches); setSelected(result.current); }
     }).catch((cause: unknown) => {
       if (active) setLoadError(cause instanceof Error ? cause.message : 'Unable to load branches');

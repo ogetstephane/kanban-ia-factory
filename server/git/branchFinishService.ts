@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { Prisma, PrismaClient } from '@prisma/client';
-import { finishPreviewSchema, finishRequestSchema, publishedWorkListSchema, type FinishRequest } from '../../src/types/git';
+import { finishPreviewSchema, finishRequestSchema, publishedWorkListSchema, type FinishRequest } from '../../shared/types/git';
 import { ensureNoActiveSessions, EntityError } from '../db/entityStore';
 import { recordActivity } from '../db/activityLog';
 import type { RepositoryService } from './repositoryService';
@@ -84,20 +84,20 @@ export class BranchFinishService {
     if (saved && saved.releaseId !== release.id) throw new EntityError(409, 'The release changed after Finish started. Restore the original assignment before retrying.');
     if (saved?.status === 'finished') return finishPreviewSchema.parse({ ...saved, releaseVersion: release.version });
     if (!project.repositoryBranch) throw new EntityError(409, 'The project has no configured branch');
-    const origin = await this.repositories.publicationOrigin(project.id);
+    const origin = await this.repositories.publication.publicationOrigin(project.id);
     if (origin !== publications[0].remoteUrl || (saved && (saved.origin !== origin || saved.targetBranch !== project.repositoryBranch))) {
       throw new EntityError(409, 'The project branch or origin changed since publication. Restore the original configuration.');
     }
     const branch = publications[0].branch;
-    const state = await this.repositories.finishState(project.id, branch, project.repositoryBranch, origin);
+    const state = await this.repositories.publication.finishState(project.id, branch, project.repositoryBranch, origin);
     const featureHead = saved?.featureHead ?? state.featureHead;
     if (!featureHead) throw new EntityError(409, 'The published feature branch is missing on origin');
     if (state.featureHead && state.featureHead !== featureHead) throw new EntityError(409, 'The feature branch changed after Finish started; inspect it locally before retrying');
     for (const publication of publications) {
-      if (!await this.repositories.containsDeliveryMerge(project.id, publication.commitHash, featureHead)) throw new EntityError(409, 'The remote feature branch no longer contains all reviewed commits');
+      if (!await this.repositories.operations.containsDeliveryMerge(project.id, publication.commitHash, featureHead)) throw new EntityError(409, 'The remote feature branch no longer contains all reviewed commits');
     }
     if (saved && state.targetHead !== saved.targetHead &&
-        (!saved.mergeHash || !await this.repositories.containsDeliveryMerge(project.id, saved.mergeHash, state.targetHead))) {
+        (!saved.mergeHash || !await this.repositories.operations.containsDeliveryMerge(project.id, saved.mergeHash, state.targetHead))) {
       throw new EntityError(409, 'The project branch changed after Finish was prepared. Inspect the saved merge before retrying.');
     }
     return finishPreviewSchema.parse({
@@ -116,13 +116,13 @@ export class BranchFinishService {
 
   private async perform(kind: Kind, id: string, input: FinishRequest) {
     const initial = await this.scope(kind, id);
-    return this.repositories.withProjectLock(initial.project.id, async () => {
+    return this.repositories.workspaces.withProjectLock(initial.project.id, async () => {
       const preview = await this.preview(kind, id);
       for (const key of ['projectId', 'scopeId', 'branch', 'targetBranch', 'origin', 'featureHead', 'targetHead', 'releaseId'] as const) {
         if (input[key] !== preview[key]) throw new EntityError(409, 'The branch or release changed. Reload Finish before confirming.');
       }
       if (preview.status === 'finished') return preview;
-      await this.repositories.deliveryIdentity(preview.projectId);
+      await this.repositories.operations.deliveryIdentity(preview.projectId);
       const saved = await this.db.$transaction(async (tx) => {
         await ensureNoActiveSessions(tx, { task: { projectId: preview.projectId } });
         const fresh = await this.scope(kind, id, tx);
@@ -145,14 +145,14 @@ export class BranchFinishService {
         return finish;
       });
       try {
-        const merge = saved.mergeHash ?? await this.repositories.prepareDeliveryMerge(preview.projectId, saved.targetHead, saved.featureHead, saved.id);
-        await this.repositories.pinReviewCommit(preview.projectId, saved.id, merge);
+        const merge = saved.mergeHash ?? await this.repositories.operations.prepareDeliveryMerge(preview.projectId, saved.targetHead, saved.featureHead, saved.id);
+        await this.repositories.operations.pinReviewCommit(preview.projectId, saved.id, merge);
         await this.db.branchFinish.update({ where: { id: saved.id }, data: { mergeHash: merge, status: 'merging' } });
-        const head = await this.repositories.applyDeliveryMerge(preview.projectId, saved.targetBranch, saved.targetHead, merge);
+        const head = await this.repositories.operations.applyDeliveryMerge(preview.projectId, saved.targetBranch, saved.targetHead, merge);
         await this.db.branchFinish.update({ where: { id: saved.id }, data: { status: 'pushing' } });
-        await this.repositories.pushFinishedProject(preview.projectId, saved.targetBranch, head, saved.origin);
+        await this.repositories.publication.pushFinishedProject(preview.projectId, saved.targetBranch, head, saved.origin);
         await this.db.branchFinish.update({ where: { id: saved.id }, data: { status: 'closing' } });
-        await this.repositories.closeFinishedBranch(preview.projectId, saved.branch, saved.featureHead, saved.targetBranch, merge, saved.origin);
+        await this.repositories.publication.closeFinishedBranch(preview.projectId, saved.branch, saved.featureHead, saved.targetBranch, merge, saved.origin);
         await this.db.$transaction(async (tx) => {
           const now = new Date().toISOString();
           await tx.branchFinish.update({ where: { id: saved.id }, data: { status: 'finished', error: '', updatedAt: now } });

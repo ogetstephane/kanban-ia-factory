@@ -1,7 +1,9 @@
 import { after, beforeEach, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from './initialData';
-import { BoardApiError, boardApi, loadProjects } from './boardApi';
+import { INITIAL_PROJECTS, INITIAL_FEATURES, INITIAL_TASKS } from '../../shared/data/initialData';
+import { BoardApiError } from './apiClient';
+import { agentApi } from './agentApi';
+import { boardApi, loadProjects } from './boardApi';
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 const values = new Map<string, string>();
@@ -51,7 +53,7 @@ after(() => {
   else Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-test('empty database initializes from legacy storage and then loads projects', async () => {
+test('empty database requests server demo data without sending seed collections', async () => {
   const projects = INITIAL_PROJECTS.map((project) => ({ ...project, revision: 0, stats: {
     totalTasks: 0, completedTasks: 0, inProgressTasks: 0, completionRate: 0, totalFeatures: 0,
   } }));
@@ -61,6 +63,30 @@ test('empty database initializes from legacy storage and then loads projects', a
   assert.deepEqual(calls.map((call) => `${call.method} ${call.route.split('/api/board')[1]}`), [
     'GET /projects', 'POST /initialize', 'GET /projects',
   ]);
+  assert.deepEqual(calls[1].body, { legacy: {} });
+});
+
+test('legacy migration sends only stored collections and preserves explicit empty arrays', async () => {
+  initializedProjects = [];
+  values.set('kanban_flow_features_v1', '[]');
+  values.set('kanban_flow_tasks_v1', '[]');
+  await loadProjects();
+  assert.deepEqual(calls[1].body, { legacy: { features: [], tasks: [] } });
+});
+
+test('legacy migration sends custom data for server-side link normalization', async () => {
+  initializedProjects = [];
+  const project = { ...INITIAL_PROJECTS[0], id: 'legacy-project', revision: 3 };
+  const feature = { ...INITIAL_FEATURES[0], projectId: undefined, revision: 4 };
+  const task = { ...INITIAL_TASKS[0], projectId: undefined, featureId: 'removed-feature', revision: 5,
+    blockedReason: '', contextFiles: [], agentProvider: 'copilot' };
+  values.set('kanban_flow_projects_v1', JSON.stringify([project]));
+  values.set('kanban_flow_features_v1', JSON.stringify([feature]));
+  values.set('kanban_flow_tasks_v1', JSON.stringify([task]));
+  await loadProjects();
+  assert.deepEqual(calls[1].body, { legacy: {
+    projects: [project], features: [JSON.parse(JSON.stringify(feature))], tasks: [JSON.parse(JSON.stringify(task))],
+  } });
 });
 
 test('existing projects skip initialization even with malformed legacy keys', async () => {
@@ -94,11 +120,23 @@ test('API errors are surfaced with status and message', async () => {
     error.message === 'Database unavailable');
 });
 
+test('agent options load the provider model catalogue and surface failures', async () => {
+  const options = { providers: [{
+    id: 'copilot', name: 'GitHub Copilot', defaultModel: null,
+    models: [{ id: 'model-a', name: 'Model A' }],
+  }] };
+  boardPayload = options;
+  assert.deepEqual(await agentApi.agentOptions(), options);
+  assert.equal(calls.at(-1)?.route, '/api/board/agent-options');
+  failureStatus = 503;
+  await assert.rejects(agentApi.agentOptions(), /Database unavailable/);
+});
+
 test('HTML returned by an outdated server gives an actionable error instead of a JSON parse error', async () => {
   mock.method(globalThis, 'fetch', async () => new Response('<!doctype html><html></html>', {
     headers: { 'Content-Type': 'text/html; charset=utf-8' },
   }));
-  await assert.rejects(boardApi.agentSessions({}), (error: unknown) =>
+  await assert.rejects(agentApi.agentSessions({}), (error: unknown) =>
     error instanceof BoardApiError &&
     error.status === 200 &&
     error.message.includes('/api/board/agent-sessions') &&
@@ -109,7 +147,7 @@ test('non-JSON HTTP errors retain their status and identify the API route', asyn
   mock.method(globalThis, 'fetch', async () => new Response('<!doctype html>', {
     status: 502, headers: { 'Content-Type': 'text/html' },
   }));
-  await assert.rejects(boardApi.agentSession('task-1'), (error: unknown) =>
+  await assert.rejects(agentApi.agentSession('task-1'), (error: unknown) =>
     error instanceof BoardApiError &&
     error.status === 502 &&
     error.message.includes('/api/board/tasks/task-1/session'));
@@ -119,4 +157,19 @@ test('invalid legacy JSON fails fast and never sends initialize request', async 
   values.set('kanban_flow_tasks_v1', '{broken');
   await assert.rejects(loadProjects(), SyntaxError);
   assert.equal(calls.length, 1);
+});
+
+test('invalid legacy collections fail before initialization instead of requesting demo defaults', async () => {
+  for (const [key, value] of [
+    ['kanban_flow_projects_v1', '[]'],
+    ['kanban_flow_features_v1', 'null'],
+    ['kanban_flow_tasks_v1', '{}'],
+  ]) {
+    values.clear();
+    calls.length = 0;
+    values.set(key, value);
+    await assert.rejects(loadProjects());
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].method, 'GET');
+  }
 });

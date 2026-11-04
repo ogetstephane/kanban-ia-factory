@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AgentSession, Prisma, PrismaClient } from '@prisma/client';
-import { agentContextSchema, type PublicationRequest } from '../../src/types/agent';
+import { agentContextSchema, type PublicationRequest } from '../../shared/types/agent';
 import { advanceEpicToReviewIfComplete, EntityError } from '../db/entityStore';
 import { recordActivity } from '../db/activityLog';
 import type { RepositoryService } from '../git/repositoryService';
@@ -37,7 +37,7 @@ export class ReviewPublicationService {
       const publication = session?.publications.find((item) => item.attempt === session.attempt && item.status === 'pushed');
       if (task.status !== 'Done' || !session?.workspace || !session.baseCommit || !publication) continue;
       try {
-        await this.repositories.cleanupPublishedTicket(projectId, session.id, session.baseCommit,
+        await this.repositories.operations.cleanupPublishedTicket(projectId, session.id, session.baseCommit,
           publication.reviewToken, publication.commitHash, publication.ticketHead);
         await this.db.$transaction(async (tx) => {
           await tx.agentSession.update({ where: { id: session.id }, data: { workspace: null, updatedAt: new Date().toISOString() } });
@@ -75,12 +75,12 @@ export class ReviewPublicationService {
     const { feature, tasks, project } = await this.scope(kind, id);
     const scopeId = tasks[0].featureId ? `feature:${tasks[0].featureId}` : `task:${tasks[0].id}`;
     const previous = await this.db.reviewPublication.findFirst({ where: { projectId: project.id, scopeId } });
-    const branch = previous?.branch ?? this.repositories.featureBranch(tasks[0].feature?.title ?? tasks[0].title);
+    const branch = previous?.branch ?? this.repositories.publication.featureBranch(tasks[0].feature?.title ?? tasks[0].title);
     if (branch === project.repositoryBranch) throw new EntityError(409, 'The feature branch cannot be the project branch');
     if (await this.db.reviewPublication.findFirst({ where: { projectId: project.id, branch, scopeId: { not: scopeId } } })) {
       throw new EntityError(409, 'Another ticket or epic already uses this feature branch. Use a distinct epic title.');
     }
-    const origin = await this.repositories.publicationOrigin(project.id);
+    const origin = await this.repositories.publication.publicationOrigin(project.id);
     if (previous && previous.remoteUrl !== origin) throw new EntityError(409, 'Origin changed since this epic or ticket started publication');
     const warnings: string[] = [];
     const snapshots = [];
@@ -102,14 +102,14 @@ export class ReviewPublicationService {
       if (!row.baseCommit || row.reviewStatus !== 'accepted') throw new EntityError(409, `${task.title}: accept the human review first`);
       const docs = requiredTicketDocumentationPath({ docsPath: project.docsPath, taskId: task.id,
         taskTitle: task.title, featureTitle: task.feature?.title });
-      const review = await this.repositories.ticketReview(project.id, row.id, row.baseCommit, undefined, docs);
+      const review = await this.repositories.operations.ticketReview(project.id, row.id, row.baseCommit, undefined, docs);
       if (!review.documentation?.ready) throw new EntityError(409, `${task.title}: required documentation is missing or empty (${docs})`);
       if (review.token !== row.reviewToken) throw new EntityError(409, `${task.title}: files changed after acceptance; reload and accept the current diff`);
       const target = agentContextSchema.parse(row.context).project?.repositoryBranch;
       if (!target) throw new EntityError(409, 'The ticket has no original project branch');
-      const state = await this.repositories.deliveryState(project.id, row.id, target);
+      const state = await this.repositories.operations.deliveryState(project.id, row.id, target);
       // Check the fingerprint again after staging the private-index snapshot.
-      if ((await this.repositories.ticketReview(project.id, row.id, row.baseCommit, undefined, docs)).token !== review.token) {
+      if ((await this.repositories.operations.ticketReview(project.id, row.id, row.baseCommit, undefined, docs)).token !== review.token) {
         throw new EntityError(409, 'Files changed while preparing publication; reload the review');
       }
       if (saved && (saved.tree !== state.tree || saved.reviewToken !== review.token || saved.ticketHead !== state.ticketHead)) {
@@ -134,14 +134,14 @@ export class ReviewPublicationService {
 
   private async perform(kind: Scope, id: string, input: PublicationRequest) {
     const initial = await this.scope(kind, id);
-    return this.repositories.withProjectLock(initial.project.id, async () => {
+    return this.repositories.workspaces.withProjectLock(initial.project.id, async () => {
       const preview = await this.preview(kind, id);
       if (preview.branch !== input.branch || preview.origin !== input.origin || preview.featureRevision !== input.featureRevision ||
           JSON.stringify(preview.tasks) !== JSON.stringify(input.tasks)) {
         throw new EntityError(409, 'The review or epic changed. Reload validation before continuing.');
       }
       if (preview.warnings.length && !input.acknowledgeChecks) throw new EntityError(409, 'Acknowledge failing or missing checks before pushing');
-      await this.repositories.deliveryIdentity(initial.project.id);
+      await this.repositories.operations.deliveryIdentity(initial.project.id);
       // Claim all sessions together, protecting the epic and ticket context during network operations.
       await this.db.$transaction(async (tx) => {
         if (kind === 'features') {
@@ -165,9 +165,9 @@ export class ReviewPublicationService {
           let publication = await this.db.reviewPublication.findUnique({ where: { sessionId_attempt: { sessionId: row.id, attempt: row.attempt } } });
           if (!publication) {
             const publicationId = randomUUID();
-            const commitHash = await this.repositories.createTicketCommit(initial.project.id, row.id,
+            const commitHash = await this.repositories.operations.createTicketCommit(initial.project.id, row.id,
               snapshot.tree, snapshot.ticketHead, `Implement: ${row.task.title}`, publicationId);
-            await this.repositories.pinReviewCommit(initial.project.id, publicationId, commitHash);
+            await this.repositories.operations.pinReviewCommit(initial.project.id, publicationId, commitHash);
             publication = await this.db.reviewPublication.create({ data: {
               id: publicationId, sessionId: row.id, attempt: row.attempt, projectId: initial.project.id,
               scopeId: row.task.featureId ? `feature:${row.task.featureId}` : `task:${row.task.id}`,
@@ -178,7 +178,7 @@ export class ReviewPublicationService {
           }
           await this.db.reviewPublication.update({ where: { id: publication.id }, data: { status: 'pushing', error: '' } });
           // Only the saved immutable commit is pushed, never an unreviewed working tree or main.
-          await this.repositories.pushReviewCommit(initial.project.id, preview.branch, publication.commitHash, preview.origin);
+          await this.repositories.publication.pushReviewCommit(initial.project.id, preview.branch, publication.commitHash, preview.origin);
           await this.db.$transaction(async (tx) => {
             const current = await tx.agentSession.findUniqueOrThrow({ where: { id: row.id } });
             if (current.status !== 'delivering' || current.attempt !== row.attempt) throw new EntityError(409, 'The session changed during publication');

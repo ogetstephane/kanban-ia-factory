@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, LoaderCircle } from 'lucide-react';
-import { boardApi } from '../data/boardApi';
-import type { reviewSchema } from '../types/agent';
+import { agentApi } from '../data/agentApi';
+import type { reviewSchema } from '../../shared/types/agent';
 import type { z } from 'zod';
 import FileDiff from './FileDiff';
 
@@ -26,7 +26,7 @@ export default function GitTaskDiffView({ taskId, title, status, onBack }: {
     setError('');
     setReview(null);
     setFile(null);
-    void boardApi.reviewAgent(taskId, controller.signal).then((value) => {
+    void agentApi.reviewAgent(taskId, controller.signal).then((value) => {
       if (!controller.signal.aborted) {
         setReview(value);
         setSelected(value.files[0]?.path ?? '');
@@ -43,7 +43,7 @@ export default function GitTaskDiffView({ taskId, title, status, onBack }: {
     if (!selected || !review) { setFile(null); return; }
     const controller = new AbortController();
     setFile(null);
-    void boardApi.reviewAgent(taskId, controller.signal, selected).then((value) => {
+    void agentApi.reviewAgent(taskId, controller.signal, selected).then((value) => {
       if (controller.signal.aborted) return;
       if (value.token !== review.token) throw new Error('Ticket files changed. Go back and reopen the diff.');
       setFile(value.files.find((entry) => entry.path === selected) ?? null);
@@ -54,7 +54,7 @@ export default function GitTaskDiffView({ taskId, title, status, onBack }: {
   }, [taskId, selected, review]);
 
   const files = review?.files ?? [];
-  return <section aria-label={`Git diff for ${title}`} className="mx-auto max-w-7xl space-y-4">
+  return <section aria-label={`Git diff for ${title}`} className="w-full min-w-0 space-y-4">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-start gap-3">
         <button type="button" onClick={onBack} className="rounded-lg border border-slate-700 p-2 text-slate-300 hover:bg-slate-800" aria-label="Back to Git inventory">

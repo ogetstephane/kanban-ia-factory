@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { boardApi } from '../data/boardApi';
-import type { GitInventory } from '../types/git';
+import { gitApi } from '../data/gitApi';
+import type { GitInventory } from '../../shared/types/git';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 import GitTaskDiffView from './GitTaskDiffView';
 import PublishedWork from './PublishedWork';
 import type { z } from 'zod';
-import type { publishedWorkListSchema } from '../types/git';
+import type { publishedWorkListSchema } from '../../shared/types/git';
 
 export default function GitView({ projectId, onOpenTask, openingTicket, ticketError }: {
   projectId: string;
@@ -23,8 +23,8 @@ export default function GitView({ projectId, onOpenTask, openingTicket, ticketEr
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true); setError('');
-    void boardApi.gitInventory(projectId, controller.signal).then(async (value) => {
-      const work = await Promise.all(value.projects.map(async (project) => [project.id, await boardApi.publishedWork(project.id, controller.signal)] as const));
+    void gitApi.gitInventory(projectId, controller.signal).then(async (value) => {
+      const work = await Promise.all(value.projects.map(async (project) => [project.id, await gitApi.publishedWork(project.id, controller.signal)] as const));
       if (!controller.signal.aborted) { setInventory(value); setPublished(Object.fromEntries(work)); }
     }).catch((cause: unknown) => {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Unable to load Git inventory');
@@ -38,7 +38,7 @@ export default function GitView({ projectId, onOpenTask, openingTicket, ticketEr
       ...project.worktrees.flatMap((worktree) => [worktree.path, worktree.branch, worktree.task?.title, worktree.task?.id])]
       .concat((published[project.id] ?? []).flatMap((work) => [work.title, work.branch, ...work.tasks.flatMap((task) => [task.title, task.releaseVersion ?? ''])]))
       .some((value) => value?.toLowerCase().includes(query))) ?? [];
-  return <section aria-label="Git repositories" className="mx-auto max-w-7xl space-y-5">
+  return <section aria-label="Git repositories" className="w-full min-w-0 space-y-5">
     <div className="flex flex-wrap justify-between gap-3">
       <div><h1 className="text-2xl font-bold">Git repositories & worktrees</h1>
         <p className="text-sm text-slate-400">Git inventory for {projectId === ALL_PROJECTS ? 'all projects' : 'the selected project'}. Finish published work with an explicit merge, push and feature-branch closure.</p></div>
