@@ -9,7 +9,7 @@ import type { TaskDraftRequest, TaskGenerator } from '../agents/taskAssistant';
 import { createTaskAssistantRouter } from './taskAssistant';
 
 const proposal = taskDraftResultSchema.parse({
-  title: 'Export', description: 'Export the selected records.', acceptanceCriteria: ['Ordering is preserved.'],
+  kind: 'proposal', title: 'Export', description: 'Export the selected records.', acceptanceCriteria: ['Ordering is preserved.'],
   subtasks: ['Extend the exporter.'], suggestedWorkflow: 'Test exports.', estimatedStoryPoints: 3,
   suggestedTags: ['export'], impactAnalysis: 'src/export.ts needs inspection.', graphAvailable: true,
 });

@@ -82,9 +82,6 @@ async function fixture(t: TestContext) {
     const task = await ticket(id);
     await entities.moveTask(task.id, { revision: task.revision!, status: 'In Progress' });
     await sessions.tick();
-    const plan = (await sessions.get(task.id))!;
-    await sessions.approve(task.id, plan.id, plan.updatedAt);
-    await sessions.tick();
     const row = (await sessions.get(task.id))!;
     const review = await sessions.review(task.id);
     await sessions.acceptReview(task.id, row.id, row.updatedAt, review.token);
@@ -162,9 +159,6 @@ test('delivery requires a release but assigning it does not invalidate the accep
   assert.equal(created.releaseId, f.release.id, 'Unassigned creation automatically uses the next upcoming release');
   const task = await f.releases.assign('project-release', created.id, null, created.revision);
   await f.entities.moveTask(task.id, { revision: task.revision, status: 'In Progress' });
-  await f.sessions.tick();
-  const plan = (await f.sessions.get(task.id))!;
-  await f.sessions.approve(task.id, plan.id, plan.updatedAt);
   await f.sessions.tick();
   const session = (await f.sessions.get(task.id))!;
   const review = await f.sessions.review(task.id);
@@ -303,9 +297,6 @@ test('finished feature branches count as delivered and can be published as a rel
   const f = await fixture(t);
   const task = await f.ticket();
   await f.entities.moveTask(task.id, { revision: task.revision, status: 'In Progress' });
-  await f.sessions.tick();
-  const plan = (await f.sessions.get(task.id))!;
-  await f.sessions.approve(task.id, plan.id, plan.updatedAt);
   await f.sessions.tick();
   const session = (await f.sessions.get(task.id))!;
   const review = await f.sessions.review(task.id);

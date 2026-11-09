@@ -18,7 +18,9 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
   actions?: ReactNode;
   stepActions?: Partial<Record<WorkflowStepId, ReactNode>>;
 }) {
-  const activeStage = snapshot.status === 'queued' || snapshot.status === 'planning'
+  const activeStage = snapshot.status === 'queued'
+    ? 'Queued'
+    : snapshot.status === 'planning'
     ? 'Planning'
     : snapshot.status === 'awaiting_input'
       ? 'Waiting for an answer'
@@ -39,7 +41,7 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
   const workflow = getAgentWorkflow(snapshot);
   const questionStep = workflow.execution !== 'pending' ? 'execution' : 'plan';
   const planningActive = current && (
-    snapshot.status === 'queued' || snapshot.status === 'planning'
+    snapshot.status === 'queued' && snapshot.resumeStatus === 'planning' || snapshot.status === 'planning'
     || snapshot.status === 'awaiting_input' && snapshot.resumeStatus === 'planning'
   );
   const hasPlanning = planningActive || !!snapshot.plan || snapshot.runtimes.some((runtime) => runtime.phase === 'plan');
@@ -73,7 +75,8 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
     <div className="grid min-w-0 gap-3">
       <WorkflowStepPanel step="plan" state={workflow.plan}>
         {snapshot.feedback && <p className="text-xs text-amber-200">Correction request: {snapshot.feedback}</p>}
-        <p className="text-slate-500">Read-only implementation plan</p>
+        <p className="text-slate-500">{workflow.plan === 'skipped'
+          ? 'Copilot judged this ticket simple enough to implement directly.' : 'Read-only implementation plan'}</p>
         {hasPlanning && <SessionAgentActivity phase="plan" runtimes={snapshot.runtimes} output={snapshot.plan}
           active={planningActive} live={current && snapshot.status === 'planning'} />}
         {questionStep === 'plan' && questions}
@@ -81,7 +84,9 @@ function AttemptTimeline({ number, snapshot, createdAt, current, actions, stepAc
       </WorkflowStepPanel>
       <WorkflowStepPanel step="approval" state={workflow.approval}>
         <p className={workflow.approval === 'pending' ? 'text-slate-500' : undefined}>
-          {workflow.approval === 'completed' ? 'Plan approved for execution.' : 'The plan must be approved before the agent can change files.'}
+          {workflow.approval === 'completed' ? 'Plan approved for execution.'
+            : workflow.approval === 'skipped' ? 'No approval was needed: Copilot executed directly.'
+              : 'The plan must be approved before the agent can change files.'}
         </p>
         {current && stepActions?.approval}
       </WorkflowStepPanel>

@@ -32,6 +32,9 @@ let failure = false;
 let askNext = false;
 let waitExecution = false;
 let recordChecks = false;
+/** Auto-mode fixture: by default Copilot judges tickets complex and requests plan approval; set to execute directly. */
+let executeDirectly = false;
+export const FIXTURE_PLAN = 'Read relevant files, implement the ticket, run tests.';
 const provider: AgentProvider = {
   id: 'copilot',
   models: async () => [{ id: 'fixture-model', name: 'Fixture model' }],
@@ -43,7 +46,7 @@ const provider: AgentProvider = {
         id: 'fixture-usage', type: 'assistant.usage', timestamp: new Date().toISOString(),
         ephemeral: true, data: { model: 'fixture-model', inputTokens: 100, outputTokens: 20, cost: 0.5 },
       });
-      const output = await runFixture(request);
+      const output = await runFixture(request, telemetry);
       await telemetry.finish();
       return output;
     } catch (error) {
@@ -53,7 +56,7 @@ const provider: AgentProvider = {
   },
 };
 
-async function runFixture(request: AgentRequest) {
+async function runFixture(request: AgentRequest, telemetry: RuntimeTelemetry) {
     calls.push(request);
     await request.onSession('fake-session');
     if (failure) throw new Error('Provider unavailable');
@@ -63,6 +66,11 @@ async function runFixture(request: AgentRequest) {
         question: 'Which behavior should this ticket implement?', choices: ['Option A', 'Option B'], allowFreeform: false,
       });
       assert.equal(answer, 'Option B');
+    }
+    if (request.adaptive && !executeDirectly) {
+      telemetry.setPhase('plan');
+      await request.requestPlanApproval!({ plan: FIXTURE_PLAN, reason: 'The fixture ticket changes shared behavior.' });
+      return 'Plan submitted for approval.';
     }
     if (request.phase === 'execute') {
       await new WorkspaceTools(request.workspace, request.signal).write('result.txt', 'implemented');
@@ -84,7 +92,7 @@ async function runFixture(request: AgentRequest) {
         request.signal?.throwIfAborted();
       });
     }
-    return request.phase === 'plan' ? 'Read relevant files, implement the ticket, run tests.' : 'Implementation complete; inspect result.txt.';
+    return request.phase === 'plan' ? FIXTURE_PLAN : 'Implementation complete; inspect result.txt.';
 }
 
 before(async () => {
@@ -137,7 +145,7 @@ async function startTicket(id: string, edit = false) {
   return moved.find((item) => item.id === id)!;
 }
 
-test('transition queues exactly one durable session and planning cannot execute before approval', async () => {
+test('transition queues one session that runs in auto mode and cannot change files before a requested plan is approved', async () => {
   const task = await startTicket('agent-one');
   const queued = await sessions.get(task.id);
   assert.equal(queued?.status, 'queued');
@@ -147,7 +155,7 @@ test('transition queues exactly one durable session and planning cannot execute 
   const plan = (await sessions.get(task.id))!;
   assert.equal(plan.status, 'awaiting_approval');
   assert.equal(plan.resumeStatus, 'awaiting_approval');
-  assert.equal(plan.plan, 'Read relevant files, implement the ticket, run tests.');
+  assert.equal(plan.plan, `${FIXTURE_PLAN}\n\n> **Why a plan is needed:** The fixture ticket changes shared behavior.`);
   assert.equal(plan.providerSessionId, 'fake-session');
   assert.equal(plan.context?.task.id, task.id);
   assert.equal(plan.runtimes.length, 1);
@@ -155,7 +163,8 @@ test('transition queues exactly one durable session and planning cannot execute 
   assert.equal(plan.runtimes[0].status, 'completed');
   assert.equal(plan.runtimes[0].events[0].data.inputTokens, 100);
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].phase, 'plan');
+  assert.equal(calls[0].phase, 'execute');
+  assert.equal(calls[0].adaptive, true);
   assert.equal(calls[0].context.task.id, task.id);
   assert.ok(!('tasks' in calls[0].context));
   assert.equal(await readFile(path.join(plan.workspace!, 'README.md'), 'utf8'), '# main\n');
@@ -251,7 +260,11 @@ test('an epic auto-executes tickets sequentially and enters review after every t
   for (let step = 0; step < 4; step += 1) await sessions.tick();
   const epicCalls = calls.slice(callOffset);
   assert.equal(epicCalls.length, 4);
-  assert.deepEqual(epicCalls.map((call) => call.phase), ['plan', 'execute', 'plan', 'execute']);
+  assert.deepEqual(epicCalls.map((call) => [call.phase, !!call.adaptive]), [
+    ['execute', true], ['execute', false], ['execute', true], ['execute', false],
+  ]);
+  assert.ok((await db.agentSession.findMany({ where: { taskId: { in: tasks.map((task) => task.id) } } }))
+    .every((row) => row.plan.startsWith(FIXTURE_PLAN)));
   assert.equal(epicCalls[0].context.task.id, epicCalls[1].context.task.id);
   assert.equal(epicCalls[2].context.task.id, epicCalls[3].context.task.id);
   assert.notEqual(epicCalls[0].context.task.id, epicCalls[2].context.task.id);
@@ -381,6 +394,28 @@ test('session listing filters and paginates without leaking the full agent conte
   assert.equal((await sessions.list({ projectId: 'missing' })).total, 0);
   assert.equal((await sessions.list({ featureId: 'missing' })).total, 0);
   assert.equal((await sessions.list({ page: 2 })).items.length, 0);
+});
+
+test('auto mode executes a simple ticket directly and records plan and approval as skipped', async () => {
+  executeDirectly = true;
+  try {
+    const task = await startTicket('agent-direct');
+    const callOffset = calls.length;
+    await sessions.tick();
+    const done = (await sessions.get(task.id))!;
+    assert.equal(done.status, 'completed', done.error);
+    assert.equal(done.plan, '');
+    assert.equal(done.output, 'Implementation complete; inspect result.txt.');
+    assert.deepEqual(calls.slice(callOffset).map((call) => [call.phase, call.adaptive]), [['execute', true]]);
+    assert.deepEqual(done.runtimes.map((runtime) => runtime.phase), ['execute']);
+    assert.equal(await readFile(path.join(done.workspace!, 'result.txt'), 'utf8'), 'implemented');
+    assert.deepEqual((await sessions.workflows('project-agent'))[task.id], {
+      plan: 'skipped', approval: 'skipped', execution: 'completed', review: 'waiting', delivery: 'pending',
+    });
+    assert.equal((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status, 'Review');
+  } finally {
+    executeDirectly = false;
+  }
 });
 
 test('ordering changes do not invalidate a plan but project scope changes do', async () => {
@@ -787,7 +822,7 @@ test('board workflow summaries are scoped, compact, complete and match session p
   const scoped = agentWorkflowsSchema.parse(await scopedResponse.json());
   for (const task of tasks) {
     assert.deepEqual(scoped[task.id], {
-      plan: 'active', approval: 'pending', execution: 'pending', review: 'pending', delivery: 'pending',
+      plan: 'pending', approval: 'pending', execution: 'active', review: 'pending', delivery: 'pending',
     });
     assert.deepEqual(Object.keys(scoped[task.id]), ['plan', 'approval', 'execution', 'review', 'delivery']);
   }

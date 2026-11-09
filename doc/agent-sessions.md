@@ -70,7 +70,9 @@ deterministic Auto-Spec helper.
 ```mermaid
 stateDiagram-v2
     [*] --> queued
-    queued --> planning
+    queued --> executing: auto mode
+    executing --> awaiting_approval: agent requests a plan
+    queued --> planning: retry / replan
     planning --> awaiting_input: question
     awaiting_input --> planning: answer sent
     planning --> awaiting_approval: plan ready
@@ -88,6 +90,19 @@ stateDiagram-v2
     cancelled --> planning: Regenerate plan
 ```
 
+
+New ticket sessions start in **auto mode**. Copilot starts in the execution phase and
+judges the ticket's complexity:
+
+- **Simple ticket:** Copilot implements it directly. The **Plan** and **Approval** steps are
+  shown as skipped ("Copilot judged this ticket simple enough to implement directly").
+- **Complex or risky ticket:** before any file write, Copilot calls the
+  `ticket_request_plan_approval` tool with a plan and a reason. The run switches to the
+  **Plan** phase and the plan is stored with a **Why a plan is needed** note. Standalone
+  tickets then wait in **Awaiting approval**. Epic tickets are approved automatically and
+  continue to execution.
+
+Regenerating a plan (retry/replan) uses the plan-first flow described below.
 
 1. The agent prepares a **read-only implementation plan**, shown as a live Markdown preview
    in the run timeline while it is being generated and when it is ready for approval. The planning session has file
@@ -481,6 +496,10 @@ built-in shell or file tools.
 The ticket editor's **Copilot Auto-Spec** uses the same skill in a read-only SDK
 session against the project's main clone. It respects the selected ticket model,
 returns the proposed specification and impact analysis, and never saves a ticket.
+The **Copilot assistant mode** selector next to the button chooses **Auto** (specify
+directly unless Copilot judges a plan necessary) or **Plan** (always plan first). A plan is
+shown in **Copilot specification plan**. Edit it, then use **Generate specification from
+plan** or **Discard plan**.
 See [ticket drafting](features/code_graph/README.md#ticket-drafting).
 
 Only code is analyzed (`graphify extract --code-only`): extraction is a local tree-sitter

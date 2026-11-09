@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { Subtask } from '../../shared/types/kanban';
-import type { TaskDraftResult } from '../../shared/types/taskDraft';
+import type { TaskDraftSpecification } from '../../shared/types/taskDraft';
 import { applyTaskSpec } from './useTaskAutoSpec';
 
 test('a generated specification fills the task form and leaves fields it does not propose untouched', () => {
@@ -14,7 +14,8 @@ test('a generated specification fills the task form and leaves fields it does no
     setStoryPoints: (value: number) => { applied.storyPoints = value; },
     setTagsInput: (value: string) => { applied.tagsInput = value; },
   };
-  const result: TaskDraftResult = {
+  const result: TaskDraftSpecification = {
+    kind: 'proposal',
     title: 'Add token revocation',
     description: 'Revoke tokens on logout.',
     acceptanceCriteria: ['Revoked tokens are rejected'],

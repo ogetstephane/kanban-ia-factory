@@ -87,6 +87,9 @@ test('local delivery retains completed review and highlights only its own progre
 
 test('a fresh queued attempt does not inherit progress from the previous run', () => {
   assert.deepEqual(states({ status: 'queued', resumeStatus: null, reviewStatus: 'pending', plan: '', output: '' }), {
+    plan: 'pending', approval: 'pending', execution: 'active', review: 'pending', delivery: 'pending',
+  });
+  assert.deepEqual(states({ status: 'queued', resumeStatus: 'planning', reviewStatus: 'pending', plan: '', output: '' }), {
     plan: 'active', approval: 'pending', execution: 'pending', review: 'pending', delivery: 'pending',
   });
 });
@@ -101,4 +104,20 @@ test('the compact component keeps accessible names and explicit step states', ()
   assert.match(markup, /data-step="review" data-state="pending"/);
   assert.match(markup, /title="Delivery: Not started"/);
   assert.match(markup, /Not started/);
+});
+
+test('auto mode shows queued execution next and skips plan and approval when Copilot executes directly', () => {
+  assert.deepEqual(states({ status: 'queued', resumeStatus: null, plan: '' }), {
+    plan: 'pending', approval: 'pending', execution: 'active', review: 'pending', delivery: 'pending',
+  });
+  assert.equal(states({ status: 'queued', resumeStatus: 'planning', plan: '' }).plan, 'active');
+  assert.deepEqual(states({ status: 'executing', resumeStatus: 'executing', plan: '' }), {
+    plan: 'skipped', approval: 'skipped', execution: 'active', review: 'pending', delivery: 'pending',
+  });
+  assert.deepEqual(states({ status: 'completed', plan: '' }), {
+    plan: 'skipped', approval: 'skipped', execution: 'completed', review: 'waiting', delivery: 'pending',
+  });
+  assert.deepEqual(states({ status: 'failed', resumeStatus: 'executing', plan: '' }), {
+    plan: 'skipped', approval: 'skipped', execution: 'failed', review: 'pending', delivery: 'pending',
+  });
 });

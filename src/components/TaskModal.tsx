@@ -18,7 +18,8 @@ import { ContextFiles } from './ContextFiles';
 import type { ContextFile } from '../../shared/types/contextFile';
 import TaskAgentSelect from './TaskAgentSelect';
 import { useTaskAutoSpec } from '../data/useTaskAutoSpec';
-import { TaskAutoSpecButton, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
+import { TaskAutoSpecButton, TaskAutoSpecPlan, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
+import { AssistantModeToggle } from './AssistantModeToggle';
 
 const TaskAgentSession = lazy(() => import('./TaskAgentSession'));
 const ReleaseSelect = lazy(() => import('./ReleaseSelect'));
@@ -154,7 +155,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     setAcceptanceCriteria(acceptanceCriteria.filter((_, i) => i !== index));
   };
 
-  const generateSpec = () => {
+  const generateSpec = (approvedPlan?: string) => {
     if (upload.pending) return;
     void autoSpec.generate(task?.projectId ?? projectId, {
       title,
@@ -167,7 +168,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       suggestedWorkflow,
       tags: tagsInput.split(',').map((tag) => tag.trim()).filter(Boolean),
       contextFiles,
-    });
+    }, approvedPlan);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -248,7 +249,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               <label htmlFor="task-title-input" className="text-xs font-semibold text-slate-300">
                 Task Title *
               </label>
-              <TaskAutoSpecButton spec={autoSpec} disabled={upload.pending || !title.trim()} onGenerate={generateSpec} />
+              <div className="flex items-center gap-2">
+                <AssistantModeToggle mode={autoSpec.mode} onChange={autoSpec.setMode} disabled={autoSpec.generating} />
+                <TaskAutoSpecButton spec={autoSpec} disabled={upload.pending || !title.trim()} onGenerate={() => generateSpec()} />
+              </div>
             </div>
             <input
               id="task-title-input"
@@ -262,6 +266,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
 
           <TaskAutoSpecResult spec={autoSpec} />
+          <TaskAutoSpecPlan spec={autoSpec} disabled={upload.pending || !title.trim()}
+            onApprove={() => generateSpec(autoSpec.plan?.plan)} />
 
           <div>
             <label htmlFor="task-desc-input" className="text-xs font-semibold text-slate-300 block mb-1">

@@ -693,14 +693,21 @@ export class SessionService {
       const escalation = planRequest;
       await this.db.$transaction(async (tx) => {
         if (escalation) {
-          const plan = `${escalation.plan.trim()}\n\n> **Why approval is needed:** ${escalation.reason.trim()}`;
+          const plan = `${escalation.plan.trim()}\n\n> **Why a plan is needed:** ${escalation.reason.trim()}`;
+          // Epic tickets run without per-ticket approval, so their plan is approved automatically.
           const escalated = await tx.agentSession.updateMany({
             where: { id: row.id, status: activeStatus, attempt: row.attempt },
-            data: { status: 'awaiting_approval', resumeStatus: 'awaiting_approval', plan, output: '', updatedAt: new Date().toISOString() },
+            data: {
+              status: row.autoExecute ? 'execution_queued' : 'awaiting_approval',
+              resumeStatus: row.autoExecute ? 'executing' : 'awaiting_approval',
+              plan, output: '', updatedAt: new Date().toISOString(),
+            },
           });
           if (escalated.count) await this.recordTaskActivity(tx, row.taskId, {
-            action: 'plan_ready', summary: 'Copilot judged the ticket complex; plan is ready for approval', actor: 'Copilot',
-            changes: [{ field: 'Session status', before: activeStatus, after: 'Awaiting approval' }],
+            action: 'plan_ready',
+            summary: row.autoExecute ? 'Copilot planned the complex epic ticket; execution is queued' : 'Copilot judged the ticket complex; plan is ready for approval',
+            actor: 'Copilot',
+            changes: [{ field: 'Session status', before: activeStatus, after: row.autoExecute ? 'Execution queued' : 'Awaiting approval' }],
           });
           return;
         }

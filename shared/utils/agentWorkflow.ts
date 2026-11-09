@@ -23,6 +23,11 @@ export function getAgentWorkflow(session?: WorkflowSession | null): AgentWorkflo
   workflow.plan = skipped ? 'skipped' : planned ? 'completed' : 'active';
   if (planned) workflow.approval = skipped ? 'skipped' : executing ? 'completed' : 'waiting';
   if (executing) workflow.execution = reviewing ? 'completed' : 'active';
+  // Auto mode: a queued ticket runs execution next; Copilot only plans when it judges the ticket complex.
+  if (status === 'queued' && resumeStatus !== 'planning') {
+    workflow.plan = 'pending';
+    workflow.execution = 'active';
+  }
   if (reviewing) workflow.review = reviewStatus === 'accepted' ? 'completed' : 'waiting';
   if (reviewStatus === 'accepted') workflow.delivery = 'waiting';
   if (delivery || publication || status === 'delivering') {

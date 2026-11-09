@@ -7,10 +7,17 @@ const meta = {
   component: AgentAssistant,
   args: {
     content: '# Getting started\n\nExisting introduction.\n',
-    onGenerate: async ({ prompt }) => ({
-      content: '# Getting started\n\nImproved introduction.\n\n## Setup\n\nFollow the project setup guide.\n',
-      summary: `Mock proposal for: ${prompt}`,
-    }),
+    onGenerate: async ({ prompt, mode, approvedPlan }) => mode === 'plan' && !approvedPlan
+      ? {
+        kind: 'plan' as const,
+        plan: '1. **Understanding** — restructure the getting-started page.\n2. **Proposed changes** — add a Setup section; keep the introduction.',
+        reason: 'Plan mode was selected, so the outline is confirmed before the page is written.',
+      }
+      : {
+        kind: 'proposal' as const,
+        content: '# Getting started\n\nImproved introduction.\n\n## Setup\n\nFollow the project setup guide.\n',
+        summary: `Mock ${mode} proposal for: ${prompt}${approvedPlan ? ' (from the approved plan)' : ''}`,
+      },
     onApply: () => {},
   },
   render: (args) => {

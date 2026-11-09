@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CopilotClient, type MessageOptions } from '@github/copilot-sdk';
 import { WikiAssistant, wikiAssistantMessage } from './wikiAssistant';
+import { ASSISTANT_PLANNING_SKILL, AUTO_ASSISTANT_AGENT, PLAN_ASSISTANT_AGENT } from '../agents/assistantModes';
 import { wikiAssistantInputSchema, MAX_WIKI_ASSISTANT_CONTEXT_BYTES, wikiAssistantContextBytes } from '../../shared/types/wiki';
 import { wikiApi } from '../../src/data/wikiApi';
 
@@ -33,7 +34,7 @@ test('wiki assistant is tool-free, returns a proposal and always stops its runti
   const result = { content: '# Improved\n', summary: 'Improved introduction' };
   const send = t.mock.fn(async (_message: MessageOptions, _timeout?: number) => ({ data: { content: JSON.stringify(result) } }));
   const create = t.mock.method(CopilotClient.prototype, 'createSession', async () => ({ sendAndWait: send }));
-  assert.deepEqual(await new WikiAssistant().generate(input, new AbortController().signal), result);
+  assert.deepEqual(await new WikiAssistant().generate(input, new AbortController().signal), { kind: 'proposal', ...result });
   assert.equal(start.mock.callCount(), 1);
   assert.equal(stop.mock.callCount(), 1);
   const config = create.mock.calls[0].arguments[0];
@@ -43,6 +44,25 @@ test('wiki assistant is tool-free, returns a proposal and always stops its runti
   assert.doesNotMatch(config?.systemMessage?.content ?? '', /codeGraph|Graphify/);
   assert.equal(send.mock.calls[0].arguments[1], 120000);
   assert.deepEqual(send.mock.calls[0].arguments[0], wikiAssistantMessage(input));
+  assert.equal(config?.agent, AUTO_ASSISTANT_AGENT);
+  assert.equal(config?.enableSkills, true);
+  assert.deepEqual(config?.customAgents?.map((agent) => agent.skills), [[ASSISTANT_PLANNING_SKILL], [ASSISTANT_PLANNING_SKILL]]);
+});
+
+test('wiki plan mode selects the planner agent and returns the plan instead of a page', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  const plan = { kind: 'plan', plan: '1. Add a Setup section.', reason: 'Plan mode was requested.' };
+  const send = t.mock.fn(async (_message: MessageOptions) => ({ data: { content: JSON.stringify(plan) } }));
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async () => ({ sendAndWait: send }));
+  const planned = wikiAssistantInputSchema.parse({ ...input, mode: 'plan' });
+  assert.deepEqual(await new WikiAssistant().generate(planned, new AbortController().signal), plan);
+  assert.equal(create.mock.calls[0].arguments[0]?.agent, PLAN_ASSISTANT_AGENT);
+  assert.equal(JSON.parse(send.mock.calls[0].arguments[0].prompt).mode, 'plan');
+  const approved = wikiAssistantInputSchema.parse({ ...input, mode: 'plan', approvedPlan: plan.plan });
+  assert.equal(JSON.parse(wikiAssistantMessage(approved).prompt).approvedPlan, plan.plan);
+  assert.equal(wikiAssistantContextBytes(approved), wikiAssistantContextBytes(input) + Buffer.byteLength(plan.plan));
 });
 
 test('context preflight accepts the exact byte boundary and rejects one byte over including multibyte text and attachments', () => {

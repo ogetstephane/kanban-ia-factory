@@ -52,6 +52,20 @@ processing may expand beyond this estimate; a model-budget rejection also shows
 guidance to reduce context. Custom repository/user instructions are not loaded
 into wiki writing sessions.
 
+Choose the **Copilot assistant mode** before generating:
+
+- **Auto** (default) writes the page directly when the request is clear and bounded.
+  For a broad or ambiguous request (restructuring, several sections, unclear scope),
+  Copilot may return a plan instead and explain why.
+- **Plan** always returns a plan first (button: **Generate plan**).
+
+A plan appears in **Copilot page plan**. It can be edited, then used with
+**Generate page from plan**, or removed with **Discard plan**. The approved plan is sent back
+with the same prompt, draft and attachments, and Copilot returns the proposal without planning
+again. Both modes are Copilot SDK custom agents (`kanban-auto-assistant`,
+`kanban-plan-assistant`) that preload the bundled
+[`assistant-planning`](../.github/skills/assistant-planning/SKILL.md) skill.
+
 Copilot receives the current unsaved Markdown draft, page path, prompt and attachments.
 Review the proposed content and change summary, then **Apply to editor** or
 **Discard proposal**. Applying replaces only the editor draft: it does not write a
@@ -137,6 +151,6 @@ branch, short commit and whether it was pushed. Document contents are not stored
 | `GET` | `/projects/:id/wiki/status` | | `{ pending: [{ path, status }], ahead }` (`ahead` is `null` when unknown or origin is local) |
 | `PUT` | `/projects/:id/wiki/file` | `{ path, content, expectedSha }` (`null` for a new file) | `{ path, sha, unchanged }`; writes only, no commit |
 | `POST` | `/projects/:id/wiki/sync` | `{}` | `{ branch, commit, files, pushed, pushError? }` |
-| `POST` | `/projects/:id/wiki/assistant` | `{ path, content, prompt, files: [{ id, name, mimeType, size, data }] }` (base64 data) | `{ content, summary }`; proposal only, no write |
+| `POST` | `/projects/:id/wiki/assistant` | `{ path, content, prompt, files: [{ id, name, mimeType, size, data }], mode?: 'auto' \| 'plan', approvedPlan? }` (base64 data) | `{ kind: 'proposal', content, summary }` or `{ kind: 'plan', plan, reason }`; no write |
 
 Paths are relative to the documentation folder. Apply the migration with `make db-migrate`.

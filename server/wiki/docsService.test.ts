@@ -60,7 +60,7 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
         assert.equal(signal.aborted, false);
         calls.push(input.content);
         argumentCounts.push(arguments.length);
-        return { content: '# Proposal\n', summary: 'Created an introduction' };
+        return { kind: 'proposal', content: '# Proposal\n', summary: 'Created an introduction' };
       },
     };
     const app = express();
@@ -78,7 +78,7 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
       const input = { path: 'new.md', content: '# Unsaved draft\n', prompt: 'Improve this', files: [] };
       const response = await post('project-wiki', input);
       assert.equal(response.status, 200);
-      assert.deepEqual(await response.json(), { content: '# Proposal\n', summary: 'Created an introduction' });
+      assert.deepEqual(await response.json(), { kind: 'proposal', content: '# Proposal\n', summary: 'Created an introduction' });
       assert.deepEqual(calls, [input.content]);
       assert.deepEqual(argumentCounts, [2], 'Wiki requests do not receive injected graph context');
       assert.deepEqual((await docs.list('project-wiki')).files, []);

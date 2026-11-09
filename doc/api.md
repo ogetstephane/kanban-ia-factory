@@ -76,8 +76,16 @@ Input is validated by [taskDraft.ts](../shared/types/taskDraft.ts): `title` is r
 `subtasks` (text array), `suggestedWorkflow`, `tags`, and `contextFiles` supply the draft.
 Attachments follow the existing task upload limits and are forwarded to Copilot.
 
+`mode` is `auto` (default) or `plan`. In `auto`, Copilot specifies the ticket directly
+unless it judges that a plan is needed first. In `plan`, it always returns a plan.
+Send the reviewed plan as `approvedPlan` (Markdown, up to 20,000 characters) to get the
+specification without planning again. The modes are the Copilot SDK custom agents
+`kanban-auto-assistant` and `kanban-plan-assistant`. Both preload the bundled
+[`assistant-planning`](../.github/skills/assistant-planning/SKILL.md) skill.
+
 The read-only Copilot SDK session loads the shared `ticket-graphify` skill on demand.
-The response contains `title`, `description`, `acceptanceCriteria`, `subtasks`,
+A plan response is `{ kind: 'plan', plan, reason, graphAvailable }`. A specification
+response has `kind: 'proposal'` and contains `title`, `description`, `acceptanceCriteria`, `subtasks`,
 `suggestedWorkflow`, `estimatedStoryPoints` (1, 2, 3, 5 or 8), `suggestedTags`,
 `impactAnalysis` (Markdown), and `graphAvailable` (whether this run had a graph,
 not proof that a particular dependency was verified).

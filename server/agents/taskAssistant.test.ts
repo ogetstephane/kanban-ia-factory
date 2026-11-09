@@ -6,6 +6,7 @@ import { boardApi } from '../../src/data/boardApi';
 import { CodeGraph } from './codeGraph';
 import { GRAPHIFY_SKILL_DIRECTORY, GRAPHIFY_SKILL_INSTRUCTION } from './graphifySkill';
 import { TaskAssistant, taskDraftMessage } from './taskAssistant';
+import { ASSISTANT_PLANNING_SKILL, AUTO_ASSISTANT_AGENT, PLAN_ASSISTANT_AGENT } from './assistantModes';
 
 const input = taskDraftInputSchema.parse({
   title: 'Add export', currentDescription: 'Keep the existing format', priority: 'High',
@@ -55,7 +56,12 @@ test('task drafting uses the native skill, the selected model and read-only proj
   });
   const signal = new AbortController().signal;
   const result = await new TaskAssistant(graph).generate({ input, project, workspace: '/project-clone', signal });
-  assert.deepEqual(result, { ...proposal, graphAvailable: true });
+  assert.deepEqual(result, { kind: 'proposal', ...proposal, graphAvailable: true });
+  assert.equal(configuration?.agent, AUTO_ASSISTANT_AGENT);
+  assert.deepEqual(configuration?.customAgents?.map((agent) => [agent.name, agent.skills, agent.infer]), [
+    [AUTO_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL], false], [PLAN_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL], false],
+  ]);
+  assert.equal(JSON.parse(send.mock.calls[0].arguments[0].prompt).mode, 'auto');
   assert.deepEqual(prepare.mock.calls[0].arguments, ['/project-clone', signal]);
   assert.equal(configuration?.model, 'ticket-model');
   assert.equal(configuration?.workingDirectory, '/project-clone');
@@ -69,6 +75,33 @@ test('task drafting uses the native skill, the selected model and read-only proj
   ]);
   assert.equal(dispose.mock.callCount(), 1);
   assert.equal(stop.mock.callCount(), 1);
+});
+
+test('plan mode returns an editable plan, and an approved plan is applied by the auto agent', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  const plan = { kind: 'plan', plan: '1. Split the export ticket.', reason: 'The scope spans two features.' };
+  let content = JSON.stringify(plan);
+  const send = t.mock.fn(async (_message: MessageOptions) => ({ data: { content } }));
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async () => ({ sendAndWait: send }));
+  const assistant = new TaskAssistant();
+  const signal = new AbortController().signal;
+  assert.deepEqual(await assistant.generate({ input: { ...input, mode: 'plan' }, project, signal }), { ...plan, graphAvailable: false });
+  assert.equal(create.mock.calls[0].arguments[0]?.agent, PLAN_ASSISTANT_AGENT);
+  assert.equal(JSON.parse(send.mock.calls[0].arguments[0].prompt).mode, 'plan');
+
+  content = JSON.stringify(proposal);
+  await assert.rejects(assistant.generate({ input: { ...input, mode: 'plan' }, project, signal }), { status: 502, message: /instead of the requested plan/ });
+  const approved = { ...input, mode: 'plan' as const, approvedPlan: '1. Split the export ticket.' };
+  assert.equal((await assistant.generate({ input: approved, project, signal })).kind, 'proposal');
+  assert.equal(create.mock.calls[2].arguments[0]?.agent, AUTO_ASSISTANT_AGENT);
+  const prompt = JSON.parse(send.mock.calls[2].arguments[0].prompt);
+  assert.equal(prompt.approvedPlan, '1. Split the export ticket.');
+  assert.equal(prompt.task.approvedPlan, undefined);
+  content = JSON.stringify(plan);
+  await assert.rejects(assistant.generate({ input: approved, project, signal }), { status: 502, message: /another plan/ });
+  assert.deepEqual(await assistant.generate({ input, project, signal }), { ...plan, graphAvailable: false });
 });
 
 test('without a repository drafting still loads the skill but cannot inspect an unrelated workspace', async (t) => {
@@ -157,7 +190,7 @@ test('timeouts and cancellation release the draft graph and do not return a fake
 });
 
 test('the browser uses the project-scoped SDK endpoint with validated drafts, results and cancellation', async (t) => {
-  const result = taskDraftResultSchema.parse({ ...proposal, graphAvailable: true });
+  const result = taskDraftResultSchema.parse({ kind: 'proposal', ...proposal, graphAvailable: true });
   const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(JSON.stringify(result), {
     headers: { 'Content-Type': 'application/json' },
   }));

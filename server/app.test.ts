@@ -20,7 +20,7 @@ let base: string;
 let repositoryUrl: string;
 const calls: AgentRequest[] = [];
 
-// Stands in for Copilot: same provider id, deterministic plan, and a real change in the ticket worktree.
+// Stands in for Copilot in auto mode: same provider id, direct execution, and a real change in the ticket worktree.
 const simulatedAgent: AgentProvider = {
   id: 'copilot',
   models: async () => [{ id: 'simulated-model', name: 'Simulated model' }],
@@ -134,31 +134,22 @@ test('runs a ticket from the HTTP API through the simulated agent into SQLite an
   assert.equal(moved.status, 200, JSON.stringify(moved.body));
   assert.equal((await api('GET', '/board/tasks/task-app/session')).body.status, 'queued');
 
-  await kanban.sessions.tick();
-  const planned = (await api('GET', '/board/tasks/task-app/session')).body;
-  assert.equal(planned.status, 'awaiting_approval');
-  assert.equal(planned.plan, 'Simulated plan: create agent-result.txt.');
-  assert.equal(planned.providerSessionId, 'simulated-plan');
-  assert.deepEqual(calls.map((call) => call.phase), ['plan']);
-  assert.equal(calls[0].context.task.id, 'task-app');
-  assert.equal(calls[0].context.project?.id, 'project-app');
-  await assert.rejects(readFile(path.join(planned.workspace, 'agent-result.txt')));
-
-  const approved = await api('POST', '/board/tasks/task-app/session/approve', {
-    sessionId: planned.id, updatedAt: planned.updatedAt,
-  });
-  assert.equal(approved.status, 200, JSON.stringify(approved.body));
-  assert.equal(approved.body.status, 'execution_queued');
-
+  // Auto mode: the simulated Copilot judges this one-file ticket simple and executes it directly.
   await kanban.sessions.tick();
   const completed = (await api('GET', '/board/tasks/task-app/session')).body;
   assert.equal(completed.status, 'completed', completed.error);
+  assert.equal(completed.plan, '');
   assert.equal(completed.output, 'Simulated execution: agent-result.txt created.');
-  assert.deepEqual(calls.map((call) => call.phase), ['plan', 'execute']);
-  assert.equal(calls[1].plan, planned.plan);
-  assert.equal(calls[1].workspace, planned.workspace);
+  assert.equal(completed.providerSessionId, 'simulated-execute');
+  assert.deepEqual(calls.map((call) => [call.phase, call.adaptive]), [['execute', true]]);
+  assert.equal(calls[0].context.task.id, 'task-app');
+  assert.equal(calls[0].context.project?.id, 'project-app');
   assert.ok(!path.relative(directory, completed.workspace).startsWith('..'));
   assert.equal(await readFile(path.join(completed.workspace, 'agent-result.txt'), 'utf8'), 'Implemented Write agent result\n');
+  const workflows = (await api('GET', '/board/agent-workflows?projectId=project-app')).body;
+  assert.deepEqual(workflows['task-app'], {
+    plan: 'skipped', approval: 'skipped', execution: 'completed', review: 'waiting', delivery: 'pending',
+  });
 
   const board = (await api('GET', '/board/projects/project-app/board')).body;
   assert.equal(board.tasks.find((task: { id: string }) => task.id === 'task-app').status, 'Review');

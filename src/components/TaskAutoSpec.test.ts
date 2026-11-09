@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { TaskAutoSpecButton, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
+import { TaskAutoSpecButton, TaskAutoSpecPlan, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
+import { AssistantModeToggle } from './AssistantModeToggle';
 
 const noop = () => undefined;
 
@@ -37,4 +38,27 @@ test('Auto-Spec result shows the notice and the rendered code impact analysis on
   assert.match(html, /Copilot generated the specification\./);
   assert.match(html, /Code impact analysis/);
   assert.match(html, /<strong[^>]*>server\/routes\/board\.ts<\/strong>/);
+});
+
+test('Auto-Spec plan is editable, explains why it is needed and can be applied or discarded', () => {
+  assert.equal(renderToStaticMarkup(createElement(TaskAutoSpecPlan, {
+    spec: { plan: null, generating: false, editPlan: noop, discardPlan: noop }, disabled: false, onApprove: noop,
+  })), '');
+  const html = renderToStaticMarkup(createElement(TaskAutoSpecPlan, {
+    spec: { plan: { plan: '1. Split the ticket', reason: 'The scope spans two features.' }, generating: false, editPlan: noop, discardPlan: noop },
+    disabled: false, onApprove: noop,
+  }));
+  assert.match(html, /aria-label="Copilot specification plan"/);
+  assert.match(html, /The scope spans two features\./);
+  assert.match(html, /<textarea[^>]*>1\. Split the ticket<\/textarea>/);
+  assert.match(html, /Generate specification from plan/);
+  assert.match(html, /Discard plan/);
+});
+
+test('the assistant mode toggle exposes Auto and Plan as an accessible radio group', () => {
+  const html = renderToStaticMarkup(createElement(AssistantModeToggle, { mode: 'plan', onChange: noop }));
+  assert.match(html, /role="radiogroup" aria-label="Copilot assistant mode"/);
+  assert.match(html, /value="auto"/);
+  assert.match(html, /checked="" value="plan"/);
+  assert.match(html, /proposes an editable plan first/);
 });

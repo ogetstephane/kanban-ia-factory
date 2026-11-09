@@ -1,4 +1,5 @@
-import { Loader2, Sparkles } from 'lucide-react';
+import { useId } from 'react';
+import { ListChecks, Loader2, Sparkles } from 'lucide-react';
 import type { TaskAutoSpec } from '../data/useTaskAutoSpec';
 import { MarkdownPreview } from './MarkdownPreview';
 
@@ -62,5 +63,31 @@ export function TaskAutoSpecResult({ spec }: { spec: Pick<TaskAutoSpec, 'feedbac
         <div className="mt-3 max-h-80 overflow-auto"><MarkdownPreview source={spec.impactAnalysis} /></div>
       </details>}
     </>
+  );
+}
+
+/** Plan returned in Plan mode, or in Auto mode when Copilot judged one necessary; the user can edit it before generating. */
+export function TaskAutoSpecPlan({ spec, disabled, onApprove }: {
+  spec: Pick<TaskAutoSpec, 'plan' | 'generating' | 'editPlan' | 'discardPlan'>;
+  disabled: boolean;
+  onApprove: () => void;
+}) {
+  const id = useId();
+  if (!spec.plan) return null;
+  return (
+    <section aria-label="Copilot specification plan" className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold text-amber-200"><ListChecks className="h-3.5 w-3.5" />Copilot plan</h3>
+      <p className="text-xs text-slate-300"><span className="font-semibold">Why a plan: </span>{spec.plan.reason}</p>
+      <label htmlFor={id} className="block text-xs font-semibold text-slate-300">Plan (editable Markdown)</label>
+      <textarea id={id} value={spec.plan.plan} onChange={(event) => spec.editPlan(event.target.value)} rows={8} maxLength={20_000}
+        className="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 font-mono text-xs text-slate-100" />
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onApprove} disabled={disabled || spec.generating || !spec.plan.plan.trim()}
+          className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
+          Generate specification from plan
+        </button>
+        <button type="button" onClick={spec.discardPlan} className="text-xs text-slate-300 underline">Discard plan</button>
+      </div>
+    </section>
   );
 }
