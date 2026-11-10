@@ -77,4 +77,83 @@ test('workflow API persists scoped drafts and immutable versions with optimistic
   assert.equal(restored.selectedVersionId, originalVersion.id);
   assert.deepEqual(restored.versions[1], originalVersion);
   assert.equal((await new WorkflowEditorStore(db).get('wiki')).revision, 0);
+  for (const scope of ['ticket-authoring', 'ticket-processing', 'wiki'] as const) {
+    const before = await new WorkflowEditorStore(db).get(scope);
+    response = await request('/current-orchestration', 'GET', undefined, scope);
+    assert.equal(response.status, 200);
+    const reference = await response.json();
+    assert.equal(reference.runtimeReference.scope, scope);
+    assert.deepEqual(await new WorkflowEditorStore(db).get(scope), before, 'Import preview must not overwrite saved drafts, selections or versions');
+    assert.equal((await request('', 'PUT', { revision: before.revision, document: {
+      ...reference, edges: reference.edges.slice(1),
+    } }, scope)).status, 400);
+    assert.equal((await request('', 'PUT', { revision: before.revision, document: {
+      ...reference, operations: reference.operations.map((operation: { policy: string }) => ({ ...operation, policy: 'Bypass approvals' })),
+    } }, scope)).status, 400);
+    assert.equal((await request('', 'PUT', { revision: before.revision, document: {
+      ...reference, agents: reference.agents.map((agent: { tools: string[] }) => ({ ...agent, tools: ['arbitrary_shell'] })),
+    } }, scope)).status, 400);
+    response = await request('', 'PUT', { revision: before.revision, document: reference }, scope);
+    assert.equal(response.status, 200);
+    const imported = workflowEditorStateSchema.parse(await response.json());
+    assert.deepEqual(imported.versions, before.versions);
+    assert.equal(imported.selectedVersionId, before.selectedVersionId);
+    assert.equal((await request('', 'PUT', { revision: before.revision, document: reference }, scope)).status, 409);
+    response = await request('/publish', 'POST', { revision: imported.revision }, scope);
+    assert.equal(response.status, 200);
+    const published = workflowEditorStateSchema.parse(await response.json());
+    assert.deepEqual(published.versions.slice(1), before.versions);
+    const resolved = await (await request('/resolve', 'POST', {}, scope)).json();
+    assert.equal(resolved.runtimeConnected, false);
+    assert.deepEqual(resolved.version.document.runtimeReference, reference.runtimeReference);
+  }
+  assert.equal((await request('/current-orchestration', 'GET', undefined, 'releases')).status, 200);
+  const wikiReference = await new WorkflowEditorStore(db).currentOrchestration('wiki');
+  await assert.rejects(new WorkflowEditorStore(db).save('ticket-authoring', 0, wikiReference), /scope does not match/);
+  const store = new WorkflowEditorStore(db);
+  await assert.rejects(store.activate('ticket-authoring', state.revision, originalVersion.id), { status: 422 });
+  for (const scope of WORKFLOW_SCOPES) {
+    const before = await store.get(scope);
+    const base = await (await request('/base', 'GET', undefined, scope)).json();
+    assert.equal(base.execution.scope, scope);
+    assert.deepEqual(await store.get(scope), before, 'Reading the base never overwrites existing work');
+    const initial = await store.active(scope);
+    assert.equal(initial.versionId, null);
+    const draft = { ...base, name: 'New active workflow' };
+    if (draft.prompts.length) draft.prompts[0].template = 'Use the company terminology.';
+    let updated = await store.save(scope, before.revision, draft);
+    updated = await store.publish(scope, updated.revision);
+    assert.equal(updated.activeVersionId, null, 'Publishing must not activate');
+    const version = updated.versions[0];
+    assert.equal((await store.active(scope)).versionId, null);
+    assert.equal((await request('/activate', 'POST', { revision: 0, versionId: version.id }, scope)).status, 409);
+    if (scope !== 'wiki') await assert.rejects(store.activate('wiki', updated.revision, version.id), { status: 404 });
+    response = await request('/activate', 'POST', { revision: updated.revision, versionId: version.id }, scope);
+    assert.equal(response.status, 200);
+    updated = workflowEditorStateSchema.parse(await response.json());
+    assert.equal(updated.activeVersionId, version.id);
+    const pinned = await store.active(scope);
+    assert.deepEqual(pinned.document, draft);
+    assert.equal((await store.resolve(scope, version.id)).runtimeConnected, true);
+    updated = await store.save(scope, updated.revision, { ...draft, name: 'Unpublished changes' });
+    updated = await store.publish(scope, updated.revision);
+    assert.equal(updated.activeVersionId, version.id, 'Publishing a later version leaves the active version unchanged');
+    assert.deepEqual(await store.active(scope), pinned);
+    updated = await store.activate(scope, updated.revision, updated.versions[0].id);
+    assert.equal((await store.active(scope)).document.name, 'Unpublished changes');
+    updated = await store.activate(scope, updated.revision, null);
+    assert.equal((await store.active(scope)).versionId, null);
+    assert.equal(updated.draft.name, 'Unpublished changes', 'Restoring the active base preserves the draft');
+    assert.equal(pinned.versionId, version.id);
+    assert.equal(pinned.document.name, 'New active workflow', 'Pinned snapshots survive activation changes');
+    assert.ok(updated.versions.some((item) => item.id === version.id));
+    if (scope !== 'releases') {
+      const incompatible = structuredClone(draft);
+      incompatible.agents[0].provider = 'codex';
+      updated = await store.save(scope, updated.revision, incompatible);
+      updated = await store.publish(scope, updated.revision);
+      await assert.rejects(store.activate(scope, updated.revision, updated.versions[0].id), { status: 422 });
+      assert.equal((await store.active(scope)).versionId, null);
+    }
+  }
 });

@@ -5,6 +5,8 @@ import { WikiAssistant, wikiAssistantMessage } from './wikiAssistant';
 import { ASSISTANT_PLANNING_SKILL, AUTO_ASSISTANT_AGENT, PLAN_ASSISTANT_AGENT } from '../agents/assistantModes';
 import { wikiAssistantInputSchema, MAX_WIKI_ASSISTANT_CONTEXT_BYTES, wikiAssistantContextBytes } from '../../shared/types/wiki';
 import { wikiApi } from '../../src/data/wikiApi';
+import { randomUUID } from 'node:crypto';
+import { builtInWorkflow } from '../agents/currentWorkflowModels';
 
 const input = wikiAssistantInputSchema.parse({
   path: 'guide.md', content: '# Existing\n', prompt: 'Improve the introduction',
@@ -12,6 +14,30 @@ const input = wikiAssistantInputSchema.parse({
     { id: '83b55352-1a04-4fb7-9ec0-72cd6ca7269b', name: 'requirements.md', mimeType: 'text/markdown', size: 4, data: 'dGVzdA==' },
     { id: 'aeebafcd-f014-481b-9659-e3951be21488', name: 'design.pdf', mimeType: 'application/pdf', size: 3, data: 'AP8K' },
   ],
+});
+
+test('active wiki configuration applies its prompt, skills and model while retaining tool-free permissions', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async () => ({
+    sendAndWait: async () => ({ data: { content: JSON.stringify({ content: '# Workflow\n', summary: 'Updated' }) } }),
+    disconnect: async () => {},
+  }));
+  const document = await builtInWorkflow('wiki');
+  document.prompts[0].template = 'Custom wiki voice.';
+  document.skills[0].instructions = 'Custom wiki procedure.';
+  document.agents[0].model = 'workflow-wiki-model';
+  await new WikiAssistant().generate(input, new AbortController().signal, { scope: 'wiki', versionId: randomUUID(), document });
+  const configuration = create.mock.calls[0].arguments[0]!;
+  assert.equal(create.mock.callCount(), 3, 'Outline, writer and quality each execute');
+  assert.equal(configuration.model, 'workflow-wiki-model');
+  assert.match(configuration.customAgents![0].prompt, /Custom wiki voice/);
+  assert.match(configuration.customAgents![0].prompt, /Custom wiki procedure/);
+  assert.equal(configuration.enableSkills, false);
+  assert.deepEqual(configuration.availableTools, []);
+  assert.deepEqual(configuration.tools, []);
+  assert.match(configuration.systemMessage?.content ?? '', /No tools/);
 });
 
 test('wiki proposal request includes the unsaved draft, instruction, readable text and binary attachments', () => {

@@ -15,10 +15,11 @@ export function WorkflowCanvas({ document, selected, disabled, connecting, onSel
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const gesture = useRef({ x: 0, y: 0, moved: false });
   const suppressClick = useRef(false);
+  const topologyLocked = !!document.runtimeReference;
   const [zoom, setZoom] = useState(1);
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null);
   const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
-  const colors = { agent: '#818cf8', hook: '#fbbf24', approval: '#34d399' };
+  const colors = { agent: '#818cf8', hook: '#fbbf24', approval: '#34d399', host: '#38bdf8' };
   useEffect(() => {
     if (menu && selected === menu.id) menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
   }, [menu, selected]);
@@ -115,10 +116,18 @@ export function WorkflowCanvas({ document, selected, disabled, connecting, onSel
         const from = document.nodes.find((node) => node.id === edge.from);
         const to = document.nodes.find((node) => node.id === edge.to);
         if (!from || !to) return null;
-        const path = `M ${from.x + 220} ${from.y + 42} C ${from.x + 275} ${from.y + 42}, ${to.x - 55} ${to.y + 42}, ${to.x} ${to.y + 42}`;
+        const returning = to.x <= from.x;
+        const path = returning
+          ? `M ${from.x + 110} ${from.y + 84} C ${from.x + 110} ${Math.max(from.y, to.y) + 145}, ${to.x + 110} ${Math.max(from.y, to.y) + 145}, ${to.x + 110} ${to.y + 84}`
+          : `M ${from.x + 220} ${from.y + 42} C ${from.x + 275} ${from.y + 42}, ${to.x - 55} ${to.y + 42}, ${to.x} ${to.y + 42}`;
         return <g key={`${edge.from}:${edge.to}`} pointerEvents="none">
           <path d={path} fill="none" stroke="#22d3ee" strokeWidth="5" opacity=".2" filter={`url(#${marker}-glow)`} />
-          <path d={path} fill="none" stroke="#67d9ec" strokeOpacity=".7" strokeWidth="1.5" markerEnd={`url(#${marker})`} />
+          <path d={path} fill="none" stroke="#67d9ec" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray={returning ? '5 4' : undefined} markerEnd={`url(#${marker})`} />
+          {edge.label && <text x={(from.x + to.x + 220) / 2}
+            y={returning ? Math.max(from.y, to.y) + 125 : (from.y + to.y) / 2 + 30}
+            textAnchor="middle" fill="#b5d5e8" fontSize="10" stroke="#070e1b" strokeWidth="4" paintOrder="stroke">
+            <title>{edge.label}</title>{edge.label.length > 35 ? `${edge.label.slice(0, 34)}…` : edge.label}
+          </text>}
         </g>;
       })}
       {document.nodes.map((node) => <g key={node.id} role="button" tabIndex={disabled ? -1 : 0}
@@ -150,11 +159,16 @@ export function WorkflowCanvas({ document, selected, disabled, connecting, onSel
         }}>
         {selected === node.id && <rect x="-3" y="-3" width="226" height="90" rx="15" fill="none" stroke={colors[node.kind]} strokeWidth="4" opacity=".5" filter={`url(#${marker}-glow)`} />}
         <rect width="220" height="84" rx="12" fill={`url(#${marker}-node)`} stroke={selected === node.id ? '#a5f3fc' : colors[node.kind]} strokeOpacity={selected === node.id ? 1 : .6} strokeWidth={selected === node.id ? 2 : 1} />
-        <text x="16" y="25" fill={colors[node.kind]} fontSize="12">{node.kind.toUpperCase()}</text>
+        <text x="16" y="25" fill={colors[node.kind]} fontSize="12">{node.kind === 'host'
+          ? document.operations?.find((item) => item.id === node.referenceId)?.category.toUpperCase() ?? 'HOST' : node.kind.toUpperCase()}</text>
         <text x="16" y="52" fill="#f1f5f9" fontSize="14">{node.label.length > 25 ? `${node.label.slice(0, 24)}…` : node.label}</text>
-        <text x="16" y="71" fill="#7e98b5" fontSize="9">{node.kind === 'agent'
+        <text x="16" y="71" fill="#7e98b5" fontSize="9">{document.execution && node.run
+          ? `${node.run.phases.join('/')} · ${node.run.output} · ${node.kind === 'host' ? 'host operation' : node.run.access}`
+          : node.kind === 'agent'
           ? document.agents.find((agent) => agent.id === node.referenceId)?.provider || 'Choose agent'
-          : node.kind === 'hook' ? document.hooks.find((hook) => hook.id === node.referenceId)?.action || 'Choose hook' : 'Human decision'}</text>
+          : node.kind === 'hook' ? document.hooks.find((hook) => hook.id === node.referenceId)?.action || 'Choose hook'
+            : node.kind === 'host' ? document.execution || document.runtimeReference?.execution === 'host-runtime'
+              ? 'Host enforced · runtime binding' : 'Host enforced · reference only' : 'Human decision'}</text>
         <circle cx="0" cy="42" r="4" fill={colors[node.kind]} /><circle cx="220" cy="42" r="4" fill={colors[node.kind]} />
       </g>)}
     </svg>
@@ -175,10 +189,11 @@ export function WorkflowCanvas({ document, selected, disabled, connecting, onSel
         }
       }}>
       <p>{document.nodes.find((node) => node.id === menu.id)?.label}</p>
-      <button role="menuitem" onClick={() => menuAction(onConfigure)}>Configure node</button>
-      <button role="menuitem" onClick={() => menuAction(onDuplicate)}>Duplicate node</button>
-      <button role="menuitem" onClick={() => menuAction(onConnect)}>Connect to another node</button>
-      <button role="menuitem" disabled={document.nodes.length <= 1} onClick={() => menuAction(onDelete)}>Delete node</button>
+      <button role="menuitem" onClick={() => menuAction(onConfigure)}>{document.nodes.find((node) => node.id === menu.id)?.kind === 'host' ? 'Inspect host operation' : 'Configure node'}</button>
+      <button role="menuitem" disabled={topologyLocked} onClick={() => menuAction(onDuplicate)}>Duplicate node</button>
+      <button role="menuitem" disabled={topologyLocked} onClick={() => menuAction(onConnect)}>Connect to another node</button>
+      <button role="menuitem" disabled={topologyLocked || document.nodes.length <= 1} onClick={() => menuAction(onDelete)}>Delete node</button>
+      {topologyLocked && <p>Current orchestration topology is host-enforced.</p>}
     </div>}
     <p className="workflow-canvas-hint">Drag to pan · click a node for actions · Escape to clear</p>
     <div className="workflow-canvas-controls" role="group" aria-label="Canvas controls">

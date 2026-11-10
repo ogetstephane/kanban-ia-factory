@@ -17,6 +17,7 @@ model WorkflowConfiguration {
   revision          Int @default(0)
   draft             Json
   selectedVersionId String?
+  activeVersionId   String?
   versions          WorkflowConfigurationVersion[]
 }
 
@@ -114,6 +115,7 @@ model Release {
   targetCommit  String?
   remoteUrl     String?
   tagHash       String?
+  workflowSnapshot Json?
   error         String @default("")
   createdAt     String
   updatedAt     String

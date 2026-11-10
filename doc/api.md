@@ -14,27 +14,64 @@ independent of project selection. Definitions and graph constraints are validate
 
 | Method | Path suffix | Body | Response |
 |--------|-------------|------|----------|
-| `GET` | none | — | `{ scope, revision, draft, selectedVersionId, versions }` |
+| `GET` | none | — | `{ scope, revision, draft, selectedVersionId, activeVersionId, versions }` |
+| `GET` | `/current-orchestration` | — | Source-backed reference document for any scope |
+| `GET` | `/base` | — | Editable prebuilt executable workflow for any scope, without writing |
 | `PUT` | none | `{ revision, document }` | Saved draft and incremented revision |
-| `POST` | `/publish` | `{ revision }` | Immutable numbered version, selected as default |
-| `POST` | `/select` | `{ revision, versionId }` | Restored default without changing the draft |
-| `POST` | `/resolve` | `{ versionId? }` | `{ scope, version, runtimeConnected: false }` |
+| `POST` | `/publish` | `{ revision }` | Immutable numbered version, selected for preview, not activated |
+| `POST` | `/select` | `{ revision, versionId }` | Preview selection without changing the draft or activation |
+| `POST` | `/activate` | `{ revision, versionId: UUID or null }` | Active version for new real tasks; `null` restores the built-in base |
+| `POST` | `/resolve` | `{ versionId? }` | `{ scope, version, runtimeConnected: boolean }`; true only for the active version |
 
-Reads of an unconfigured scope return an editable template without writing to the
-database. The template is not a reconstruction of current runtime behavior. Writes
+Reads of an unconfigured scope return its prebuilt executable workflow without writing to the
+database. Existing saved drafts and versions are never replaced automatically. Writes
 reject stale revisions with `409`; invalid documents/scopes return `400`; missing
 or cross-scope versions return `404`. Responses use `Cache-Control: no-store`.
-Graphs must be connected and acyclic, with valid agent, prompt, skill and hook
+Generic graphs must be connected and acyclic, with valid agent, prompt, skill and hook
 references. Template placeholders must be declared in their prompt's variables.
 Scripts require nonempty content and `approvalRequired: true`, but are stored as
 **inert text**: saving, publishing and resolving never run scripts or AI.
 
-The editor document is a design format, not an executable Core workflow catalog.
+`/current-orchestration` is a read-only import preview; it never replaces a saved
+draft or version. Imported documents add `runtimeReference` (`scope`, `revision: 1`,
+`execution: "reference-only"`), `operations` (host category, responsibility, policy
+and source symbols), `host` nodes and labelled edges. These reference graphs can
+contain cycles representing explicit re-entry/resumption, not executable loops.
+Agents can carry named `promptVariants` and `maxIterations: "runtime-managed"`.
+Save/publish validate scope, host definitions/topology and permission invariants
+against the source model, rejecting changes with `400`. Prompts, skills, proposed
+model/settings and node positions/labels remain editable. Generic preview launch
+rejects reference models with `422` before creating a run or calling any provider.
+
+Prebuilt documents use `execution: { scope, revision: 1 }` and execute their editable
+DAG. Each node has `run: { phases, output: "context" | "result", access: "read-only" |
+"phase" }`. Phases are `author`/`plan` for authoring/wiki, `plan`/`execute`/`review`
+for processing, and `release` for releases. Connections determine order and carry
+predecessor outputs across skipped lifecycle nodes. Each phase must have exactly one
+result reachable from all its active steps. Context steps must be read-only; the
+processing execution result must use phase tools. Release graphs accept only registered
+host operations and must retain create-tag → push-tag → record-publication ordering.
+Each agent node creates a separate inference call with its own compiled prompt and
+skills. No native skill discovery is needed, including for the default version.
+Activation rejects invalid execution semantics, unsupported providers, custom tool
+inventories, unmanaged budgets, prompt variables, generic designs and reference-only
+versions with `422`. Compatible legacy `runtimeReference.execution: "host-runtime"`
+versions retain the previous host binding; descriptive imports stay locked.
+Mandatory host instructions, tools, structured outputs and human gates remain
+enforced. Explicit request/ticket models override the workflow model, which overrides
+the server default. Ticket processing retains its ticket-selected provider;
+authoring and wiki remain Copilot. Releases contain only host operations, not an
+invented AI agent or script executor.
+
 `/resolve` previews an immutable snapshot, explicitly selected or using the saved
-default; it does not start or modify a session. Existing production authoring, ticket, wiki
-and release runtimes do not consume these definitions yet. Future integration
-must persist the selected snapshot at launch; restoring a default must affect only
-future launches, never an already-running execution.
+preview selection; it does not start or modify a session. Active configuration is
+independent of this selection. Assistant requests capture a snapshot at request
+start; ticket attempts persist it in `context.workflow` when queued and reuse it
+through planning, approval, execution and optional review. New correction/retry
+attempts capture the then-active version; archived attempts keep the original.
+Release publication persists `workflowSnapshot` in its atomic claim and retains it
+on retry. Existing sessions without a snapshot keep legacy behavior. Publishing,
+saving and preview selection never change running work or activate a version.
 
 ### Preview test runs
 
@@ -52,7 +89,16 @@ preview runner, never the production ticket queue or write services.
 
 A launch requires an explicit published `versionId`, `input` JSON object,
 `authorizeRealAgents` boolean, and `agents` keyed by **agent node ID**, not by
-definition ID. Every agent node must have exactly one configuration:
+definition ID. Every agent node must have exactly one configuration.
+
+Executable agent graphs additionally require `phase`. Inactive phase steps are
+skipped and their nearest executed predecessors are forwarded. A plan/clarification
+output returns to the host without downstream execution. Preview inference remains
+tool-free and does not validate production response contracts; a successful preview
+is not permission to bypass host validation. Release host operations cannot run in
+this inference-only console; use the release publication preview and explicit confirmation.
+
+Example for a generic preview graph:
 
 ```json
 {

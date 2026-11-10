@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { workflowDocumentSchema, workflowScopeSchema } from './workflowEditor';
+import { workflowDocumentSchema, workflowScopeSchema, workflowPhaseSchema } from './workflowEditor';
 
 export const workflowJsonObjectSchema = z.record(z.string(), z.json()).superRefine((value, ctx) => {
   if (JSON.stringify(value).length > 64_000) ctx.addIssue({ code: 'custom', message: 'JSON exceeds 64,000 characters.' });
@@ -19,6 +19,7 @@ export const workflowTestLaunchSchema = z.object({
   input: workflowJsonObjectSchema,
   agents: z.record(z.string(), workflowTestAgentSchema),
   authorizeRealAgents: z.boolean(),
+  phase: workflowPhaseSchema.optional(),
 }).strict().superRefine((value, ctx) => {
   if (Object.keys(value.agents).length > 100 || JSON.stringify(value).length > 256_000) {
     ctx.addIssue({ code: 'custom', message: 'Test configuration exceeds 100 agent steps or 256,000 characters.' });

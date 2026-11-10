@@ -89,6 +89,37 @@ test('preview runner persists isolated real/mock execution, controls and API fai
     assert.equal(calls.length, 0);
   });
 
+  await t.test('reference orchestration models cannot silently execute as generic preview checkpoints', async () => {
+    const version = await publish(await store.currentOrchestration('ticket-authoring'));
+    const response = await request('', 'POST', { ...configuration(version.id), agents: {} });
+    assert.equal(response.status, 422);
+    assert.match((await response.json()).error, /reference-only/);
+    assert.equal(await db.workflowTestRun.count(), 0);
+    assert.equal(calls.length, 0);
+  });
+
+  await t.test('executable previews honor phases, skipped predecessors and early human handoff', async () => {
+    const document = await store.base('ticket-authoring');
+    const version = await publish(document);
+    const agents = Object.fromEntries(document.nodes.map((node) => [node.id, mock({ step: node.id })]));
+    const config: WorkflowTestLaunch = { ...configuration(version.id), agents, phase: 'author' };
+    await assert.rejects(service.launch('ticket-authoring', { ...config, phase: undefined }), { status: 400 });
+    const launched = await service.launch('ticket-authoring', config);
+    const completed = await wait(launched.id, (run) => run.status === 'completed');
+    assert.deepEqual(completed.steps.filter((step) => step.status === 'completed').map((step) => step.nodeId),
+      ['framing', 'impact', 'writer', 'quality']);
+    assert.equal(completed.steps.find((step) => step.nodeId === 'plan-agent')!.status, 'skipped');
+    assert.deepEqual(completed.steps.find((step) => step.nodeId === 'writer')!.input?.upstream, { impact: { step: 'impact' } });
+    const planning = await service.launch('ticket-authoring', { ...config, phase: 'plan' });
+    const planned = await wait(planning.id, (run) => run.status === 'completed');
+    assert.deepEqual(planned.steps.filter((step) => step.status === 'completed').map((step) => step.nodeId), ['plan-agent']);
+    assert.deepEqual(planned.steps.find((step) => step.nodeId === 'plan-agent')!.input?.upstream, {});
+    const handoff = await service.launch('ticket-authoring', { ...config, agents: { ...agents, framing: mock({ kind: 'clarification' }) } });
+    const stopped = await wait(handoff.id, (run) => run.status === 'completed');
+    assert.deepEqual(stopped.steps.filter((step) => step.status === 'completed').map((step) => step.nodeId), ['framing']);
+    assert.equal(calls.length, 0);
+  });
+
   await t.test('mocks return exact JSON, scripts are skipped, approvals pause and versions remain pinned', async () => {
     const response = await request('', 'POST', configuration());
     assert.equal(response.status, 200);

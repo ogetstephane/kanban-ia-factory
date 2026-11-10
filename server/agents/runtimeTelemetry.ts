@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { agentRuntimeEventSchema, agentRuntimeSchema, type AgentRuntime } from '../../shared/types/agent';
 import type { AgentRequest } from './provider';
+import { ticketWorkflowAgent } from './workflowRuntime';
 
 export class RuntimeTelemetry {
   private runtime: AgentRuntime;
@@ -15,7 +16,7 @@ export class RuntimeTelemetry {
       status: 'running', startedAt: new Date().toISOString(), endedAt: null, error: '',
       metadata: {
         provider: request.context.task.agentProvider,
-        requestedModel: request.resolvedModel ?? request.context.task.agentModel ?? (request.context.task.agentProvider === 'claude-code'
+        requestedModel: request.resolvedModel ?? request.context.task.agentModel ?? ticketWorkflowAgent(request)?.model ?? (request.context.task.agentProvider === 'claude-code'
           ? null : process.env.COPILOT_MODEL) ?? null,
         workspace: request.workspace, context: request.context,
         approvedPlan: request.plan, feedback: request.feedback ?? null,

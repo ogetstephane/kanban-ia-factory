@@ -5,6 +5,7 @@ import { agentMessage } from './contextFiles';
 import { agentContextSchema } from '../../shared/types/agent';
 import { INITIAL_TASKS } from '../../shared/data/initialData';
 import type { AgentRequest } from './provider';
+import { builtInWorkflow } from './currentWorkflowModels';
 
 test('agent messages embed text and send exact PDF/image bytes as SDK blob attachments in every phase', () => {
   const text = '# Requirements\nUse the uploaded design.\n';
@@ -52,4 +53,16 @@ test('older tasks remain valid and binary data disguised as text is attached wit
   assert.deepEqual(agentMessage(request).attachments, [{
     type: 'blob', data: '/wA=', mimeType: 'text/plain', displayName: 'data.txt',
   }]);
+});
+
+test('pinned workflow definitions remain host configuration rather than duplicated user context', async () => {
+  const request: AgentRequest = {
+    context: agentContextSchema.parse({ task: INITIAL_TASKS[0], project: null, feature: null,
+      workflow: { scope: 'ticket-processing', versionId: randomUUID(), document: await builtInWorkflow('ticket-processing') } }),
+    phase: 'plan', workspace: '/unused', plan: '', answers: [],
+    onSession: async () => {}, ask: async () => '',
+  };
+  const message = agentMessage(request);
+  assert.equal(JSON.parse(message.prompt).context.workflow, undefined);
+  assert.doesNotMatch(message.prompt, /host-runtime|planner-prompt|approved-execution-prompt/);
 });

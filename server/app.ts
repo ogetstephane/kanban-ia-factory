@@ -56,7 +56,8 @@ export function createApp({
   const app = express();
   app.use(express.json({ limit: '5mb' }));
   const entities = new EntityStore(db, agentProvider.id);
-  app.use('/api/board', createWorkflowEditorRouter(new WorkflowEditorStore(db)));
+  const workflows = new WorkflowEditorStore(db);
+  app.use('/api/board', createWorkflowEditorRouter(workflows));
   const workflowTests = new WorkflowTestService(db, workflowTestAgent);
   app.use('/api/board', createWorkflowTestRouter(workflowTests));
   app.use('/api/board', createBoardRouter(new BoardStore(db), entities, repositories.workspaces));
@@ -65,8 +66,8 @@ export function createApp({
   const releases = new ReleaseService(db, repositories);
   app.use('/api/board', createReleaseRouter(releases));
   app.use('/api/board', createActivityRouter(new ActivityService(db)));
-  app.use('/api/board', createWikiRouter(new DocsService(db, repositories), wikiAssistant));
-  app.use('/api/board', createTaskAssistantRouter(entities, repositories.workspaces, taskAssistant));
+  app.use('/api/board', createWikiRouter(new DocsService(db, repositories), wikiAssistant, workflows));
+  app.use('/api/board', createTaskAssistantRouter(entities, repositories.workspaces, taskAssistant, workflows));
   app.use('/api/board', createCodeGraphRouter(codeGraph, async (projectId) => {
     const project = await entities.project(projectId);
     if (!project.repositoryUrl) throw new RepositoryError(400, 'This project has no git repository, so it has no code graph');

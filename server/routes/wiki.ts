@@ -6,8 +6,9 @@ import { RepositoryError } from '../git/repositoryService';
 import type { DocsService } from '../wiki/docsService';
 import { checkDocPath } from '../wiki/docsService';
 import type { WikiGenerator } from '../wiki/wikiAssistant';
+import type { WorkflowEditorStore } from '../db/workflowEditorStore';
 
-export function createWikiRouter(docs: DocsService, assistant?: WikiGenerator) {
+export function createWikiRouter(docs: DocsService, assistant?: WikiGenerator, workflows?: Pick<WorkflowEditorStore, 'active'>) {
   const router = Router();
   router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
   router.post('/projects/:projectId/wiki/assistant', async (req, res, next) => {
@@ -17,9 +18,10 @@ export function createWikiRouter(docs: DocsService, assistant?: WikiGenerator) {
     try {
       if (!assistant) throw new RepositoryError(503, 'The wiki assistant is not configured.');
       const input = wikiAssistantInputSchema.parse(req.body);
+      const workflow = await workflows?.active('wiki');
       checkDocPath(input.path);
       await docs.list(req.params.projectId);
-      const proposal = wikiAssistantResultSchema.parse(await assistant.generate(input, controller.signal));
+      const proposal = wikiAssistantResultSchema.parse(await assistant.generate(input, controller.signal, workflow));
       if (!controller.signal.aborted) res.json(proposal);
     } catch (error) { if (!controller.signal.aborted) next(error); }
     finally { res.off('close', abort); }

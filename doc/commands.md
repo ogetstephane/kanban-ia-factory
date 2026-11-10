@@ -34,6 +34,11 @@ The repository currently lacks `.env.example`. Until that template is restored,
 | `make lint` | `npm run lint` | TypeScript type check (`tsc --noEmit`). |
 | `make check` | `lint` + `test` + `build` | Type-check, run the default test suite, and build the frontend. |
 
+Generated `workspaces/` clones and ticket worktrees are excluded from Vite and
+VS Code file watching to avoid exhausting Linux inotify watchers. After changing
+these exclusions, restart the dev server; if VS Code still reports `ENOSPC`, run
+**Developer: Reload Window**. The directories remain available on disk.
+
 ### Single-test commands
 
 The analysis native target requires `bwrap` (bubblewrap) and the installed SDK runtime.

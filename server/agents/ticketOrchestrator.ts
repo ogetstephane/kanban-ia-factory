@@ -1,6 +1,8 @@
 import { agentProviderSchema, type AgentProviderId } from '../../shared/types/agentProvider';
 import type { AgentOptions } from '../../shared/types/agent';
 import type { AgentProvider, AgentRequest } from './provider';
+import { ticketWorkflowAgent, workflowNodeAgent } from './workflowRuntime';
+import { runWorkflowGraph } from './workflowGraphRunner';
 
 export interface TicketRuntimeRegistration {
   id: AgentProviderId;
@@ -53,7 +55,25 @@ export class TicketOrchestrator implements AgentProvider {
   async run(request: AgentRequest) {
     request.signal?.throwIfAborted();
     const registration = this.runtime(request.context.task.agentProvider ?? this.id);
-    const model = request.context.task.agentModel || registration.defaultModel || undefined;
+    if (request.context.workflow?.document.execution && !request.workflowStep) {
+      const snapshot = request.context.workflow;
+      return runWorkflowGraph(snapshot, request.phase, async (node, inputs) => {
+        const definition = workflowNodeAgent(snapshot, node.id);
+        const readOnly = node.run?.access === 'read-only';
+        const intermediate = node.run?.output !== 'result';
+        return registration.provider!.run({
+          ...request,
+          phase: readOnly && request.phase === 'execute' ? 'plan' : request.phase,
+          workflowStep: { nodeId: node.id, inputs, intermediate },
+          resolvedModel: request.context.task.agentModel || definition.model || registration.defaultModel || undefined,
+          adaptive: !readOnly && request.adaptive,
+          requestPlanApproval: readOnly ? undefined : request.requestPlanApproval,
+          onContent: intermediate ? undefined : request.onContent,
+          recordCheck: readOnly ? undefined : request.recordCheck,
+        });
+      }, request.signal);
+    }
+    const model = request.context.task.agentModel || ticketWorkflowAgent(request)?.model || registration.defaultModel || undefined;
     const output = await registration.provider!.run({
       ...request, resolvedModel: model,
     });

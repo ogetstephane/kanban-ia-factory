@@ -6,6 +6,7 @@ import type { AgentProvider, AgentRequest } from './provider';
 import type { CodeGraph, PreparedCodeGraph } from './codeGraph';
 import { RuntimeTelemetry } from './runtimeTelemetry';
 import { ticketSession } from './ticketSession';
+import { ticketWorkflowAgent } from './workflowRuntime';
 import { agentMessage } from './contextFiles';
 import { withClaudeQuery, CLAUDE_RUNTIME_VERSION, CLAUDE_SDK_VERSION, type ClaudeRuntimeOptions } from './adapters/claudeRuntime';
 import { claudeToolSession, validateClaudeInitialization, claudeInventorySchema, claudeResultSchema } from './adapters/claudeToolSession';
@@ -42,7 +43,7 @@ export class ClaudeTicketProvider implements AgentProvider {
 
   async run(request: AgentRequest) {
     this.assertEnabled();
-    const model = request.resolvedModel || request.context.task.agentModel;
+    const model = request.resolvedModel || request.context.task.agentModel || ticketWorkflowAgent(request)?.model;
     if (!model) throw new Error('Select an explicit Claude model on the ticket or configure KANBAN_CLAUDE_MODEL.');
     const message = agentMessage(request);
     if (message.attachments?.length) throw new Error('Experimental Claude tickets accept UTF-8 text context only. Replace binary attachments with readable text.');
@@ -63,7 +64,8 @@ export class ClaudeTicketProvider implements AgentProvider {
         requestPlanApproval: request.requestPlanApproval
           ? (proposal) => persist(() => request.requestPlanApproval!(proposal)) : undefined,
       }, graph, () => telemetry.setPhase('plan'));
-      const skill = await readFile(new URL('../skills/ticket-graphify/SKILL.md', import.meta.url), 'utf8');
+      const skill = request.context.workflow?.versionId || request.context.workflow?.document.execution ? ''
+        : await readFile(new URL('../skills/ticket-graphify/SKILL.md', import.meta.url), 'utf8');
       const tools = definition.tools.map((item) => tool(item.name, item.description, item.parameters.shape,
         async (args) => {
           const callId = randomUUID();
@@ -88,7 +90,7 @@ export class ClaudeTicketProvider implements AgentProvider {
       const configuration = claudeToolSession(tools, [
         ...definition.instructions, 'Delegation and all native tools are forbidden.',
         `Tool aliases: ${tools.map(({ name }) => `${name} -> mcp__analysis__${name}`).join(', ')}.`,
-        'The following bundled skill is injected once; do not invoke native skills:', skill,
+        ...(skill ? ['The following bundled skill is injected once; do not invoke native skills:', skill] : []),
       ].join('\n'), signal, async (name, callId, reason) => {
         telemetry.event({ id: randomUUID(), type: 'tool.denied', timestamp: new Date().toISOString(), data: { name, callId, reason } });
       });
@@ -96,7 +98,8 @@ export class ClaudeTicketProvider implements AgentProvider {
         provider: this.id, experimental: true, sdkVersion: CLAUDE_SDK_VERSION,
         runtimeVersion: CLAUDE_RUNTIME_VERSION, requestedModel: model,
         permissionPolicy: 'Only host ticket tools via SDK MCP; native tools, ambient settings and delegation denied. No strict billing cap.',
-        skill: 'ticket-graphify (injected)', tools: tools.map(({ name }) => name),
+        skill: request.context.workflow?.versionId || request.context.workflow?.document.execution ? 'workflow step skills (injected)' : 'ticket-graphify (injected)',
+        tools: tools.map(({ name }) => name),
         configuration: {
           systemPrompt: configuration.options.systemPrompt,
           tools: definition.tools.map(({ name, description, parameters }) => ({

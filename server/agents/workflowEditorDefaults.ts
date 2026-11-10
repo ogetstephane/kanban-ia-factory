@@ -5,17 +5,8 @@ import { workflowDocumentSchema, WORKFLOW_SCOPE_NAMES, type WorkflowScope } from
 const skillNames = ['ticket-framing', 'ticket-writing', 'ticket-decomposition', 'ticket-quality', 'ticket-graphify', 'assistant-planning'];
 
 export async function workflowEditorDefault(scope: WorkflowScope) {
-  const skills = await Promise.all((scope === 'ticket-authoring' ? skillNames
-    : scope === 'ticket-processing' ? ['ticket-graphify'] : scope === 'wiki' ? ['assistant-planning'] : []).map(async (id) => {
-    const text = await readFile(new URL(`../skills/${id}/SKILL.md`, import.meta.url), 'utf8');
-    const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
-    if (!match) throw new Error(`Invalid bundled skill: ${id}`);
-    const metadata: unknown = parseYaml(match[1]);
-    if (!metadata || typeof metadata !== 'object' || !('description' in metadata) || typeof metadata.description !== 'string') {
-      throw new Error(`Missing bundled skill description: ${id}`);
-    }
-    return { id, name: id, description: metadata.description, instructions: match[2].trim() };
-  }));
+  const skills = await loadWorkflowSkills(scope === 'ticket-authoring' ? skillNames
+    : scope === 'ticket-processing' ? ['ticket-graphify'] : scope === 'wiki' ? ['assistant-planning'] : []);
   return workflowDocumentSchema.parse({
     schemaVersion: 1, name: WORKFLOW_SCOPE_NAMES[scope],
     description: 'Editable design template. Not a complete representation of the current runtime.',
@@ -33,4 +24,17 @@ export async function workflowEditorDefault(scope: WorkflowScope) {
     ],
     edges: [{ from: 'agent-step', to: 'validate-step' }, { from: 'validate-step', to: 'approval-step' }],
   });
+}
+
+export async function loadWorkflowSkills(names: string[]) {
+  return Promise.all(names.map(async (id) => {
+    const text = await readFile(new URL(`../skills/${id}/SKILL.md`, import.meta.url), 'utf8');
+    const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) throw new Error(`Invalid bundled skill: ${id}`);
+    const metadata: unknown = parseYaml(match[1]);
+    if (!metadata || typeof metadata !== 'object' || !('description' in metadata) || typeof metadata.description !== 'string') {
+      throw new Error(`Missing bundled skill description: ${id}`);
+    }
+    return { id, name: id, description: metadata.description, instructions: match[2].trim() };
+  }));
 }

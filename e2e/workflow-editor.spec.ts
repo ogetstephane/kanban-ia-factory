@@ -66,7 +66,7 @@ test('workflow studio edits visual definitions, validates connections and restor
   const editor = page.getByRole('region', { name: 'Agent workflow editor' });
   await openWorkflow(page);
   await expect(editor.getByRole('heading', { name: 'Agent workflow studio' })).toBeVisible();
-  await editor.getByText('Preview environment · production isolated · global configuration', { exact: true }).click();
+  await editor.getByText('Explicit activation · pinned execution · global configuration', { exact: true }).click();
   await expect(editor.getByText('Scripts and production writes are disabled.', { exact: false })).toBeVisible();
   const save = editor.getByRole('button', { name: 'Save draft', exact: true });
   await editor.getByLabel('Workflow name', { exact: true }).fill('Ticket pipeline v1');
@@ -135,8 +135,8 @@ test('workflow studio edits visual definitions, validates connections and restor
   await editor.getByRole('button', { name: 'Publish saved draft' }).click();
   await expect(editor.getByLabel('Published version').locator('option')).toHaveCount(3);
   await editor.getByLabel('Published version').selectOption(firstVersion.id);
-  await editor.getByRole('button', { name: 'Select as default' }).click();
-  await expect(editor.getByText('Default version restored.', { exact: false })).toBeVisible();
+  await editor.getByRole('button', { name: 'Select for preview' }).click();
+  await expect(editor.getByText('Preview version selected.', { exact: false })).toBeVisible();
   await expect(editor.getByLabel('Workflow name', { exact: true })).toHaveValue('Ticket pipeline v2');
   await editor.getByRole('button', { name: 'Preview launch snapshot' }).click();
   await expect(editor.locator('pre')).toContainText('Ticket pipeline v1');

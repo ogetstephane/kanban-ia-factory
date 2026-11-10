@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WorkflowDocument, WorkflowScope } from '../../shared/types/workflowEditor';
+import { workflowPhaseSchema, type WorkflowDocument, type WorkflowScope, type WorkflowPhase } from '../../shared/types/workflowEditor';
+import { workflowPhases } from '../../shared/utils/workflowGraph';
 import {
   workflowJsonObjectSchema, workflowTestLaunchSchema,
   type WorkflowTestAgent, type WorkflowTestLaunch, type WorkflowTestRun,
@@ -19,6 +20,7 @@ export function WorkflowTestPanel({ scope, version }: { scope: WorkflowScope; ve
     Object.fromEntries(version.document.nodes.filter((node) => node.kind === 'agent').map((node) => [node.id, mockDefaults()])));
   const [providers, setProviders] = useState<string[]>([]);
   const [authorized, setAuthorized] = useState(false);
+  const [phase, setPhase] = useState<WorkflowPhase>(workflowPhases(scope)[0]);
   const [run, setRun] = useState<WorkflowTestRun | null>(null);
   const [history, setHistory] = useState<RunSummary[]>([]);
   const [historyId, setHistoryId] = useState('');
@@ -80,7 +82,8 @@ export function WorkflowTestPanel({ scope, version }: { scope: WorkflowScope; ve
           : { kind: 'output', output: workflowJsonObjectSchema.parse(JSON.parse(setting.output)) },
       };
     }
-    configuration = workflowTestLaunchSchema.parse({ versionId: version.id, input: JSON.parse(input), agents, authorizeRealAgents: authorized });
+    configuration = workflowTestLaunchSchema.parse({ versionId: version.id, input: JSON.parse(input), agents, authorizeRealAgents: authorized,
+      ...(version.document.execution ? { phase } : {}) });
   } catch (failure) { validationError = failure instanceof Error ? failure.message : 'Invalid JSON test configuration.'; }
   const realNodes = version.document.nodes.filter((node) => settings[node.id]?.mode === 'real');
   const unsupported = realNodes.some((node) => {
@@ -102,6 +105,11 @@ export function WorkflowTestPanel({ scope, version }: { scope: WorkflowScope; ve
     {error && <div role="alert" className="text-sm text-rose-300">{error}</div>}
     {pollError && <div role="alert" className="text-sm text-amber-300">Refresh failed: {pollError}. Displayed results may be stale.</div>}
     <fieldset disabled={pending} className="space-y-3">
+      {version.document.execution && <label className="block text-xs">Preview phase
+        <select aria-label="Preview phase" className={fieldClass} value={phase} onChange={(event) => setPhase(workflowPhaseSchema.parse(event.target.value))}>
+          {workflowPhases(scope).map((phase) => <option key={phase} value={phase}>{phase}</option>)}
+        </select>
+      </label>}
       <label className="block text-xs">Test input variables (JSON object)
         <textarea aria-label="Test input variables (JSON object)" className={`${fieldClass} mt-1 font-mono`} rows={5} value={input} onChange={(event) => setInput(event.target.value)} />
       </label>

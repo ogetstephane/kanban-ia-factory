@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { workflowRuntimeSnapshotSchema } from './workflowEditor';
 
 export const versionSchema = z.string().trim().max(100).regex(
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/,
@@ -16,7 +17,9 @@ export const releaseSchema = z.object({
   createdAt: z.string(), updatedAt: z.string(), ticketCount: z.number(), deliveredCount: z.number(),
 });
 export type Release = z.infer<typeof releaseSchema>;
-export const releaseRecordSchema = releaseSchema.omit({ ticketCount: true, deliveredCount: true });
+export const releaseRecordSchema = releaseSchema.omit({ ticketCount: true, deliveredCount: true }).extend({
+  workflowSnapshot: workflowRuntimeSnapshotSchema.nullable().optional(),
+});
 export const releaseEditSchema = z.object({
   version: versionSchema, status: z.enum(['upcoming', 'in_progress', 'cancelled']),
 });

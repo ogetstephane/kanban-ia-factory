@@ -5,6 +5,9 @@ import { releaseEditSchema, releaseUpdateSchema, releasePublishSchema, releaseDe
 import { assignNextRelease, checkReleaseAssignment, ensureNoActiveSessions, EntityError, taskData } from '../db/entityStore';
 import type { RepositoryService } from '../git/repositoryService';
 import { activityChanges, recordActivity } from '../db/activityLog';
+import { resolveActiveWorkflow } from '../db/workflowEditorStore';
+import { workflowRuntimeSnapshotSchema } from '../../shared/types/workflowEditor';
+import { runWorkflowGraph } from '../agents/workflowGraphRunner';
 
 const releaseInclude = {
   tasks: { orderBy: { id: 'asc' as const }, select: {
@@ -184,11 +187,14 @@ export class ReleaseService {
       if (preview.revision !== input.revision || preview.commit !== input.commit || preview.remoteUrl !== input.remoteUrl || preview.branch !== input.branch) {
         throw new EntityError(409, 'The release or Git target changed. Reload the publication preview.');
       }
-      await this.db.$transaction(async (tx) => {
+      const workflow = await this.db.$transaction(async (tx) => {
         const row = await this.row(projectId, id, tx);
         this.eligible(row);
+        const workflow = row.workflowSnapshot
+          ? workflowRuntimeSnapshotSchema.parse(row.workflowSnapshot) : await resolveActiveWorkflow('releases', tx);
         const claimed = await tx.release.updateMany({ where: { id, projectId, revision: input.revision, publishing: false }, data: {
           publishing: true, targetBranch: preview.branch, targetCommit: preview.commit, remoteUrl: preview.remoteUrl,
+          workflowSnapshot: workflow,
           error: '', revision: { increment: 1 }, updatedAt: new Date().toISOString(),
         } });
         if (!claimed.count) throw new EntityError(409, 'This release changed or is already being published');
@@ -197,22 +203,40 @@ export class ReleaseService {
           action: 'publication_started', summary: `Started publishing tag ${preview.tag}`, actor: 'User',
           changes: [{ field: 'Tag target', before: null, after: preview.commit.slice(0, 12) }],
         });
+        return workflow;
       });
       try {
-        const tagHash = await this.repositories.operations.createReleaseTag(projectId, preview.tag, preview.commit);
-        await this.db.release.update({ where: { id }, data: { tagHash } });
-        await this.repositories.publication.pushReleaseTag(projectId, preview.tag, preview.commit, preview.remoteUrl);
-        const now = new Date().toISOString();
-        await this.db.$transaction(async (tx) => {
-          await tx.release.update({ where: { id }, data: {
-            status: 'published', publishing: false, error: '', publishedAt: now, updatedAt: now, revision: { increment: 1 },
-          } });
-          await recordActivity(tx, {
-            projectId, entityType: 'release', entityId: id, entityTitle: `v${previous.version}`,
-            action: 'published', summary: `Published tag ${preview.tag}`, actor: 'System',
-            changes: [{ field: 'Status', before: 'In progress', after: 'Published' }, { field: 'Tag', before: null, after: preview.tag }],
-          });
-        });
+        const executeOperation = async (operation: string) => {
+          if (operation === 'create-tag') {
+            const tagHash = await this.repositories.operations.createReleaseTag(projectId, preview.tag, preview.commit);
+            await this.db.release.update({ where: { id }, data: { tagHash } });
+          } else if (operation === 'push-tag') {
+            await this.repositories.publication.pushReleaseTag(projectId, preview.tag, preview.commit, preview.remoteUrl);
+          } else if (operation === 'release-checkpoint') {
+            const current = await this.row(projectId, id);
+            if (!current.publishing || current.targetCommit !== preview.commit || current.remoteUrl !== preview.remoteUrl || current.targetBranch !== preview.branch) {
+              throw new EntityError(409, 'The pinned release publication target changed.');
+            }
+          } else if (operation === 'record-publication') {
+            const now = new Date().toISOString();
+            await this.db.$transaction(async (tx) => {
+              await tx.release.update({ where: { id }, data: {
+                status: 'published', publishing: false, error: '', publishedAt: now, updatedAt: now, revision: { increment: 1 },
+              } });
+              await recordActivity(tx, {
+                projectId, entityType: 'release', entityId: id, entityTitle: `v${previous.version}`,
+                action: 'published', summary: `Published tag ${preview.tag}`, actor: 'System',
+                changes: [{ field: 'Status', before: 'In progress', after: 'Published' }, { field: 'Tag', before: null, after: preview.tag }],
+              });
+            });
+          } else throw new EntityError(422, `Unsupported release workflow operation: ${operation}`);
+          return JSON.stringify({ operation, commit: preview.commit, tag: preview.tag });
+        };
+        if (workflow.document.execution) {
+          await runWorkflowGraph(workflow, 'release', (node) => executeOperation(node.referenceId));
+        } else {
+          for (const operation of ['create-tag', 'push-tag', 'record-publication']) await executeOperation(operation);
+        }
       } catch (error) {
         console.error('Release tag publication failed:', error);
         await this.db.$transaction(async (tx) => {

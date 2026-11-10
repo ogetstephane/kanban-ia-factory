@@ -12,6 +12,7 @@ import { DocsService } from './docsService';
 import express from 'express';
 import { createWikiRouter } from '../routes/wiki';
 import type { WikiGenerator } from './wikiAssistant';
+import { WorkflowEditorStore } from '../db/workflowEditorStore';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', cwd.endsWith('.git') ? ['--git-dir', cwd, ...args] : args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
 const ssh = `node ${path.resolve('server/git/testSsh.cjs')}`;
@@ -54,18 +55,26 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
 
   await t.test('wiki assistant validates project and path and never saves proposals', async () => {
     const calls: string[] = [];
-    const argumentCounts: number[] = [];
+    const workflows = new WorkflowEditorStore(db);
+    let configuration = await workflows.save('wiki', 0, await workflows.base('wiki'));
+    configuration = await workflows.publish('wiki', configuration.revision);
+    const activeVersion = configuration.versions[0].id;
+    configuration = await workflows.activate('wiki', configuration.revision, activeVersion);
     const generator: WikiGenerator = {
-      async generate(input, signal) {
+      async generate(input, signal, workflow) {
         assert.equal(signal.aborted, false);
         calls.push(input.content);
-        argumentCounts.push(arguments.length);
+        assert.equal(workflow?.scope, 'wiki');
+        assert.equal(workflow?.versionId, activeVersion);
+        assert.equal('graph' in workflow!, false);
+        await workflows.activate('wiki', configuration.revision, null);
+        assert.equal(workflow?.versionId, activeVersion, 'In-flight request retains its snapshot after activation changes');
         return { kind: 'proposal', content: '# Proposal\n', summary: 'Created an introduction' };
       },
     };
     const app = express();
     app.use(express.json());
-    app.use('/api/board', createWikiRouter(docs, generator));
+    app.use('/api/board', createWikiRouter(docs, generator, workflows));
     const server = app.listen(0, '127.0.0.1');
     await new Promise<void>((resolve) => server.once('listening', resolve));
     try {
@@ -80,7 +89,6 @@ test('wiki edits are committed on the project branch and pushed to origin', asyn
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { kind: 'proposal', content: '# Proposal\n', summary: 'Created an introduction' });
       assert.deepEqual(calls, [input.content]);
-      assert.deepEqual(argumentCounts, [2], 'Wiki requests do not receive injected graph context');
       assert.deepEqual((await docs.list('project-wiki')).files, []);
       assert.equal((await post('missing-project', input)).status, 404);
       assert.equal((await post('project-wiki', { ...input, path: '../outside.md' })).status, 400);

@@ -6,11 +6,13 @@ import { EntityError, type EntityStore } from '../db/entityStore';
 import { RepositoryError } from '../git/repositoryService';
 import type { WorkspaceService } from '../git/workspaceService';
 import type { TaskGenerator } from '../agents/taskAssistant';
+import type { WorkflowEditorStore } from '../db/workflowEditorStore';
 
 export function createTaskAssistantRouter(
   projects: Pick<EntityStore, 'project'>,
   workspaces: Pick<WorkspaceService, 'docsWorkspace'>,
   assistant?: TaskGenerator,
+  workflows?: Pick<WorkflowEditorStore, 'active'>,
 ) {
   const router = Router();
   const generate = (breakdown: boolean) => async (req: Request, res: Response, next: NextFunction) => {
@@ -22,12 +24,13 @@ export function createTaskAssistantRouter(
       if (!assistant) throw new RepositoryError(503, 'The task assistant is not configured.');
       if (breakdown && !assistant.generateBreakdown) throw new RepositoryError(503, 'The ticket breakdown assistant is not configured.');
       const input = taskDraftInputSchema.parse(req.body);
+      const workflow = await workflows?.active('ticket-authoring');
       const project = await projects.project(req.params.projectId);
       const workspace = project.repositoryUrl ? (await workspaces.docsWorkspace(project.id)).cwd : undefined;
       controller.signal.throwIfAborted();
       const request = {
         input, project: { id: project.id, name: project.name, description: project.description },
-        workspace, signal: controller.signal,
+        workspace, signal: controller.signal, workflow,
       };
       const proposal = breakdown
         ? taskBreakdownResultSchema.parse(await assistant.generateBreakdown!(request))

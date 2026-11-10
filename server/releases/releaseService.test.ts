@@ -18,6 +18,8 @@ import { ReleaseService } from './releaseService';
 import { BoardStore } from '../db/boardStore';
 import { boardDataSchema } from '../../shared/types/board';
 import { requiredTicketDocumentationPath } from '../agents/ticketDocumentation';
+import { WorkflowEditorStore } from '../db/workflowEditorStore';
+import { workflowRuntimeSnapshotSchema } from '../../shared/types/workflowEditor';
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git',
   [...TEST_GIT_CONFIG, ...(cwd.endsWith('.git') ? ['--git-dir', cwd] : []), ...args],
@@ -182,12 +184,20 @@ test('delivery requires a release but assigning it does not invalidate the accep
 
 test('failed push retains the exact local tag/commit, freezes membership and version, and retries on the pinned commit', async (t) => {
   const f = await fixture(t);
+  const workflows = new WorkflowEditorStore(f.db);
+  let configuration = await workflows.save('releases', 0, await workflows.base('releases'));
+  configuration = await workflows.publish('releases', configuration.revision);
+  const activeVersion = configuration.versions[0].id;
+  configuration = await workflows.activate('releases', configuration.revision, activeVersion);
   await f.deliver();
   const preview = await f.progress();
   const original = f.repositories.publication.pushReleaseTag.bind(f.repositories.publication);
   f.repositories.publication.pushReleaseTag = async () => { throw new Error('Temporary remote outage'); };
   await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /Temporary remote outage/);
   const failed = await f.releases.detail('project-release', f.release.id);
+  const pinnedWorkflow = workflowRuntimeSnapshotSchema.parse((await f.db.release.findUniqueOrThrow({ where: { id: f.release.id } })).workflowSnapshot);
+  assert.equal(pinnedWorkflow.versionId, activeVersion);
+  await workflows.activate('releases', configuration.revision, null);
   assert.equal(failed.status, 'in_progress');
   assert.equal(failed.publishing, false);
   assert.equal(failed.targetCommit, preview.commit);
@@ -202,7 +212,33 @@ test('failed push retains the exact local tag/commit, freezes membership and ver
   assert.equal(retry.commit, preview.commit);
   assert.equal(retry.alreadyTagged, true);
   assert.equal((await f.releases.publish('project-release', f.release.id, retry)).status, 'published');
+  assert.deepEqual((await f.db.release.findUniqueOrThrow({ where: { id: f.release.id } })).workflowSnapshot, pinnedWorkflow);
   assert.equal(git(f.bare, 'rev-parse', 'refs/tags/v1.2.0'), preview.commit);
+});
+
+test('an activated inserted release checkpoint executes and prevents push if its pinned target changed', async (t) => {
+  const f = await fixture(t);
+  const workflows = new WorkflowEditorStore(f.db);
+  const document = await workflows.base('releases');
+  document.nodes.push({ ...document.nodes[0], id: 'custom-checkpoint', referenceId: 'release-checkpoint', label: 'Verify pinned target' });
+  document.edges = [
+    { from: 'create-tag', to: 'custom-checkpoint' }, { from: 'custom-checkpoint', to: 'push-tag' },
+    { from: 'push-tag', to: 'record-publication' },
+  ];
+  let state = await workflows.save('releases', 0, document);
+  state = await workflows.publish('releases', state.revision);
+  await workflows.activate('releases', state.revision, state.versions[0].id);
+  await f.deliver();
+  const preview = await f.progress();
+  const original = f.repositories.operations.createReleaseTag.bind(f.repositories.operations);
+  f.repositories.operations.createReleaseTag = async (...args) => {
+    const hash = await original(...args);
+    await f.db.release.update({ where: { id: f.release.id }, data: { targetCommit: 'changed-target' } });
+    return hash;
+  };
+  await assert.rejects(f.releases.publish('project-release', f.release.id, preview), /pinned release publication target changed/);
+  assert.equal((await f.releases.detail('project-release', f.release.id)).status, 'in_progress');
+  assert.equal(git(f.bare, 'tag', '--list'), '', 'Checkpoint failure prevents the subsequent remote push');
 });
 
 test('restart after remote success reconciles without rewriting the tag', async (t) => {

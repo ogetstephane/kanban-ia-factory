@@ -9,8 +9,99 @@ ticket processing, wiki or releases. These configurations are global by function
 not per-project overrides. Drag nodes (or use arrow keys), connect steps, and edit
 agents, prompts, skills and lifecycle hooks in the definition library. Initial
 skills are editable copies from `server/skills/`; editing a copy does not change
-the bundled Markdown files. The initial graph is a design template, not an export
-of the production runtime.
+the bundled Markdown files. Unconfigured scopes open their source-backed built-in
+executable workflow; existing saved designs are preserved.
+
+#### Built-in base and activation
+
+Each scope has a built-in base used by real tasks until another version is
+explicitly activated. In **Workflow menu**, choose **Load prebuilt workflow**,
+edit agents, prompts, skills and connections, then **Save draft → Publish saved draft →
+Activate version**. Publishing alone does not change real execution. The menu shows
+the active version; **Activate prebuilt default** restores default execution without
+deleting drafts or published history. Activation requires confirmation and checks
+the configuration revision.
+
+These are real executable DAGs, not wrappers around a single native skill call:
+
+- **Ticket authoring:** framing (`assistant-planning`, `ticket-framing`) → impact (`ticket-graphify`) →
+  writing (`ticket-writing`, `ticket-decomposition`) → quality (`ticket-quality`).
+- **Ticket processing:** impact (`ticket-graphify`) feeds the planner, executor or
+  reviewer, according to the host lifecycle phase.
+- **Wiki:** outline (`assistant-planning`) → Markdown writer → quality review.
+- **Releases:** create pinned tag → push tag → record publication. Optional registered
+  release checkpoints can be inserted; these are host operations, not AI calls.
+
+Authoring/wiki also have a separate planning-phase agent using `assistant-planning`.
+Select a node and choose **Configure node** to set its execution phases, context/result
+output and tool policy. Connections schedule steps in dependency order and deliver
+the nearest executed predecessors' outputs, forwarding across inactive phase nodes.
+Each phase needs exactly one result, and all its steps must feed that result. Joins
+wait for every predecessor; execution is sequential, not concurrent. New/duplicated
+steps start as read-only context; reconnect them before publishing. Only the
+processing execution result can write. Human plan/clarification responses return
+to the host immediately without running downstream agents.
+
+Generic designs remain preview-only; old activated host-workflow versions remain
+supported. Host transitions, tools, autonomy, budgets and human approval gates stay
+enforced outside the editable DAG. Providers cannot be switched by a workflow: processing inherits
+the ticket provider, and authoring/wiki use Copilot. Explicit request/ticket models
+take precedence over workflow models and server defaults. Edited skill bodies are
+injected separately for each step from the immutable version instead of loading
+the original native files. The prebuilt default also runs this graph interpreter.
+Mandatory host instructions and response validation remain in force.
+
+The inspector reports execution-readiness errors before activation. Cycles,
+unsupported nodes/providers, multiple results and disconnected phase steps cannot
+activate. Outputs exceeding 256,000 bytes per step or 1,000,000 bytes per graph fail
+explicitly without truncation. Individual node results are not restart checkpoints:
+interrupted execution fails and is never automatically replayed.
+
+Each ticket attempt pins its workflow at queue time, including approval, execution,
+questions and optional AI review. Activation changes affect new attempts only;
+explicit retry/corrections take the current active version and archive the previous
+snapshot. Assistant generation captures its version at request start (a resubmission
+is a new request). Release publication pins its version on claim and keeps it for
+retries. Releases use host-only operations with the existing eligibility, Git,
+revision and explicit-publication checks; no AI agent or arbitrary script is added.
+
+#### Importing current orchestration
+
+In the **Workflow menu**, choose **Import current orchestration** for ticket
+authoring, ticket processing, wiki or releases. Confirm replacement of the *local* draft.
+Import itself writes nothing: the saved draft, selected version and all published
+versions remain unchanged until an explicit save/publish.
+
+These are source-backed **reference models**, not executable workflows. They show:
+
+- Ticket authoring: single-ticket/breakdown contracts, context preparation,
+  Auto/Plan selection, clarification answers, plan review/resubmission, strict
+  response validation, local quality review and explicit save.
+- Ticket processing: queue snapshots and isolated worktrees, adaptive/planned
+  execution, phase-specific tools, persisted user questions, standalone approval
+  versus epic auto-approval, checks, diff/documentation review, optional AI review,
+  human acceptance, separate delivery/publication and Finish, cancellation and explicit retry.
+- Wiki: document/path validation, Auto/Plan selection, plan resubmission,
+  validated proposals, local acceptance, SHA-guarded save and separate commit/sync.
+- Releases: explicit publication, eligibility/Git preview, atomic claim, tag push,
+  publication recording and explicit retry after failure.
+
+Host nodes distinguish triggers, operations, decisions, waits and results. Inspect
+one to read its policy and source symbol references. Edges name the branch or user
+action, including re-entry cycles. Cycles are representational only: generic
+preview workflows remain DAGs. Runtime-specific prompt variants are editable
+copies assembled from the same instruction builders as production. Dynamic
+documentation paths, conditional graph/workspace tools and request/server model
+selection remain host-resolved. Iteration limits are shown as runtime-managed,
+not as an invented studio cap.
+
+Positions, labels, prompts, skills and proposed agent settings can be edited.
+Host topology, operations, tool permissions and autonomy cannot be changed; the
+API validates these against the current source model on save and publish.
+Imported instructions and settings **do not affect live execution**. Publishing
+does not activate them. Reference graphs cannot run in the
+generic preview runner (HTTP 422), because it cannot yet execute host branches,
+wait/resume or production operations. Use the built-in base for an activatable version.
 
 The studio opens in immersive fullscreen with nothing selected: only the workflow,
 an **Add element** button at the top right and a compact **Workflow menu** are shown.

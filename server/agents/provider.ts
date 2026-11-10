@@ -7,6 +7,7 @@ export interface AgentRequest {
   context: AgentContext;
   /** Runtime-resolved model, without overwriting the snapshotted ticket selection. */
   resolvedModel?: string;
+  workflowStep?: { nodeId: string; inputs: Record<string, string>; intermediate: boolean };
   workspace: string;
   phase: 'plan' | 'execute' | 'review';
   plan: string;

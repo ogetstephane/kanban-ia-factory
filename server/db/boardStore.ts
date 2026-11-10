@@ -33,7 +33,8 @@ async function writeBoard(tx: Prisma.TransactionClient, data: BoardData) {
     await tx.feature.upsert({ where: { id: feature.id }, create: values, update: values });
   }
   for (const release of data.releases ?? []) {
-    await tx.release.upsert({ where: { id: release.id }, create: release, update: release });
+    const values = { ...release, workflowSnapshot: release.workflowSnapshot ?? Prisma.DbNull };
+    await tx.release.upsert({ where: { id: release.id }, create: values, update: values });
   }
   for (const [position, task] of data.tasks.entries()) {
     const { subtasks, ...fields } = task;

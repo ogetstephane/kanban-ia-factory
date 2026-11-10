@@ -9,6 +9,8 @@ import { TaskAssistant, taskDraftMessage, TICKET_AUTHORING_SKILLS } from './task
 import { ASSISTANT_PLANNING_SKILL, AUTO_ASSISTANT_AGENT, PLAN_ASSISTANT_AGENT } from './assistantModes';
 import { readFile } from 'node:fs/promises';
 import { parse as parseYaml } from 'yaml';
+import { randomUUID } from 'node:crypto';
+import { builtInWorkflow } from './currentWorkflowModels';
 
 const input = taskDraftInputSchema.parse({
   title: 'Add export', currentDescription: 'Keep the existing format', priority: 'High',
@@ -25,6 +27,33 @@ const proposal = {
   suggestedWorkflow: 'Test the exporter.', estimatedStoryPoints: 3,
   suggestedTags: ['export'], impactAnalysis: 'Inspect src/export.ts; graph limitations are noted.',
 };
+
+test('active authoring configuration reaches the selected native agent and model without enabling extra tools', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async (_config: SessionConfig) => ({
+    sendAndWait: async () => ({ data: { content: JSON.stringify(proposal) } }),
+    disconnect: async () => {},
+  }));
+  const document = await builtInWorkflow('ticket-authoring');
+  document.prompts[0].template = 'Custom authoring terminology.';
+  document.skills[0].instructions = 'Custom planning procedure.';
+  document.agents[0].model = 'workflow-authoring-model';
+  await new TaskAssistant().generate({
+    input: { ...input, agentModel: undefined }, project, signal: new AbortController().signal,
+    workflow: { scope: 'ticket-authoring', versionId: randomUUID(), document },
+  });
+  const configuration = create.mock.calls[0].arguments[0];
+  assert.equal(create.mock.callCount(), 4, 'Framing, impact, writer and quality each execute');
+  assert.equal(configuration.model, 'workflow-authoring-model');
+  assert.match(configuration.customAgents![0].prompt, /Custom authoring terminology/);
+  assert.match(configuration.customAgents![0].prompt, /Custom planning procedure/);
+  assert.equal(configuration.enableSkills, false);
+  assert.deepEqual(configuration.availableTools, []);
+  assert.deepEqual(configuration.customAgents![0].skills, []);
+  assert.match(configuration.systemMessage?.content ?? '', /read-only/);
+});
 
 test('ticket authoring skills are discoverable and technology-neutral', async () => {
   for (const name of TICKET_AUTHORING_SKILLS) {

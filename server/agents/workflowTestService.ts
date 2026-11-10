@@ -8,6 +8,7 @@ import {
 } from '../../shared/types/workflowTestRun';
 import { WorkflowEditorStore } from '../db/workflowEditorStore';
 import { RepositoryError } from '../git/repositoryService';
+import { orderedWorkflowNodes, workflowGraphErrors } from '../../shared/utils/workflowGraph';
 
 export interface WorkflowTestAgentExecutor {
   readonly providers: readonly string[];
@@ -77,12 +78,21 @@ export class WorkflowTestService {
     const configuration = workflowTestLaunchSchema.parse(raw);
     const { version } = await new WorkflowEditorStore(this.db).resolve(scope, configuration.versionId);
     const document = version.document;
+    if (document.runtimeReference || document.nodes.some((node) => node.kind === 'host')) {
+      throw new RepositoryError(422, 'Current orchestration imports are reference-only. Reference models and release host operations cannot run in the inference-only preview runner.');
+    }
+    if (document.execution) {
+      const errors = workflowGraphErrors(document, scope);
+      if (errors.length) throw new RepositoryError(422, errors.join(' '));
+      if (!configuration.phase || !document.nodes.some((node) => node.run?.phases.includes(configuration.phase!))) throw new RepositoryError(400, 'Choose a supported execution phase for this workflow preview.');
+    }
     const nodes = document.nodes.filter((node) => node.kind === 'agent');
     if (Object.keys(configuration.agents).some((id) => !nodes.some((node) => node.id === id))
       || nodes.some((node) => !configuration.agents[node.id])) {
       throw new RepositoryError(400, 'Specify exactly one real/mock configuration for every agent step, keyed by node ID.');
     }
     for (const node of nodes) {
+      if (document.execution && !node.run?.phases.includes(configuration.phase!)) continue;
       const agent = document.agents.find((item) => item.id === node.referenceId)!;
       const prompt = document.prompts.find((item) => item.id === agent.promptId)!;
       for (const variable of prompt.variables) {
@@ -98,8 +108,9 @@ export class WorkflowTestService {
     const run: WorkflowTestRun = {
       id: randomUUID(), scope, revision: 0, versionId: version.id, versionNumber: version.number,
       document, configuration, status: 'running', previewOnly: true, createdAt: now, updatedAt: now,
-      steps: document.nodes.map((node) => ({
-        nodeId: node.id, status: 'pending', mode: node.kind === 'agent' ? configuration.agents[node.id].mode : 'control',
+      steps: (document.execution ? orderedWorkflowNodes(document) : document.nodes).map((node) => ({
+        nodeId: node.id, status: document.execution && !node.run?.phases.includes(configuration.phase!) ? 'skipped' : 'pending',
+        mode: node.kind === 'agent' ? configuration.agents[node.id].mode : 'control',
       })),
     };
     await this.db.workflowTestRun.create({ data: { id: run.id, scope, status: run.status, snapshot: run } });
@@ -185,8 +196,13 @@ export class WorkflowTestService {
             .every((edge) => run.steps.some((previous) => previous.nodeId === edge.from && terminal(previous))));
         if (!step) throw new Error('No executable step remains in this graph.');
         const node = run.document.nodes.find((item) => item.id === step.nodeId)!;
-        const upstream = Object.fromEntries(run.document.edges.filter((edge) => edge.to === node.id).map((edge) =>
-          [edge.from, run.steps.find((previous) => previous.nodeId === edge.from)?.output ?? null]));
+        const upstreamIds = (id: string): string[] => {
+          const previous = run.steps.find((step) => step.nodeId === id);
+          if (run.document.execution && previous?.status === 'skipped') return run.document.edges.filter((edge) => edge.to === id).flatMap((edge) => upstreamIds(edge.from));
+          return [id];
+        };
+        const upstream = Object.fromEntries([...new Set(run.document.edges.filter((edge) => edge.to === node.id).flatMap((edge) => upstreamIds(edge.from)))]
+          .map((id) => [id, run.steps.find((previous) => previous.nodeId === id)?.output ?? null]));
         step.input = workflowJsonObjectSchema.parse({ variables: run.configuration.input, upstream });
         step.startedAt = new Date().toISOString();
         const hook = node.kind === 'hook' ? run.document.hooks.find((item) => item.id === node.referenceId) : undefined;
@@ -230,6 +246,12 @@ export class WorkflowTestService {
         this.assertResultBudget(run);
         if (step.status === 'running') step.status = 'completed';
         step.finishedAt = new Date().toISOString();
+        if (run.document.execution && ['author', 'plan'].includes(run.configuration.phase ?? '')
+          && ['plan', 'clarification'].includes(String(step.output?.kind))) {
+          for (const remaining of run.steps.filter((item) => item.status === 'pending')) {
+            remaining.status = 'skipped'; remaining.note = 'Returned to the host for human confirmation.'; remaining.finishedAt = step.finishedAt;
+          }
+        }
         await this.persist(run);
       }
       run.status = 'completed'; await this.persist(run);

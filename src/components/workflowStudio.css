@@ -101,6 +101,8 @@
 .studio-workflow-panel { position: absolute; z-index: 15; top: 64px; left: 14px; bottom: 80px; width: min(560px, calc(100% - 28px)); overflow: auto; border: 1px solid var(--studio-border); border-radius: 14px; background: #0c1729f5; box-shadow: 0 12px 35px #0007; }
 .studio-feedback { position: absolute; z-index: 25; bottom: 14px; right: 14px; max-width: min(560px, calc(100% - 28px)); max-height: 60px; overflow: auto; border: 1px solid var(--studio-border); border-radius: 10px; font-size: 12px; }
 .studio-feedback button { margin-left: 8px; }
+.studio-reference-info { margin: 12px; padding: 12px; border: 1px solid #38bdf855; border-radius: 10px; font-size: 12px; color: #a5d9ec; }
+.studio-reference-info p { margin-top: 8px; }
 .studio-connection-banner { position: absolute; z-index: 15; top: 64px; left: 14px; right: 14px; width: fit-content; max-width: calc(100% - 28px); padding: 10px; background: #123141; border: 1px solid #67e8f9; border-radius: 10px; font-size: 12px; }
 .studio-connection-banner button { margin-left: 8px; }
 .studio-compose-first [hidden] { display: none; }

@@ -20,6 +20,7 @@ import { agentWorkflowsSchema } from '../../shared/types/workflow';
 import { RuntimeTelemetry } from './runtimeTelemetry';
 import { attemptSnapshotSchema } from '../../shared/types/agent';
 import { TicketOrchestrator } from './ticketOrchestrator';
+import { WorkflowEditorStore } from '../db/workflowEditorStore';
 
 let directory: string;
 let db: PrismaClient;
@@ -163,13 +164,15 @@ test('transition queues one session that runs in auto mode and cannot change fil
   assert.equal(plan.plan, `${FIXTURE_PLAN}\n\n> **Why a plan is needed:** The fixture ticket changes shared behavior.`);
   assert.equal(plan.providerSessionId, 'fake-session');
   assert.equal(plan.context?.task.id, task.id);
-  assert.equal(plan.runtimes.length, 1);
+  assert.equal(plan.runtimes.length, 2, 'Read-only impact and adaptive executor have separate runtimes');
   assert.equal(plan.runtimes[0].phase, 'plan');
   assert.equal(plan.runtimes[0].status, 'completed');
   assert.equal(plan.runtimes[0].events[0].data.inputTokens, 100);
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].phase, 'execute');
-  assert.equal(calls[0].adaptive, true);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].workflowStep?.nodeId, 'impact');
+  assert.equal(calls[0].phase, 'plan');
+  assert.equal(calls[1].phase, 'execute');
+  assert.equal(calls[1].adaptive, true);
   assert.equal(calls[0].context.task.id, task.id);
   assert.ok(!('tasks' in calls[0].context));
   assert.equal(await readFile(path.join(plan.workspace!, 'README.md'), 'utf8'), '# main\n');
@@ -177,7 +180,7 @@ test('transition queues one session that runs in auto mode and cannot change fil
   assert.equal((await repositories.workspaces.ticketWorkspace('project-agent', plan.id, 'main')).workspace, plan.workspace);
   await assert.rejects(readFile(path.join(plan.workspace!, 'result.txt')));
   await sessions.tick();
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
 
   await sessions.approve(task.id, plan.id, plan.updatedAt);
   await assert.rejects(sessions.approve(task.id, plan.id, plan.updatedAt), /plan changed|awaiting approval/);
@@ -185,8 +188,8 @@ test('transition queues one session that runs in auto mode and cannot change fil
   const done = (await sessions.get(task.id))!;
   assert.equal(done.status, 'completed');
   assert.equal(done.resumeStatus, 'executing');
-  assert.equal(calls[1].phase, 'execute');
-  assert.equal(calls[1].plan, plan.plan);
+  assert.equal(calls[3].phase, 'execute');
+  assert.equal(calls[3].plan, plan.plan);
   assert.equal(await readFile(path.join(done.workspace!, 'result.txt'), 'utf8'), 'implemented');
   await assert.rejects(readFile(path.join(repositories.workspaces.pathFor('project-agent'), 'result.txt')));
   assert.equal((await repositories.workspaces.workspaceBranches('project-agent')).current, 'main');
@@ -196,6 +199,35 @@ test('transition queues one session that runs in auto mode and cannot change fil
   assert.equal(done.reviewStatus, 'pending');
   await entities.moveTask(task.id, { revision: reviewed.revision, status: 'Review' });
   assert.equal(await db.agentSession.count({ where: { taskId: task.id } }), 1);
+});
+
+test('workflow activation is pinned at queue time through approval, execution and review; a new attempt takes the new active version', async () => {
+  const workflows = new WorkflowEditorStore(db);
+  const base = await workflows.base('ticket-processing');
+  let state = await workflows.save('ticket-processing', 0, base);
+  state = await workflows.publish('ticket-processing', state.revision);
+  const version = state.versions[0];
+  state = await workflows.activate('ticket-processing', state.revision, version.id);
+  const task = await startTicket('workflow-pinning');
+  assert.equal((await sessions.get(task.id))?.context?.workflow?.versionId, version.id);
+  state = await workflows.activate('ticket-processing', state.revision, null);
+  await sessions.tick();
+  const planned = (await sessions.get(task.id))!;
+  assert.equal(planned.status, 'awaiting_approval');
+  assert.equal(calls.at(-1)?.context.workflow?.versionId, version.id);
+  await sessions.approve(task.id, planned.id, planned.updatedAt);
+  await sessions.tick();
+  assert.equal(calls.at(-1)?.context.workflow?.versionId, version.id);
+  const review = await sessions.review(task.id);
+  await sessions.aiReview(task.id, review.token);
+  assert.equal(calls.at(-1)?.context.workflow?.versionId, version.id);
+  const current = (await sessions.get(task.id))!;
+  await sessions.retry(task.id, current.id, 'Improve the result', current.updatedAt);
+  const retry = (await sessions.get(task.id))!;
+  assert.equal(retry.context?.workflow?.versionId, null);
+  const archived = await db.agentAttempt.findFirstOrThrow({ where: { sessionId: current.id, number: 1 } });
+  assert.equal(attemptSnapshotSchema.parse(archived.snapshot).context?.workflow?.versionId, version.id);
+  await sessions.cancel(task.id, retry.id);
 });
 
 test('agent options expose integrated providers and their model catalogue over HTTP', async () => {
@@ -300,7 +332,8 @@ test('an epic auto-executes tickets sequentially and enters review after every t
 
   const callOffset = calls.length;
   for (let step = 0; step < 4; step += 1) await sessions.tick();
-  const epicCalls = calls.slice(callOffset);
+  assert.equal(calls.slice(callOffset).filter((call) => call.workflowStep?.intermediate).length, 4);
+  const epicCalls = calls.slice(callOffset).filter((call) => !call.workflowStep?.intermediate);
   assert.equal(epicCalls.length, 4);
   assert.deepEqual(epicCalls.map((call) => [call.phase, !!call.adaptive]), [
     ['execute', true], ['execute', false], ['execute', true], ['execute', false],
@@ -448,8 +481,8 @@ test('auto mode executes a simple ticket directly and records plan and approval 
     assert.equal(done.status, 'completed', done.error);
     assert.equal(done.plan, '');
     assert.equal(done.output, 'Implementation complete; inspect result.txt.');
-    assert.deepEqual(calls.slice(callOffset).map((call) => [call.phase, call.adaptive]), [['execute', true]]);
-    assert.deepEqual(done.runtimes.map((runtime) => runtime.phase), ['execute']);
+    assert.deepEqual(calls.slice(callOffset).map((call) => [call.phase, call.adaptive]), [['plan', false], ['execute', true]]);
+    assert.deepEqual(done.runtimes.map((runtime) => runtime.phase), ['plan', 'execute']);
     assert.equal(await readFile(path.join(done.workspace!, 'result.txt'), 'utf8'), 'implemented');
     assert.deepEqual((await sessions.workflows('project-agent'))[task.id], {
       plan: 'skipped', approval: 'skipped', execution: 'completed', review: 'waiting', delivery: 'pending',
@@ -683,7 +716,7 @@ test('structured checks, snapshot-bound human review and correction attempts rem
   assert.ok(aiReview.report.length > 0);
   assert.equal(calls.at(-1)?.phase, 'review');
   const reviewedRuntimes = (await sessions.get(task.id))!.runtimes;
-  assert.deepEqual(reviewedRuntimes.map((runtime) => runtime.phase), ['plan', 'execute', 'review']);
+  assert.deepEqual(reviewedRuntimes.map((runtime) => runtime.phase), ['plan', 'plan', 'plan', 'execute', 'review', 'review']);
   assert.equal(reviewedRuntimes.at(-1)?.events[0].data.cost, 0.5);
   assert.equal(await readFile(path.join(row.workspace!, documentationPath), 'utf8'), `# ${task.title}\n\nDocuments the implementation.\n`);
   await assert.rejects(sessions.acceptReview(task.id, row.id, '2020-01-01T00:00:00.000Z', review.token), /execution changed/);
@@ -716,7 +749,7 @@ test('structured checks, snapshot-bound human review and correction attempts rem
   await sessions.tick();
   row = (await sessions.get(task.id))!;
   assert.equal(row.status, 'awaiting_approval');
-  assert.equal(row.runtimes.length, 1);
+  assert.equal(row.runtimes.length, 2);
   assert.equal(row.runtimes[0].phase, 'plan');
   assert.equal(calls.at(-1)?.feedback, 'Fix the failing assertion');
   assert.equal(await readFile(path.join(row.workspace!, 'result.txt'), 'utf8'), 'Edited after opening diff', 'planning retains changes without executing');

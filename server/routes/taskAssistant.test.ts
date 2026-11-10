@@ -7,6 +7,9 @@ import { EntityError } from '../db/entityStore';
 import { RepositoryError } from '../git/repositoryService';
 import type { TaskDraftRequest, TaskGenerator } from '../agents/taskAssistant';
 import { createTaskAssistantRouter } from './taskAssistant';
+import type { WorkflowEditorStore } from '../db/workflowEditorStore';
+import { builtInWorkflow } from '../agents/currentWorkflowModels';
+import { randomUUID } from 'node:crypto';
 
 const proposal = taskDraftResultSchema.parse({
   kind: 'proposal', title: 'Export', description: 'Export the selected records.', acceptanceCriteria: ['Ordering is preserved.'],
@@ -14,7 +17,7 @@ const proposal = taskDraftResultSchema.parse({
   suggestedTags: ['export'], impactAnalysis: 'src/export.ts needs inspection.', graphAvailable: true,
 });
 
-async function fixture(t: test.TestContext, assistant?: TaskGenerator) {
+async function fixture(t: test.TestContext, assistant?: TaskGenerator, workflows?: Pick<WorkflowEditorStore, 'active'>) {
   const resolved: string[] = [];
   const app = express();
   app.use(express.json());
@@ -33,7 +36,7 @@ async function fixture(t: test.TestContext, assistant?: TaskGenerator) {
       if (id === 'broken') throw new RepositoryError(503, 'Project clone is unavailable');
       return { cwd: `/clones/${id}`, branch: 'main' };
     },
-  }, assistant));
+  }, assistant, workflows));
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>((resolve) => server.once('listening', resolve));
   t.after(async () => {
@@ -49,6 +52,22 @@ async function fixture(t: test.TestContext, assistant?: TaskGenerator) {
   );
   return { post, resolved };
 }
+
+test('authoring pins the active workflow before workspace preparation and does not accept a client-supplied snapshot', async (t) => {
+  const active = { scope: 'ticket-authoring' as const, versionId: randomUUID(), document: await builtInWorkflow('ticket-authoring') };
+  const snapshot = structuredClone(active);
+  let actual: TaskDraftRequest | undefined;
+  const { post } = await fixture(t, { async generate(request) {
+    actual = request;
+    active.versionId = randomUUID();
+    return proposal;
+  } }, { async active(scope) { assert.equal(scope, 'ticket-authoring'); return structuredClone(active); } });
+  const response = await post('p1', { title: 'Export', workflow: { versionId: 'untrusted' } });
+  assert.equal(response.status, 200);
+  assert.deepEqual(actual?.workflow, snapshot);
+  assert.notEqual(actual?.workflow?.versionId, active.versionId);
+  assert.equal('workflow' in actual!.input, false);
+});
 
 test('drafting resolves the owning project clone, validates the input and returns a proposal without saving', async (t) => {
   const calls: TaskDraftRequest[] = [];

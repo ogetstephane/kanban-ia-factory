@@ -38,3 +38,21 @@ test('workflow documents enforce exact resource and script limits', () => {
   const nodes = document.nodes.map((node) => node.kind === 'approval' ? { ...node, referenceId: 'hook' } : node);
   assert.equal(workflowDocumentSchema.safeParse({ ...document, nodes }).success, false);
 });
+
+test('host operations and labelled resumption cycles require an explicit reference model', () => {
+  const original = documentFixture();
+  const reference = {
+    ...original, hooks: [], runtimeReference: { scope: 'wiki', revision: 1, execution: 'reference-only' },
+    operations: [{ id: 'wait', name: 'Wait', category: 'wait', responsibility: 'Wait for approval',
+      policy: 'Explicit user action', sources: ['server/wiki/wikiAssistant.ts#WikiAssistant'] }],
+    nodes: [original.nodes[0], { ...original.nodes[1], kind: 'host', referenceId: 'wait' }],
+    edges: [{ from: 'writer', to: 'check', label: 'Plan ready' }, { from: 'check', to: 'writer', label: 'Explicit approved resubmit' }],
+  };
+  assert.ok(workflowDocumentSchema.safeParse(reference).success);
+  assert.equal(workflowDocumentSchema.safeParse({ ...reference, runtimeReference: undefined }).success, false);
+  assert.equal(workflowDocumentSchema.safeParse({ ...reference, operations: [] }).success, false);
+  assert.equal(workflowDocumentSchema.safeParse({ ...reference, nodes: original.nodes }).success, false);
+  assert.equal(workflowDocumentSchema.safeParse({ ...reference, operations: [...reference.operations, ...reference.operations] }).success, false);
+  assert.equal(workflowDocumentSchema.safeParse({ ...reference, operations: [{ ...reference.operations[0], sources: ['https://untrusted.invalid'] }] }).success, false);
+  assert.equal(workflowDocumentSchema.safeParse({ ...original, agents: [{ ...original.agents[0], promptVariants: [{ when: 'alternate', promptId: 'missing' }] }] }).success, false);
+});

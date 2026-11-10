@@ -6,6 +6,7 @@ import { RuntimeTelemetry } from './runtimeTelemetry';
 import { GRAPHIFY_SKILL_INSTRUCTION, graphifySkillConfiguration } from './graphifySkill';
 import { copilotTicketTools } from './ticketTools';
 import { ticketSession } from './ticketSession';
+import { ticketWorkflowAgent } from './workflowRuntime';
 
 async function accountQuota(client: CopilotClient) {
   const observedAt = new Date().toISOString();
@@ -88,21 +89,26 @@ export class CopilotProvider implements AgentProvider {
       await telemetry.update({ accountQuotaAtStart: await accountQuota(client) });
       const message = agentMessage(request);
       const ticketModel = request.context.task.agentModel;
-      const requestedModel = request.resolvedModel || ticketModel || process.env.COPILOT_MODEL || undefined;
+      const requestedModel = request.resolvedModel || ticketModel || ticketWorkflowAgent(request)?.model || process.env.COPILOT_MODEL || undefined;
       const configuration = {
         onEvent: telemetry.event,
         workingDirectory: request.workspace,
         ...(requestedModel ? { model: requestedModel } : {}),
         ...graphifySkillConfiguration(tools),
+        ...((request.context.workflow?.versionId || request.context.workflow?.document.execution) ? {
+          availableTools: tools.map((tool) => tool.name), enableSkills: false, skillDirectories: [],
+        } : {}),
         streaming: true,
         systemMessage: {
           mode: 'replace',
-          content: [...definition.instructions, GRAPHIFY_SKILL_INSTRUCTION].join('\n'),
+          content: [...definition.instructions, ...((request.context.workflow?.versionId || request.context.workflow?.document.execution) ? [] : [GRAPHIFY_SKILL_INSTRUCTION])].join('\n'),
         },
       } satisfies SessionConfig;
       await telemetry.update({
         message, configuration,
-        permissionPolicy: 'Only the bundled ticket-graphify skill may be loaded. Registered custom tools are approved; built-in permissions are denied.',
+        permissionPolicy: request.context.workflow?.versionId || request.context.workflow?.document.execution
+          ? 'Workflow step skills are injected. Registered phase tools are approved; native skills and built-in permissions are denied.'
+          : 'Only the bundled ticket-graphify skill may be loaded. Registered custom tools are approved; built-in permissions are denied.',
       });
       const session = await client.createSession(configuration).catch((error: unknown) => {
         throw unavailableModelError(error, requestedModel, !!ticketModel) ?? error;

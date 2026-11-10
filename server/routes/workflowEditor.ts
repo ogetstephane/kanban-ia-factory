@@ -13,6 +13,8 @@ export function createWorkflowEditorRouter(store: WorkflowEditorStore) {
     try { res.json(await action(req)); } catch (error) { next(error); }
   };
   router.get('/workflow-editor/:scope', handle((req) => store.get(workflowScopeSchema.parse(req.params.scope))));
+  router.get('/workflow-editor/:scope/current-orchestration', handle((req) => store.currentOrchestration(workflowScopeSchema.parse(req.params.scope))));
+  router.get('/workflow-editor/:scope/base', handle((req) => store.base(workflowScopeSchema.parse(req.params.scope))));
   router.put('/workflow-editor/:scope', handle((req) => {
     const { revision, document } = revisionSchema.extend({ document: workflowDocumentSchema }).parse(req.body);
     return store.save(workflowScopeSchema.parse(req.params.scope), revision, document);
@@ -24,6 +26,10 @@ export function createWorkflowEditorRouter(store: WorkflowEditorStore) {
   router.post('/workflow-editor/:scope/select', handle((req) => {
     const { revision, versionId } = revisionSchema.extend({ versionId: z.string().uuid() }).parse(req.body);
     return store.select(workflowScopeSchema.parse(req.params.scope), revision, versionId);
+  }));
+  router.post('/workflow-editor/:scope/activate', handle((req) => {
+    const { revision, versionId } = revisionSchema.extend({ versionId: z.string().uuid().nullable() }).parse(req.body);
+    return store.activate(workflowScopeSchema.parse(req.params.scope), revision, versionId);
   }));
   router.post('/workflow-editor/:scope/resolve', handle((req) => {
     const { versionId } = z.object({ versionId: z.string().uuid().optional() }).parse(req.body);

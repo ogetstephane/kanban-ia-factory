@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { taskSchema, projectSchema, featureSchema } from './board';
 import { agentProviderSchema } from './agentProvider';
+import { workflowRuntimeSnapshotSchema } from './workflowEditor';
 
 export const agentOptionsSchema = z.object({
   providers: z.array(z.object({
@@ -17,6 +18,7 @@ export const agentContextSchema = z.object({
   task: taskSchema,
   project: projectSchema.nullable(),
   feature: featureSchema.nullable(),
+  workflow: workflowRuntimeSnapshotSchema.optional(),
 });
 export type AgentContext = z.infer<typeof agentContextSchema>;
 

@@ -26,9 +26,10 @@ export function agentMessage(request: AgentRequest): MessageOptions {
     prompt: JSON.stringify({
       phase: request.phase,
       ...(request.adaptive ? { mode: 'adaptive' } : {}),
-      context: { ...request.context, task: { ...request.context.task, contextFiles } },
+      context: { project: request.context.project, feature: request.context.feature, task: { ...request.context.task, contextFiles } },
       approvedPlan: request.plan, feedback: request.feedback,
       previousAnswers: request.answers, reviewDiff: request.reviewDiff,
+      ...(request.workflowStep ? { workflowStep: request.workflowStep } : {}),
     }),
     ...(attachments.length ? { attachments } : {}),
   };

@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma, AgentSession } from '@prisma/client';
 import type { AgentContext } from '../../shared/types/agent';
 import { recordActivity } from '../db/activityLog';
+import { resolveActiveWorkflow } from '../db/workflowEditorStore';
 
 /** `planFirst` forces a read-only planning run (a revised plan was requested); otherwise the next run is adaptive. */
 export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSession, context: AgentContext, feedback: string, autoExecute = false, planFirst = false) {
+  context = { ...context, workflow: await resolveActiveWorkflow('ticket-processing', tx) };
   const now = new Date().toISOString();
   const questions = await tx.agentQuestion.findMany({ where: { sessionId: row.id }, orderBy: { createdAt: 'asc' } });
   const checks = await tx.agentCheck.findMany({ where: { sessionId: row.id, attempt: row.attempt }, orderBy: { createdAt: 'asc' } });
@@ -47,6 +49,7 @@ export async function enqueueTicket(tx: Prisma.TransactionClient, context: Agent
     return;
   }
   const now = new Date().toISOString();
+  context = { ...context, workflow: await resolveActiveWorkflow('ticket-processing', tx) };
   const session = await tx.agentSession.create({
     data: {
       id: randomUUID(), taskId: context.task.id, provider, status: 'queued',
