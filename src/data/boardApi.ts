@@ -5,6 +5,7 @@ import {
 } from '../../shared/types/board';
 import type { Project, Feature, Task, KanbanStatus } from '../../shared/types/kanban';
 import { taskDraftInputSchema, taskDraftResultSchema, type TaskDraftInput } from '../../shared/types/taskDraft';
+import { taskBreakdownResultSchema } from '../../shared/types/taskBreakdown';
 import { ALL_PROJECTS } from '../utils/projectLogic';
 import { entityPath, request, validInput } from './apiClient';
 
@@ -65,6 +66,12 @@ export const boardApi = {
     const data = validInput(taskDraftInputSchema, input);
     return taskDraftResultSchema.parse(await request(
       `${entityPath('projects', projectId)}/tasks/assistant`, 'POST', data, signal,
+    ));
+  },
+  async assistBreakdown(projectId: string, input: TaskDraftInput, signal?: AbortSignal) {
+    const data = validInput(taskDraftInputSchema, input);
+    return taskBreakdownResultSchema.parse(await request(
+      `${entityPath('projects', projectId)}/tasks/breakdown`, 'POST', data, signal,
     ));
   },
   async reset() { await request('/reset', 'POST'); },

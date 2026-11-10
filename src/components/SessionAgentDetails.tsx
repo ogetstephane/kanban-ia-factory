@@ -51,8 +51,8 @@ function RuntimeDetails({ runtime }: { runtime: AgentRuntime }) {
     <dl className="grid grid-cols-2 gap-2 lg:grid-cols-4">
       <Metric label="Agent">{agentName(overview)}</Metric>
       <Metric label="Subagents">{overview.subagents.join(', ') || 'None'}</Metric>
-      <Metric label="Copilot quota used / entitlement">{quota ? quota.unlimited ? 'Unlimited' : `${number(quota.used)} / ${number(quota.entitlement)}` : 'Not reported'}</Metric>
-      <Metric label="Copilot quota available">{quota?.remainingPercentage == null ? 'Not reported' : `${quota.remainingPercentage.toFixed(1)}%`}</Metric>
+      <Metric label="Provider quota used / entitlement">{quota ? quota.unlimited ? 'Unlimited' : `${number(quota.used)} / ${number(quota.entitlement)}` : 'Not reported'}</Metric>
+      <Metric label="Provider quota available">{quota?.remainingPercentage == null ? 'Not reported' : `${quota.remainingPercentage.toFixed(1)}%`}</Metric>
       <Metric label="Runtime ID">{runtime.id}</Metric>
       <Metric label="Provider session ID">{runtime.providerSessionId ?? 'Not created'}</Metric>
       <Metric label="Started">{new Date(runtime.startedAt).toLocaleString()}</Metric>
@@ -66,7 +66,7 @@ function RuntimeDetails({ runtime }: { runtime: AgentRuntime }) {
       <Metric label="Selected model">{typeof start?.selectedModel === 'string' ? start.selectedModel : 'Not reported'}</Metric>
       <Metric label="Reasoning effort">{typeof start?.reasoningEffort === 'string' ? start.reasoningEffort : 'Not reported'}</Metric>
       <Metric label="Context tier">{typeof start?.contextTier === 'string' ? start.contextTier : 'Not reported'}</Metric>
-      <Metric label="Copilot version">{typeof start?.copilotVersion === 'string' ? start.copilotVersion : 'Not reported'}</Metric>
+      <Metric label="Runtime version">{typeof start?.copilotVersion === 'string' ? start.copilotVersion : typeof start?.runtimeVersion === 'string' ? start.runtimeVersion : 'Not reported'}</Metric>
     </dl>
     {runtime.error && <p role="alert" className="whitespace-pre-wrap text-xs text-rose-300">{runtime.error}</p>}
     <JsonDetails title="Context window details (latest root-agent sample)" value={context ?? null} />

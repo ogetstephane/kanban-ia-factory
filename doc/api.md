@@ -5,6 +5,104 @@ All board endpoints are under `/api/board` and defined in
 zod schemas in [shared/types/board.ts](../shared/types/board.ts). Responses are sent with
 `Cache-Control: no-store`.
 
+## Workflow studio (configuration and preview tests)
+
+The global studio uses `/workflow-editor/:scope`, where `scope` is
+`ticket-authoring`, `ticket-processing`, `wiki` or `releases`. Configurations are
+independent of project selection. Definitions and graph constraints are validated by
+[workflowEditor.ts](../shared/types/workflowEditor.ts).
+
+| Method | Path suffix | Body | Response |
+|--------|-------------|------|----------|
+| `GET` | none | — | `{ scope, revision, draft, selectedVersionId, versions }` |
+| `PUT` | none | `{ revision, document }` | Saved draft and incremented revision |
+| `POST` | `/publish` | `{ revision }` | Immutable numbered version, selected as default |
+| `POST` | `/select` | `{ revision, versionId }` | Restored default without changing the draft |
+| `POST` | `/resolve` | `{ versionId? }` | `{ scope, version, runtimeConnected: false }` |
+
+Reads of an unconfigured scope return an editable template without writing to the
+database. The template is not a reconstruction of current runtime behavior. Writes
+reject stale revisions with `409`; invalid documents/scopes return `400`; missing
+or cross-scope versions return `404`. Responses use `Cache-Control: no-store`.
+Graphs must be connected and acyclic, with valid agent, prompt, skill and hook
+references. Template placeholders must be declared in their prompt's variables.
+Scripts require nonempty content and `approvalRequired: true`, but are stored as
+**inert text**: saving, publishing and resolving never run scripts or AI.
+
+The editor document is a design format, not an executable Core workflow catalog.
+`/resolve` previews an immutable snapshot, explicitly selected or using the saved
+default; it does not start or modify a session. Existing production authoring, ticket, wiki
+and release runtimes do not consume these definitions yet. Future integration
+must persist the selected snapshot at launch; restoring a default must affect only
+future launches, never an already-running execution.
+
+### Preview test runs
+
+These endpoints extend `/workflow-editor/:scope/test-runs`. They use a separate
+preview runner, never the production ticket queue or write services.
+
+| Method | Path suffix | Body | Response |
+|--------|-------------|------|----------|
+| `GET` | `/options` | — | `{ realProviders, previewOnly: true }` |
+| `GET` | none | — | Latest 20 run summaries for this scope |
+| `POST` | none | Launch configuration below | Persisted pinned test run |
+| `GET` | `/:id` | — | Run configuration, immutable document and per-node inputs/outputs/status/errors |
+| `POST` | `/:id/approve` | `{ revision, nodeId }` | Continue a waiting preview approval |
+| `POST` | `/:id/cancel` | `{ revision }` | Cancel without replay or late success |
+
+A launch requires an explicit published `versionId`, `input` JSON object,
+`authorizeRealAgents` boolean, and `agents` keyed by **agent node ID**, not by
+definition ID. Every agent node must have exactly one configuration:
+
+```json
+{
+  "versionId": "00000000-0000-4000-8000-000000000001",
+  "input": { "request": "Draft the requested ticket" },
+  "authorizeRealAgents": false,
+  "agents": {
+    "agent-step": {
+      "mode": "mock",
+      "delayMs": 0,
+      "response": { "kind": "output", "output": { "title": "My exact mock" } }
+    }
+  }
+}
+```
+
+Alternatively use `response: { kind: "error", error: "Chosen failure" }`, or
+`{ mode: "real" }` for a real agent. Mixed runs are supported. Mocks are literal
+JSON objects, never implicit fallbacks, and are saved with the run for reuse.
+Delay is 0–30,000 ms; JSON objects are bounded at 64,000 characters; launch
+configuration at 256,000 characters and 100 agent nodes. All prompt variables
+must be supplied as input keys. Strings substitute directly into `{{variable}}`;
+other values substitute as JSON. Each agent receives
+`{ variables: input, upstream: { predecessorNodeId: output } }` separately.
+
+The initial real preview adapter supports **Copilot only** (`inherit` resolves to
+Copilot). Unsupported providers return `422`, absent live-call consent returns
+`400`; authentication/output failures fail the step with no provider/mock fallback.
+Real calls use isolated temporary SDK sessions, no repository context, disabled
+ambient discovery, an empty verified tool inventory, and deny-all permission/tool
+hooks. Role, prompt and selected skill text are supplied; tools, delegation,
+production autonomy and production iteration settings are not enabled. Calls may
+consume AI quota. No live calls are needed for offline validation.
+
+Nodes execute sequentially in topological order; joins wait for all predecessors.
+Approval nodes/hooks pause for explicit continuation. Log/validate hooks are
+preview checkpoints (JSON structure/size only, not business-quality validation).
+Lifecycle-event metadata does not dispatch hooks independently of their graph
+position. **Script hooks are skipped**, explicitly marked, and never executed.
+No ticket, repository, release or production-session mutation is reachable.
+
+Runs persist their definition, mocks, inputs and outputs. Default restoration or
+draft changes cannot modify a launched snapshot. Stale approvals/cancellations
+return `409`; cross-scope run IDs return `404`. At most four runs may start/execute
+concurrently (`429` otherwise). Active execution segments are limited to ten
+minutes, each real call to two minutes, and results to 1,000,000 characters.
+Restart marks interrupted running tests failed without replaying AI calls; waiting
+approvals remain resumable. Shutdown cancels active tests. Responses are no-store.
+Treat persisted test prompts and outputs as application data: do not supply secrets.
+
 ## Projects and board
 
 | Method | Path | Body | Response |
@@ -81,7 +179,7 @@ unless it judges that a plan is needed first. In `plan`, it always returns a pla
 Send the reviewed plan as `approvedPlan` (Markdown, up to 20,000 characters) to get the
 specification without planning again. The modes are the Copilot SDK custom agents
 `kanban-auto-assistant` and `kanban-plan-assistant`. Both preload the bundled
-[`assistant-planning`](../.github/skills/assistant-planning/SKILL.md) skill.
+[`assistant-planning`](../server/skills/assistant-planning/SKILL.md) skill.
 
 The read-only Copilot SDK session loads the shared `ticket-graphify` skill on demand.
 A plan response is `{ kind: 'plan', plan, reason, graphAvailable }`. A specification
@@ -89,6 +187,10 @@ response has `kind: 'proposal'` and contains `title`, `description`, `acceptance
 `suggestedWorkflow`, `estimatedStoryPoints` (1, 2, 3, 5 or 8), `suggestedTags`,
 `impactAnalysis` (Markdown), and `graphAvailable` (whether this run had a graph,
 not proof that a particular dependency was verified).
+Single-ticket proposals may also include `openQuestions` (up to 30 nonempty
+strings, 2,000 characters each); generation requests this field, while older
+responses without it remain accepted. Auto-Spec appends these decisions to the
+editable description so a manual save preserves them.
 
 Invalid input returns `400`; an unknown project returns `404`; unavailable Copilot
 authentication/configuration returns `503`; invalid responses or generation failures
@@ -96,7 +198,72 @@ return `502`; rejected model context size returns `413`. There is no template
 fallback. Graph unavailability does not block drafting but is explicitly reported.
 Disconnecting or cancelling aborts generation. Saving the returned draft remains manual.
 
+In Auto mode, before drafting, essential missing user decisions may instead
+produce `{ kind: 'clarification', reason, questions, graphAvailable }`. There are
+1–5 unique nonempty questions (2,000 characters each); `reason` has the same limit.
+No ticket proposal accompanies this response. The form collects answers and sends
+them only on **Generate from answers**, using `clarificationAnswers`:
+`[{ question, answer }]` (1–5 entries; question up to 2,000 characters, answer up to
+4,000; both trimmed and nonempty). These are reference data, not permissions or
+plan approval. Responses use the original project and current draft context.
+
+Clarification is a single round: after answers, the assistant must produce a
+proposal or a plan, listing any remaining uncertainty in `openQuestions` rather
+than asking again. Another clarification then returns `502`. Plan mode still
+requires a plan; `approvedPlan` still requires a proposal. Questions are not
+enabled for wiki generation. Invalid question responses return `502`; invalid
+answer input returns `400`. No dedicated endpoint or persisted assistant session
+is introduced.
+
+Both drafting modes also preload the technology-neutral `ticket-framing`,
+`ticket-writing`, `ticket-decomposition` and `ticket-quality` skills. They guide
+scope, measurable acceptance criteria, verification, evidence and a final
+self-check; structural validation is still enforced by the host.
+
+`POST /projects/:projectId/tasks/breakdown` accepts the same draft input, mode and
+approved plan. It uses the same project-scoped read-only tools and cancellation.
+It returns a plan, or `{ kind: 'proposal', summary, impactAnalysis, openQuestions,
+tasks, graphAvailable }`. Each of 1–20 tasks contains the single-ticket proposal
+fields plus `id` (local lowercase slug), `priority`, and `dependsOn` (local IDs).
+IDs must be unique; prerequisites must be unique earlier tickets. Missing/self/
+forward references and cycles are rejected. Proposals are limited to 150,000
+JSON characters. No database writes occur during generation.
+It also supports the same clarification response and answer input before
+drafting; answers remain attached when a subsequent plan is approved.
+
+The UI requires all prerequisites of selected tickets to remain selected and
+saves only on **Add Selected Tasks to Board**, through the existing atomic
+`POST /breakdown`. Tickets share the selected feature; prerequisite titles,
+per-ticket impact and open questions are preserved in descriptions. Dependency
+references are planning metadata, not scheduler-enforced execution gates.
+Only Backlog/To Do features can be used in this authoring UI, avoiding immediate
+execution when adding tickets to an active epic. A failed save keeps the proposal.
+
+The client derives a deterministic review report through the shared
+[proposal checks](../shared/utils/ticketProposalQuality.ts); it is not a
+model-authored field or a new API response property. The report reuses the
+canonical schemas and flags repeated criteria/subtasks, repeated ticket titles/
+descriptions, and declared open decisions (including per-ticket decisions).
+Repeated text is compared after Unicode normalization, lowercasing and
+whitespace normalization, not semantic similarity. These warnings do not prevent
+manual saving; invalid API responses and invalid selected prerequisites still do.
+No inference request is needed to compute the report.
+
 ## Agent sessions
+
+`GET /agent-options` returns `{ providers }`, with `id` (`copilot` or `claude-code`),
+`name`, `defaultModel`, `models`, `available`, `experimental`, and nullable `issue`
+for each registered ticket runtime. Catalogue failures are reported per provider.
+Tasks accept either provider ID in `agentProvider` (default `copilot`); provider
+and explicit model selection are captured with each queued/replanned session.
+An empty model selection resolves that runtime's server default per phase.
+Plan, execution and
+AI review use that runtime without fallback. A stored runtime/context mismatch
+is refused. Claude requires explicit experimental activation and a dedicated
+server key; options expose it as unavailable otherwise. See
+[experimental ticket runtime](./agent-sessions.md#experimental-claude-ticket-runtime).
+The project health endpoint still diagnoses the default Copilot runtime, not all
+selected ticket runtimes. Auto-Spec and wiki remain separate Copilot assistants.
 
 | Method | Path | Body / query | Response |
 |--------|------|--------------|----------|

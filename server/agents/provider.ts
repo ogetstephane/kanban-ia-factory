@@ -1,9 +1,12 @@
-import type { AgentContext, AgentQuestionInput, AgentRuntime } from '../../shared/types/agent';
+import type { AgentCheckScript, AgentContext, AgentQuestionInput, AgentRuntime } from '../../shared/types/agent';
+import type { AgentOptions } from '../../shared/types/agent';
 
 export interface PlanApprovalRequest { plan: string; reason: string }
 
 export interface AgentRequest {
   context: AgentContext;
+  /** Runtime-resolved model, without overwriting the snapshotted ticket selection. */
+  resolvedModel?: string;
   workspace: string;
   phase: 'plan' | 'execute' | 'review';
   plan: string;
@@ -18,7 +21,7 @@ export interface AgentRequest {
   signal?: AbortSignal;
   feedback?: string;
   reviewDiff?: string;
-  recordCheck?: (result: { script: 'test' | 'lint'; passed: boolean; output: string }) => Promise<void>;
+  recordCheck?: (result: { script: AgentCheckScript; passed: boolean; output: string }) => Promise<void>;
 }
 
 export interface AgentProvider {
@@ -26,4 +29,5 @@ export interface AgentProvider {
   run(request: AgentRequest): Promise<string>;
   health?(): Promise<{ authenticated: boolean; issue?: string }>;
   models?(): Promise<Array<{ id: string; name: string }>>;
+  options?(): Promise<AgentOptions>;
 }

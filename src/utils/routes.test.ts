@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { isViewMode, taskEditorPath, taskReturnPath, VIEW_MODES, viewPath } from './routes';
 
 test('every main view has a project-scoped, shareable URL', () => {
-  assert.equal(VIEW_MODES.length, 11);
+  assert.equal(VIEW_MODES.length, 12);
   for (const view of VIEW_MODES) {
     assert.equal(isViewMode(view), true);
     assert.equal(viewPath('project one', view), `/projects/project%20one/${view}`);

@@ -103,7 +103,7 @@ ignore rules without changing `HEAD`.
 ### Shared on-demand skill
 
 The harness registers the bundled
-[`ticket-graphify` skill](../../../.github/skills/ticket-graphify/SKILL.md) with the
+[`ticket-graphify` skill](../../../server/skills/ticket-graphify/SKILL.md) with the
 Copilot SDK's `skillDirectories` and enables its native `skill` tool. Initial
 context contains the skill catalog metadata and a short activation instruction,
 not the full workflow or graph report. The agent loads the skill body on demand
@@ -460,7 +460,7 @@ unexpected route errors return 500.
   caching, snapshots, reports and graph queries.
 - [Copilot provider](../../../server/agents/copilotProvider.ts) and
   [context files](../../../server/agents/contextFiles.ts): ticket tools and prompt context.
-- [Impact-analysis skill](../../../.github/skills/ticket-graphify/SKILL.md) and
+- [Impact-analysis skill](../../../server/skills/ticket-graphify/SKILL.md) and
   [SDK registration](../../../server/agents/graphifySkill.ts): on-demand workflow,
   trusted skill selection and unavailable-graph fallback.
 - [Task assistant](../../../server/agents/taskAssistant.ts) and

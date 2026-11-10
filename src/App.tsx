@@ -29,6 +29,7 @@ const ActivityView = lazy(() => import('./components/ActivityView').then((module
 const WikiView = lazy(() => import('./components/WikiView'));
 const CodeGraphView = lazy(() => import('./components/CodeGraphView'));
 const ArchifyView = lazy(() => import('./components/ArchifyView'));
+const WorkflowEditorView = lazy(() => import('./components/WorkflowEditorView'));
 const STORAGE_ACTIVE_PROJECT_KEY = 'kanban_flow_active_project_id_v1';
 type ProjectAction = { kind: 'task'; status: KanbanStatus } | { kind: 'feature' } | { kind: 'breakdown' };
 
@@ -51,6 +52,7 @@ function NotFound() {
 }
 
 function Workspace() {
+  const [studioImmersive, setStudioImmersive] = useState(true);
   const navigate = useNavigate();
   const params = useParams();
   const projectsState = useProjects();
@@ -241,7 +243,7 @@ function Workspace() {
   };
 
   const handleApplyBreakdown = (feature: Feature, tasksToAdd: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>[]) => {
-    void boardOps.run(async () => {
+    return boardOps.run(async () => {
       const projectId = feature.projectId || activeProjectId;
       if (!projects.some((project) => project.id === projectId)) throw new Error('Select a project before creating a breakdown.');
       const now = new Date().toISOString();
@@ -331,6 +333,7 @@ function Workspace() {
           <X className="h-4 w-4" />
         </button>}
       </div>}
+      <div style={{ display: viewMode === 'workflows' && studioImmersive ? 'none' : 'contents' }}>
       <Navbar
         projects={projects}
         activeProjectId={activeProjectId}
@@ -349,6 +352,7 @@ function Workspace() {
         onResetDemoData={handleResetDemoData}
         taskCount={activeProjectTasks.length}
       />
+      </div>
 
       {['board', 'analytics'].includes(viewMode) && <FeatureBar
         features={activeProjectFeatures}
@@ -391,7 +395,7 @@ function Workspace() {
         </div>
       )}
 
-      <main className="w-full min-w-0 flex-1 p-4 sm:p-6 lg:p-8 overflow-x-auto">
+      <main className={`w-full min-w-0 flex-1 overflow-x-auto ${viewMode === 'workflows' ? 'p-2 sm:p-3' : 'p-4 sm:p-6 lg:p-8'}`}>
         {viewMode === 'cockpit' ? (
           <Suspense fallback={<p role="status">Loading cockpit...</p>}>
             <CockpitView key={`${activeProjectId}:${releaseRefresh}`} scopeId={activeProjectId} projects={projects}
@@ -442,6 +446,10 @@ function Workspace() {
           <Suspense fallback={<p role="status">Loading diagrams...</p>}>
             <ArchifyView />
           </Suspense>
+        ) : viewMode === 'workflows' ? (
+          <Suspense fallback={<p role="status">Loading workflow studio...</p>}>
+            <WorkflowEditorView immersive={studioImmersive} onImmersiveChange={setStudioImmersive} />
+          </Suspense>
         ) : viewMode === 'releases' ? (
           <Suspense fallback={<p role="status">Loading releases...</p>}>
             <ReleasesView key={activeProjectId} projectId={activeProjectId} projects={projects} onOpenTask={handleEditTask} refreshKey={releaseRefresh} focusReleaseId={focusReleaseId} />
@@ -490,6 +498,7 @@ function Workspace() {
         isOpen={isBreakdownModalOpen}
         onClose={() => setIsBreakdownModalOpen(false)}
         features={activeProjectFeatures}
+        projectId={activeProjectId}
         initialFeatureId={breakdownFeatureId}
         onApplyBreakdown={handleApplyBreakdown}
       />

@@ -15,7 +15,8 @@ export class RuntimeTelemetry {
       status: 'running', startedAt: new Date().toISOString(), endedAt: null, error: '',
       metadata: {
         provider: request.context.task.agentProvider,
-        requestedModel: request.context.task.agentModel ?? process.env.COPILOT_MODEL ?? null,
+        requestedModel: request.resolvedModel ?? request.context.task.agentModel ?? (request.context.task.agentProvider === 'claude-code'
+          ? null : process.env.COPILOT_MODEL) ?? null,
         workspace: request.workspace, context: request.context,
         approvedPlan: request.plan, feedback: request.feedback ?? null,
         previousAnswers: request.answers, reviewDiff: request.reviewDiff ?? null,

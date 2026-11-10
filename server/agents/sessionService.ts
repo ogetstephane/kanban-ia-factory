@@ -41,13 +41,17 @@ export class SessionService {
   }) {
     const task = await tx.task.findUnique({ where: { id: taskId }, include: { project: { select: { name: true } } } });
     if (!task) return;
+    const claude = task.agentProvider === 'claude-code';
     await recordActivity(tx, {
       projectId: task.projectId, projectName: task.project?.name,
       entityType: 'task', entityId: task.id, entityTitle: task.title, ...event,
+      summary: claude ? event.summary.replaceAll('Copilot', 'Claude Code') : event.summary,
+      actor: claude && event.actor === 'Copilot' ? 'System' : event.actor,
     });
   }
 
   async options() {
+    if (this.provider.options) return agentOptionsSchema.parse(await this.provider.options());
     if (!this.provider.models) throw new EntityError(503, 'This agent provider does not expose a model catalogue.');
     return agentOptionsSchema.parse({
       providers: [{
@@ -471,8 +475,10 @@ export class SessionService {
     if (!row?.workspace) throw new EntityError(409, 'No ticket worktree is available yet');
     const review = await this.review(taskId, undefined, true);
     if (review.token !== token) throw new EntityError(409, 'Files changed since this review was opened. Reload the diff and run the AI review again.');
+    const context = agentContextSchema.parse(row.context);
+    if (row.provider !== (context.task.agentProvider ?? 'copilot')) throw new EntityError(409, 'Stored runtime differs from its ticket context. Regenerate the plan.');
     const report = await this.provider.run({
-      context: agentContextSchema.parse(row.context),
+      context,
       workspace: row.workspace,
       phase: 'review',
       plan: row.plan,
@@ -638,8 +644,9 @@ export class SessionService {
       const latest = await this.db.agentSession.findUniqueOrThrow({ where: { id: row.id } });
       if (latest.status !== activeStatus) { controller.abort(); signal.throwIfAborted(); }
       await this.current(row);
-      if (row.provider !== this.provider.id) throw new Error(`Agent provider is unavailable: ${row.provider}`);
       const context = agentContextSchema.parse(row.context);
+      if (row.provider !== (context.task.agentProvider ?? 'copilot')) throw new Error('Stored ticket runtime differs from its context snapshot. Regenerate the plan.');
+      if (!this.provider.options && row.provider !== this.provider.id) throw new Error(`Agent provider is unavailable: ${row.provider}`);
       if (!context.project?.repositoryUrl || !context.project.repositoryBranch) {
         throw new Error('Associate a git repository with commits to the project before executing a ticket');
       }

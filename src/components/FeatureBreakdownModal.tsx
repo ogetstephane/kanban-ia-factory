@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Sparkles,
@@ -10,18 +10,23 @@ import {
   ArrowRight,
   ListPlus
 } from 'lucide-react';
-import { Feature, Task, TaskPriority, KanbanStatus } from '../../shared/types/kanban';
+import { Feature, Task, TaskPriority } from '../../shared/types/kanban';
+import type { TaskBreakdownTicket } from '../../shared/types/taskBreakdown';
+import type { AssistantPlan } from '../../shared/types/assistantMode';
+import { boardApi } from '../data/boardApi';
+import { taskDraftInputSchema } from '../../shared/types/taskDraft';
+import { selectedBreakdownTasks } from '../utils/ticketBreakdown';
+import { MarkdownPreview } from './MarkdownPreview';
+import { canCreateTaskIn } from '../../shared/utils/kanbanLogic';
+import { assessTicketBreakdown } from '../../shared/utils/ticketProposalQuality';
+import { TicketProposalQuality } from './TicketProposalQuality';
+import { TicketClarification } from './TicketClarification';
+import {
+  clarificationContext, ticketClarificationAnswersSchema,
+  type TicketClarification as Clarification, type TicketClarificationAnswer,
+} from '../../shared/types/ticketClarification';
 
-interface ProposedTask {
-  title: string;
-  description: string;
-  priority: TaskPriority;
-  status: KanbanStatus;
-  storyPoints: number;
-  tags: string[];
-  acceptanceCriteria: string[];
-  subtasks: string[];
-  suggestedWorkflow?: string;
+interface ProposedTask extends TaskBreakdownTicket {
   selected: boolean;
 }
 
@@ -29,14 +34,16 @@ interface FeatureBreakdownModalProps {
   isOpen: boolean;
   onClose: () => void;
   features: Feature[];
+  projectId: string;
   initialFeatureId?: string;
-  onApplyBreakdown: (feature: Feature, tasks: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>[]) => void;
+  onApplyBreakdown: (feature: Feature, tasks: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'order'>[]) => void | boolean | Promise<void | boolean>;
 }
 
 export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
   isOpen,
   onClose,
   features,
+  projectId,
   initialFeatureId,
   onApplyBreakdown,
 }) => {
@@ -51,8 +58,20 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
   const [summary, setSummary] = useState<string | null>(null);
   const [proposedTasks, setProposedTasks] = useState<ProposedTask[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [impact, setImpact] = useState('');
+  const [graphAvailable, setGraphAvailable] = useState(false);
+  const [questions, setQuestions] = useState<string[]>([]);
+  const [plan, setPlan] = useState<AssistantPlan | null>(null);
+  const [clarification, setClarification] = useState<Clarification | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [confirmedAnswers, setConfirmedAnswers] = useState<TicketClarificationAnswer[]>([]);
+  const [saving, setSaving] = useState(false);
+  const active = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    active.current?.abort();
+    active.current = null;
+    setIsLoading(false);
     if (initialFeatureId) {
       setSelectedFeatureId(initialFeatureId);
       setMode('existing');
@@ -65,7 +84,29 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
     setProposedTasks([]);
     setSummary(null);
     setErrorMsg(null);
-  }, [isOpen, initialFeatureId, features]);
+    setPlan(null);
+    setImpact('');
+    setQuestions([]);
+    setClarification(null);
+    setAnswers([]);
+    setConfirmedAnswers([]);
+    return () => { active.current?.abort(); active.current = null; };
+  }, [isOpen, initialFeatureId, features, projectId]);
+
+  useEffect(() => {
+    active.current?.abort();
+    active.current = null;
+    setIsLoading(false);
+    setProposedTasks([]);
+    setSummary(null);
+    setPlan(null);
+    setImpact('');
+    setQuestions([]);
+    setErrorMsg(null);
+    setClarification(null);
+    setAnswers([]);
+    setConfirmedAnswers([]);
+  }, [mode, selectedFeatureId, newTitle, newDescription, newCategory]);
 
   if (!isOpen) return null;
 
@@ -75,7 +116,8 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
   const activeDesc = mode === 'existing' ? currentFeature?.description || '' : newDescription;
   const activeCategory = mode === 'existing' ? currentFeature?.category || 'General' : newCategory;
 
-  const handleGenerateBreakdown = async () => {
+  const handleGenerateBreakdown = async (approvedPlan?: string) => {
+    if (active.current || saving) return;
     if (!activeTitle.trim()) {
       setErrorMsg('Please specify a feature title to break down.');
       return;
@@ -84,42 +126,45 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
     setIsLoading(true);
     setErrorMsg(null);
     setProposedTasks([]);
+    setSummary(null);
+    setImpact('');
+    setQuestions([]);
+    const controller = new AbortController();
+    active.current = controller;
 
     try {
-      const response = await fetch('/api/copilot/breakdown', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          featureTitle: activeTitle,
-          featureDescription: activeDesc,
-          category: activeCategory,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to generate breakdown from Copilot');
-
-      const data = await response.json();
-      setSummary(data.summary || 'AI Copilot generated the following task breakdown:');
-
-      if (Array.isArray(data.tasks)) {
-        const mapped: ProposedTask[] = data.tasks.map((t: any) => ({
-          title: t.title || 'Untitled Task',
-          description: t.description || '',
-          priority: (t.priority as TaskPriority) || 'Medium',
-          status: t.status === 'Backlog' ? 'Backlog' : 'To Do',
-          storyPoints: t.storyPoints || 3,
-          tags: Array.isArray(t.tags) ? t.tags : ['feature'],
-          acceptanceCriteria: Array.isArray(t.acceptanceCriteria) ? t.acceptanceCriteria : [],
-          subtasks: Array.isArray(t.subtasks) ? t.subtasks : [],
-          suggestedWorkflow: t.suggestedWorkflow || '',
-          selected: true,
-        }));
-        setProposedTasks(mapped);
+      const submittedAnswers = clarification
+        ? ticketClarificationAnswersSchema.parse(clarification.questions.map((question, index) => ({ question, answer: answers[index] ?? '' })))
+        : confirmedAnswers;
+      const data = await boardApi.assistBreakdown(projectId, taskDraftInputSchema.parse({
+        title: activeTitle, currentDescription: activeDesc, tags: [activeCategory],
+        ...(approvedPlan ? { approvedPlan } : {}),
+        ...(submittedAnswers.length ? { clarificationAnswers: submittedAnswers } : {}),
+      }), controller.signal);
+      if (controller.signal.aborted) return;
+      if (data.kind === 'clarification') {
+        setPlan(null);
+        setClarification(data);
+        setAnswers(data.questions.map(() => ''));
+        return;
       }
-    } catch (err: any) {
-      setErrorMsg(`Copilot breakdown error: ${err.message || 'Unknown error'}`);
+      setClarification(null);
+      setAnswers([]);
+      setConfirmedAnswers(submittedAnswers);
+      if (data.kind === 'plan') {
+        setPlan({ plan: data.plan, reason: data.reason });
+        return;
+      }
+      setPlan(null);
+      setSummary(data.summary);
+      setImpact(data.impactAnalysis);
+      setGraphAvailable(data.graphAvailable);
+      setQuestions(data.openQuestions);
+      setProposedTasks(data.tasks.map((task) => ({ ...task, selected: true })));
+    } catch (err) {
+      if (!controller.signal.aborted) setErrorMsg(`Copilot breakdown error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
-      setIsLoading(false);
+      if (active.current === controller) { active.current = null; setIsLoading(false); }
     }
   };
 
@@ -135,47 +180,38 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
     );
   };
 
-  const handleApply = () => {
-    const selected = proposedTasks.filter((t) => t.selected);
-    if (selected.length === 0) {
-      setErrorMsg('Please select at least one task to add to the board.');
-      return;
-    }
-
-    let targetFeature: Feature;
-    if (mode === 'existing' && currentFeature) {
-      targetFeature = currentFeature;
-    } else {
-      targetFeature = {
-        id: `feat-${Date.now()}`,
-        title: newTitle.trim(),
-        description: newDescription.trim(),
-        category: newCategory.trim(),
-        status: 'To Do',
-        color: newColor,
-        createdAt: new Date().toISOString(),
+  const handleApply = async () => {
+    if (saving || active.current) return;
+    setSaving(true);
+    setErrorMsg(null);
+    try {
+      const selected = selectedBreakdownTasks(proposedTasks);
+      if (mode === 'existing' && (!currentFeature || !canCreateTaskIn(currentFeature.status))) {
+        throw new Error('Choose a Backlog or To Do feature. Ticket creation must not start implementation automatically.');
+      }
+      const targetFeature: Feature = mode === 'existing' && currentFeature ? currentFeature : {
+        id: `feat-${Date.now()}`, title: newTitle.trim(), description: newDescription.trim(),
+        category: newCategory.trim(), status: 'To Do', color: newColor, createdAt: new Date().toISOString(),
       };
-    }
-
-    const tasksToAdd = selected.map((pt) => ({
-      title: pt.title,
-      description: pt.description,
-      priority: pt.priority,
-      status: targetFeature.status,
-      featureId: targetFeature.id,
-      storyPoints: pt.storyPoints,
-      tags: pt.tags,
-      subtasks: pt.subtasks.map((st, i) => ({
-        id: `sub-${Date.now()}-${i}`,
-        text: st,
-        completed: false,
-      })),
-      acceptanceCriteria: pt.acceptanceCriteria,
-      suggestedWorkflow: pt.suggestedWorkflow,
-    }));
-
-    onApplyBreakdown(targetFeature, tasksToAdd);
-    onClose();
+      const tasksToAdd = selected.map((pt) => {
+        const openQuestions = [...questions, ...(pt.openQuestions ?? [])];
+        return {
+          title: pt.title,
+          description: [pt.description, ...[clarificationContext(confirmedAnswers)].filter(Boolean), ...(openQuestions.length ? [
+            `## Open decisions\n\n${openQuestions.map((question) => `- ${question}`).join('\n')}`,
+          ] : [])].join('\n\n'),
+          priority: pt.priority, status: targetFeature.status, featureId: targetFeature.id,
+          storyPoints: pt.estimatedStoryPoints, tags: pt.suggestedTags,
+          subtasks: pt.subtasks.map((text) => ({ id: crypto.randomUUID(), text, completed: false })),
+          acceptanceCriteria: pt.acceptanceCriteria, suggestedWorkflow: pt.suggestedWorkflow,
+        };
+      });
+      const result = await onApplyBreakdown(targetFeature, tasksToAdd);
+      if (result !== false) onClose();
+      else setErrorMsg('Unable to save the breakdown. Your proposal is preserved; check the board error and retry.');
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : 'Unable to save the breakdown.');
+    } finally { setSaving(false); }
   };
 
   return (
@@ -203,6 +239,7 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
           </div>
           <button
             onClick={onClose}
+            disabled={saving}
             className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
             aria-label="Close dialog"
           >
@@ -211,7 +248,7 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
         </div>
 
         {/* Feature Selection / Creation Tabs */}
-        <div className="mt-4">
+        <fieldset disabled={saving || isLoading} className="mt-4">
           <div className="flex items-center gap-2 p-1 bg-slate-800/80 rounded-xl mb-4 border border-slate-700/60 w-fit">
             <button
               type="button"
@@ -326,8 +363,8 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
           <div className="mt-4 flex items-center justify-between">
             <button
               type="button"
-              onClick={handleGenerateBreakdown}
-              disabled={isLoading || !activeTitle.trim()}
+              onClick={() => void handleGenerateBreakdown()}
+              disabled={isLoading || !!clarification || !activeTitle.trim() || (mode === 'existing' && (!currentFeature || !canCreateTaskIn(currentFeature.status)))}
               className="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 hover:from-amber-400 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/25 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
             >
               {isLoading ? (
@@ -349,7 +386,44 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
               </span>
             )}
           </div>
+          {mode === 'existing' && currentFeature && !canCreateTaskIn(currentFeature.status) && <p role="alert" className="mt-2 text-xs text-amber-300">
+            Choose a Backlog or To Do feature to create tickets without starting implementation.
+          </p>}
 
+          {clarification && <div className="mt-3">
+            <TicketClarification clarification={clarification} answers={answers}
+              onChange={(index, answer) => setAnswers((current) => current.map((value, i) => i === index ? answer : value))}
+              onGenerate={() => void handleGenerateBreakdown()}
+              onDiscard={() => { setClarification(null); setAnswers([]); setConfirmedAnswers([]); }}
+              disabled={isLoading || saving || !activeTitle.trim()} />
+          </div>}
+          {plan && <section aria-label="Ticket breakdown plan" className="mt-3 space-y-2">
+            <p className="text-xs text-amber-300">{plan.reason}</p>
+            <textarea aria-label="Breakdown plan" value={plan.plan} rows={6} maxLength={20_000}
+              onChange={(event) => setPlan({ ...plan, plan: event.target.value })}
+              className="w-full rounded bg-slate-800 p-2 text-sm" />
+            <button type="button" disabled={!plan.plan.trim()} onClick={() => void handleGenerateBreakdown(plan.plan)}>
+              Generate tickets from plan
+            </button>
+          </section>}
+          {impact && <details className="mt-3 text-xs"><summary>Code impact analysis</summary><MarkdownPreview source={impact} /></details>}
+          {impact && !graphAvailable && <p className="mt-2 text-xs text-amber-300">
+            Graphify was unavailable; verify the reported limitations.
+          </p>}
+          {proposedTasks.length > 0 && <p className="mt-3 text-xs text-slate-400">
+            Drafts only until saved. Prerequisites are planning references preserved in descriptions, not execution gates.
+          </p>}
+          {proposedTasks.length > 0 && <div className="mt-3 space-y-1">
+            <p className="text-xs text-slate-400">Checks for the selected tickets.</p>
+            <TicketProposalQuality report={assessTicketBreakdown({
+              summary, impactAnalysis: impact, openQuestions: questions,
+              tasks: proposedTasks.filter((task) => task.selected),
+            })} />
+          </div>}
+          {questions.length > 0 && <div className="mt-3 text-xs text-amber-300">
+            <p>Open decisions — resolve these before processing tickets:</p>
+            <ul>{questions.map((question, index) => <li key={index}>{question}</li>)}</ul>
+          </div>}
           {errorMsg && (
             <div className="mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-xs text-rose-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
@@ -390,9 +464,16 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
                           <h4 className="text-xs font-semibold text-slate-100 mb-1">
                             {t.title}
                           </h4>
+                          {t.dependsOn.length > 0 && <p className="text-xs text-amber-300">Prerequisites: {t.dependsOn.join(', ')}</p>}
                           <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed mb-2">
                             {t.description}
                           </p>
+                          <details className="mb-2 text-xs">
+                            <summary>Review specification and acceptance criteria</summary>
+                            <MarkdownPreview source={t.description} />
+                            <ul>{t.acceptanceCriteria.map((criterion, index) => <li key={index}>{criterion}</li>)}</ul>
+                            <MarkdownPreview source={t.impactAnalysis} />
+                          </details>
 
                           {/* Acceptance preview & subtasks */}
                           {t.subtasks && t.subtasks.length > 0 && (
@@ -429,7 +510,7 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
                           <option value="Low">Low</option>
                         </select>
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300">
-                          {t.status} • {t.storyPoints} pts
+                          {mode === 'existing' ? currentFeature?.status : 'To Do'} • {t.estimatedStoryPoints} pts
                         </span>
                       </div>
                     </div>
@@ -458,7 +539,10 @@ export const FeatureBreakdownModal: React.FC<FeatureBreakdownModalProps> = ({
               <span>Add Selected Tasks to Board</span>
             </button>
           </div>
-        </div>
+        </fieldset>
+        {isLoading && <button type="button" className="mt-3 text-xs underline" onClick={() => {
+          active.current?.abort(); active.current = null; setIsLoading(false);
+        }}>Cancel generation</button>}
       </div>
     </div>
   );

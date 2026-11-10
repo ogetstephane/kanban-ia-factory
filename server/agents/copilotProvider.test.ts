@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { agentContextSchema, type AgentRuntime } from '../../shared/types/agent';
+import { agentContextSchema, type AgentCheckScript, type AgentRuntime } from '../../shared/types/agent';
 import type { SessionConfig } from '@github/copilot-sdk';
 import { CodeGraph } from './codeGraph';
 import { GRAPHIFY_SKILL_DIRECTORY, GRAPHIFY_SKILL_INSTRUCTION } from './graphifySkill';
@@ -92,6 +92,20 @@ test('Copilot telemetry captures creation events, ephemeral usage and the actual
     onSession: async () => undefined, ask: async () => 'answer',
   });
   assert.equal(selectedModels.at(-1), undefined);
+  await new CopilotProvider().run({
+    context: defaults, resolvedModel: 'orchestrator-default-model', workspace: '/fixture', phase: 'plan', plan: '', answers: [],
+    onRuntime: async (runtime) => { writes.push(runtime); },
+    onSession: async () => undefined, ask: async () => 'answer',
+  });
+  assert.equal(selectedModels.at(-1), 'orchestrator-default-model');
+  assert.equal(writes.at(-1)?.metadata.requestedModel, 'orchestrator-default-model');
+  t.mock.method(CopilotClient.prototype, 'createSession', async () => {
+    throw new Error('Model "orchestrator-default-model" is not available');
+  });
+  await assert.rejects(new CopilotProvider().run({
+    context: defaults, resolvedModel: 'orchestrator-default-model', workspace: '/fixture', phase: 'plan', plan: '', answers: [],
+    onSession: async () => undefined, ask: async () => 'answer',
+  }), /Server default model.*COPILOT_MODEL/);
 });
 
 test('all ticket phases discover the skill and query tools without injecting its body or a graph summary', async (t) => {
@@ -221,7 +235,7 @@ test('Copilot can inspect a fixture and implement only with execution tools', {
     assert.ok(plan.includes(marker), `Planning must read the fixture using the registered tool: ${plan}`);
     assert.ok(questions > 0, 'Copilot must route clarification through the provider-neutral ask callback');
     await assert.rejects(readFile(path.join(workspace, 'result.txt')));
-    const checks: { script: 'test' | 'lint'; passed: boolean; output: string }[] = [];
+    const checks: { script: AgentCheckScript; passed: boolean; output: string }[] = [];
     const output = await provider.run({
       context, workspace, phase: 'execute', plan, onSession, ask,
       answers: [{ question: 'Output filename?', answer: 'result.txt' }],

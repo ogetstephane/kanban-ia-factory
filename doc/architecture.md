@@ -78,13 +78,58 @@ Each user action persists **only the entity it changes**, in its own transaction
 
 ## Ticket execution
 
-[AgentProvider](../server/agents/provider.ts) abstracts the AI backend; the initial adapter is
-[CopilotProvider](../server/agents/copilotProvider.ts). The
+[TicketOrchestrator](../server/agents/ticketOrchestrator.ts) replaces single-provider
+dispatch behind the [AgentProvider](../server/agents/provider.ts) application port.
+It routes each phase to the runtime captured with the ticket, without fallback:
+[CopilotProvider](../server/agents/copilotProvider.ts) remains the default and
+[ClaudeTicketProvider](../server/agents/claudeTicketProvider.ts) is experimental and
+disabled until explicitly activated with a dedicated API key. Shared
+[ticketSession](../server/agents/ticketSession.ts) definitions own business tools and
+instructions; SDK adapters translate them to native tools or in-process MCP. The
 [session service](../server/agents/sessionService.ts) polls durable jobs, prepares per-ticket
 worktrees, persists questions and answers, and waits for plan approval before enabling writes.
 [SessionsView](../src/components/SessionsView.tsx) and the task session panel are lazy-loaded;
 list queries return paginated metadata without full ticket contexts or plans.
 See [agent sessions](./agent-sessions.md) for permissions, lifecycle and setup.
+The [multi-provider orchestrator proposal](./ai-orchestrator.md) describes a provider-neutral
+target contract and an incremental migration path. Its first Core slice is implemented under
+[server/agents/core/](../server/agents/core/) but is not yet wired into the ticket-session runtime.
+Its [read-only analysis runner](../server/agents/core/analysis.ts) is tested offline with
+an immutable text workspace snapshot, host-controlled tools and a scripted fake provider.
+The separate [Copilot analysis adapter](../server/agents/adapters/copilotAnalysisProvider.ts)
+uses an empty runtime, ephemeral persistence, and only the canonical broker tools.
+It refuses unqualified SDK/runtime/model combinations; offline tests do not establish
+production confinement. Canonical tool IDs are translated to runtime-compatible aliases;
+a pre-model RPC inventory check rejects ambient configuration or unexpected tools.
+`make test-analysis-native` exercises these boundaries with the real runtime inside
+bubblewrap, without network, credentials or model calls. The separate opt-in
+`make test-analysis-live` observes active model output, aborts the real SDK session,
+and verifies runtime child exit; it shares the host network and uses AI quota.
+Neither test automatically grants model-specific production qualification.
+The separate [Claude Code analysis adapter](../server/agents/adapters/claudeAnalysisProvider.ts)
+implements the same Core port through in-process MCP snapshot tools. It requires explicit
+Anthropic API credentials and SDK/runtime/model qualification, disables ambient settings
+and built-in tools, and checks hook registration and runtime inventory. Its offline tests
+use a simulated runtime transport, a real in-memory MCP exchange and an inert Node child;
+they do not start Claude Code, prove native confinement or make model requests.
+`make test-analysis-claude-native` separately probes the installed runtime inside bubblewrap
+without external network or real credentials: hook registration, MCP inventory,
+hostile fixture exclusion and idle-process abort. Synthetic turns against an isolated
+loopback SSE fixture demonstrate broker execution and explicit delegation refusals despite
+the five advertised built-in agents. The adapter checks executable tools instead of requiring
+an empty agent registry and rejects an altered MCP inventory before releasing a prompt.
+Documented plugin-disable settings and skill overrides now produce empty skill/plugin
+inventories, and the actual adapter completes a broker-only synthetic turn while refusing
+delegation persistently. Unknown entries remain rejected: no inventory bypass was added.
+This is not model-specific production qualification. Active model behavior
+and live-model cancellation remain unverified. `make test-analysis-claude-prepare`
+rehearses analysis and cancellation of an unfinished local SSE stream through the actual
+adapter, checking runtime exit and cleanup. It never reads host credentials or permits
+paid execution; SDK estimated budget stops do not guarantee a strict billing ceiling.
+It is not enabled in the application. See [adapter limits](./ai-orchestrator.md#second-adaptateur--claude-code-validation-hors-ligne).
+[PrismaAnalysisStore](../server/db/analysisStore.ts) persists
+prepared snapshots, ordered events, and write-once terminal results in the application SQLite
+database. These analysis services are not mounted in the API or wired into ticket execution.
 
 ## Optimistic concurrency
 

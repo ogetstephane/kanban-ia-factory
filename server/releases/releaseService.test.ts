@@ -11,7 +11,7 @@ import { taskSchema } from '../../shared/types/board';
 import { versionSchema, releaseDetailSchema } from '../../shared/types/release';
 import { EntityStore } from '../db/entityStore';
 import { RepositoryService } from '../git/repositoryService';
-import { createSourceRepository } from '../git/testRepository';
+import { createSourceRepository, TEST_GIT_CONFIG } from '../git/testRepository';
 import { SessionService } from '../agents/sessionService';
 import { createReleaseRouter } from '../routes/releases';
 import { ReleaseService } from './releaseService';
@@ -19,7 +19,9 @@ import { BoardStore } from '../db/boardStore';
 import { boardDataSchema } from '../../shared/types/board';
 import { requiredTicketDocumentationPath } from '../agents/ticketDocumentation';
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', cwd.endsWith('.git') ? ['--git-dir', cwd, ...args] : args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+const git = (cwd: string, ...args: string[]) => execFileSync('git',
+  [...TEST_GIT_CONFIG, ...(cwd.endsWith('.git') ? ['--git-dir', cwd] : []), ...args],
+  { cwd, encoding: 'utf8', stdio: 'pipe', timeout: 30_000 }).trim();
 const ssh = `node ${path.resolve('server/git/testSsh.cjs')}`;
 
 async function fixture(t: TestContext) {

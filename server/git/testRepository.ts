@@ -2,8 +2,10 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', args, {
-  cwd, stdio: 'pipe', encoding: 'utf8',
+export const TEST_GIT_CONFIG = ['-c', 'commit.gpgsign=false', '-c', 'tag.gpgsign=false'];
+
+const git = (cwd: string, ...args: string[]) => execFileSync('git', [...TEST_GIT_CONFIG, ...args], {
+  cwd, stdio: 'pipe', encoding: 'utf8', timeout: 30_000,
   env: { ...process.env, GIT_AUTHOR_NAME: 'Test', GIT_AUTHOR_EMAIL: 't@example.com', GIT_COMMITTER_NAME: 'Test', GIT_COMMITTER_EMAIL: 't@example.com' },
 }).trim();
 

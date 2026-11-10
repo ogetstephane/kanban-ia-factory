@@ -1,0 +1,160 @@
+.workflow-studio {
+  --studio-border: rgba(100, 160, 200, .18);
+  min-width: 0;
+  border: 1px solid var(--studio-border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #070d19;
+  box-shadow: 0 20px 70px #02061766, inset 0 1px #ffffff08;
+}
+.studio-header, .studio-scope, .studio-actions, .studio-metadata, .studio-stage-heading, .studio-dock-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.studio-header { justify-content: space-between; padding: 18px 22px; background: linear-gradient(110deg, #13223b99, #0d142499); }
+.studio-eyebrow { color: #67d9ec; font-size: 10px; font-weight: 600; letter-spacing: .16em; }
+.studio-header h1 { margin-top: 5px; }
+.studio-scope { align-items: end; }
+.studio-safety { border-block: 1px solid var(--studio-border); padding: 9px 22px; color: #9cacc6; font-size: 11px; }
+.studio-safety summary { cursor: pointer; color: #8ddbc9; }
+.studio-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 320px;
+  grid-template-rows: auto minmax(480px, calc(100dvh - 560px)) auto;
+  grid-template-areas: "metadata actions actions" "palette stage inspector" "versions versions versions";
+  min-width: 0;
+}
+.studio-metadata { grid-area: metadata; flex-wrap: wrap; padding: 12px; }
+.studio-metadata > div { width: 100%; }
+.studio-save-state { font-size: 10px; color: #79bfb1; }
+.studio-save-state.is-dirty { color: #fbbf24; }
+.studio-actions { grid-area: actions; justify-content: end; flex-wrap: wrap; padding: 12px 18px; }
+.workflow-studio button { transition: background-color .15s, border-color .15s; }
+.workflow-studio button:focus-visible, .workflow-studio summary:focus-visible { outline: 2px solid #67e8f9; outline-offset: 3px; }
+.workflow-studio input, .workflow-studio select, .workflow-studio textarea { min-width: 0; border-color: var(--studio-border); border-radius: 7px; background: #080f1f; }
+.workflow-studio input:focus, .workflow-studio select:focus, .workflow-studio textarea:focus { outline: 1px solid #22d3ee88; }
+.workflow-studio button:hover:not(:disabled) { border-color: #67e8f977; background-color: #153449; }
+.studio-test-button { border-color: #22d3ee66; color: #a5f3fc; background: #164e6344; }
+.studio-palette, .studio-inspector { overflow: auto; min-width: 0; min-height: 0; border-block: 1px solid var(--studio-border); background: linear-gradient(150deg, #15223866, #0b132199); }
+.studio-palette { grid-area: palette; border-right: 1px solid var(--studio-border); }
+.studio-inspector { grid-area: inspector; border-left: 1px solid var(--studio-border); padding: 0 12px 12px; }
+.studio-inspector > section { margin-top: 12px; border-color: var(--studio-border); background: #0c1525aa; }
+.studio-panel-heading { padding: 16px 12px; border-bottom: 1px solid var(--studio-border); }
+.studio-panel-heading h2 { margin-top: 5px; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.studio-node-palette, .studio-library, .studio-description { padding: 12px; }
+.studio-library, .studio-description { border-top: 1px solid var(--studio-border); }
+.studio-node-palette { display: grid; gap: 8px; }
+.studio-node-palette button { display: flex; align-items: center; gap: 10px; text-align: left; padding: 10px; border: 1px solid var(--studio-border); border-radius: 10px; background: #101c30; font-size: 11px; }
+.studio-node-palette button > span:last-child { margin-left: auto; color: #67e8f9; }
+.studio-node-palette small { display: block; color: #8d9fbd; font-size: 9px; margin-top: 4px; }
+.studio-node-icon { display: grid; place-items: center; width: 30px; height: 32px; flex-shrink: 0; border: 1px solid currentColor; border-radius: 8px; font-size: 10px; }
+.studio-node-icon.agent { color: #a5b4fc; background: #6366f122; }
+.studio-node-icon.hook { color: #fcd34d; background: #f59e0b15; }
+.studio-node-icon.approval { color: #6ee7b7; background: #10b98115; }
+.studio-stage { grid-area: stage; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-block: 1px solid var(--studio-border); }
+.studio-stage-heading { justify-content: space-between; padding: 12px 16px; font-size: 10px; color: #8d9fbd; }
+.studio-validation { flex-shrink: 0; padding: 10px 16px; max-height: 130px; overflow: auto; font-size: 11px; border-top: 1px solid var(--studio-border); }
+.studio-validation.is-valid h2 { color: #6ee7b7; }
+.studio-validation.is-invalid h2 { color: #fda4af; }
+.studio-validation p { margin-top: 4px; color: #8d9fbd; font-size: 10px; }
+.studio-versions { grid-area: versions; padding: 12px 18px; border-bottom: 1px solid var(--studio-border); display: grid; grid-template-columns: auto minmax(180px, 1fr) auto; align-items: end; gap: 12px; }
+.studio-versions h2 { font-size: 12px; align-self: center; }
+.studio-versions > details { grid-column: 1 / -1; }
+.studio-dock-toggle { width: 100%; justify-content: space-between; padding: 14px 18px; background: #0e1a2e; font-size: 12px; }
+.studio-dock-toggle > span:last-child { color: #91a5c5; font-size: 10px; }
+.studio-dock-content { max-height: 60dvh; overflow: auto; border-top: 1px solid var(--studio-border); }
+.studio-dock-content > section { border: 0; border-radius: 0; background: #080f1c; }
+.workflow-canvas { position: relative; flex: 1; min-height: 300px; overflow: hidden; background: radial-gradient(ellipse at 40% 40%, #14253c77, transparent 70%), #070e1b; }
+.workflow-canvas-viewport { width: 100%; height: 100%; overflow: auto; }
+.workflow-canvas-controls { position: absolute; bottom: 14px; left: 14px; display: flex; align-items: center; gap: 4px; border: 1px solid #48718f66; border-radius: 10px; padding: 4px; background: #0c192fee; box-shadow: 0 4px 20px #0005; }
+.workflow-canvas-controls button { border-radius: 6px; padding: 6px 10px; font-size: 11px; }
+.workflow-canvas-controls output { min-width: 42px; text-align: center; font: 10px monospace; color: #a5f3fc; }
+.workflow-canvas-hint { position: absolute; top: 12px; right: 12px; pointer-events: none; font-size: 10px; color: #8da7c3; }
+@media (max-width: 1100px) {
+  .studio-layout { grid-template-columns: 185px minmax(0, 1fr) 280px; }
+  .studio-versions { grid-template-columns: 1fr; }
+}
+@media (max-width: 850px) {
+  .studio-header { align-items: start; flex-direction: column; padding: 14px; }
+  .studio-scope { width: 100%; }
+  .studio-scope > div { flex: 1; }
+  .studio-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto 460px auto auto; grid-template-areas: "metadata" "actions" "palette" "stage" "inspector" "versions"; }
+  .studio-actions { justify-content: start; padding: 12px; }
+  .studio-palette { max-height: 320px; border-right: 0; }
+  .studio-node-palette { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .studio-node-palette button { padding: 8px 5px; gap: 5px; font-size: 10px; }
+  .studio-node-palette small, .studio-node-palette button > span:last-child { display: none; }
+  .studio-node-icon { width: 23px; height: 26px; font-size: 8px; }
+  .studio-inspector { max-height: 560px; border-left: 0; }
+  .studio-dock-toggle { padding: 14px 10px; gap: 8px; }
+  .studio-dock-toggle .studio-eyebrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workflow-studio button { transition: none; }
+}
+
+.studio-compose-first { position: relative; display: flex; flex-direction: column; height: max(600px, calc(100dvh - 180px)); }
+.studio-immersive { position: fixed; inset: 0; z-index: 80; width: 100%; height: 100dvh; border: 0; border-radius: 0; }
+.studio-canvas-toolbar { position: absolute; z-index: 20; top: 14px; left: 14px; right: 14px; display: flex; justify-content: space-between; pointer-events: none; }
+.studio-canvas-toolbar button { pointer-events: auto; background: #0c192fee; box-shadow: 0 4px 20px #0005; }
+.studio-workflow-panel { position: absolute; z-index: 15; top: 64px; left: 14px; bottom: 80px; width: min(560px, calc(100% - 28px)); overflow: auto; border: 1px solid var(--studio-border); border-radius: 14px; background: #0c1729f5; box-shadow: 0 12px 35px #0007; }
+.studio-feedback { position: absolute; z-index: 25; bottom: 14px; right: 14px; max-width: min(560px, calc(100% - 28px)); max-height: 60px; overflow: auto; border: 1px solid var(--studio-border); border-radius: 10px; font-size: 12px; }
+.studio-feedback button { margin-left: 8px; }
+.studio-connection-banner { position: absolute; z-index: 15; top: 64px; left: 14px; right: 14px; width: fit-content; max-width: calc(100% - 28px); padding: 10px; background: #123141; border: 1px solid #67e8f9; border-radius: 10px; font-size: 12px; }
+.studio-connection-banner button { margin-left: 8px; }
+.studio-compose-first [hidden] { display: none; }
+.studio-compose-first .studio-header { flex-shrink: 0; padding: 10px 18px; }
+.studio-compose-first .studio-header > div > p:last-child { display: none; }
+.studio-compose-first .studio-header, .studio-compose-first .studio-scope { flex-wrap: wrap; }
+.studio-compose-first .studio-safety { flex-shrink: 0; padding-block: 6px; max-height: 120px; overflow: auto; }
+.studio-compose-first .studio-layout {
+  display: flex; flex: 1; min-height: 0;
+}
+.studio-compose-first .studio-metadata { padding: 8px 14px; gap: 5px 12px; }
+.studio-compose-first .studio-metadata > div { max-width: 240px; }
+.studio-compose-first .studio-actions { padding: 8px 14px; gap: 6px; justify-content: start; }
+.studio-compose-first .studio-actions button { font-size: 11px; }
+.studio-compose-first .studio-stage { position: relative; flex: 1; border: 0; }
+.studio-compose-first .workflow-canvas { min-height: 0; }
+.studio-compose-first .workflow-canvas-viewport { padding: 64px 20px 20px; }
+.studio-compose-first .studio-palette,
+.studio-compose-first .studio-inspector {
+  position: absolute; z-index: 15; top: 64px; bottom: 80px; width: min(310px, calc(100% - 28px)); max-height: none;
+  border: 1px solid #47718c66; border-radius: 14px; background: #0c1729f2;
+  backdrop-filter: blur(16px); box-shadow: 0 12px 35px #0007;
+}
+.studio-compose-first .studio-palette { right: 14px; }
+.studio-compose-first .studio-inspector { right: 14px; }
+.studio-compose-first .studio-panel-heading { padding: 12px; }
+.studio-compose-first .studio-validation { padding: 6px 16px; max-height: 82px; }
+.studio-compose-first .studio-versions { background: #0a1322; padding: 7px 14px; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.studio-compose-first .studio-versions > div button { font-size: 10px; padding: 6px 8px; }
+.studio-compose-first .studio-versions > details { min-width: 0; }
+.studio-compose-first .studio-dock { position: absolute; bottom: 0; left: 0; right: 0; z-index: 18; }
+.studio-compose-first .studio-dock-content { position: absolute; bottom: 100%; left: 0; right: 0; max-height: 65dvh; background: #080f1c; box-shadow: 0 -12px 40px #0008; }
+.studio-compose-first .workflow-canvas-controls { left: 14px; }
+.studio-compose-first .workflow-canvas-hint { top: auto; bottom: 68px; left: 14px; right: auto; opacity: 0; }
+.studio-compose-first .workflow-canvas-controls { opacity: 0; transition: opacity .15s; }
+.workflow-canvas:hover .workflow-canvas-controls, .workflow-canvas:focus-within .workflow-canvas-controls,
+.workflow-canvas:hover .workflow-canvas-hint, .workflow-canvas:focus-within .workflow-canvas-hint { opacity: 1; }
+.workflow-node-menu { position: absolute; z-index: 16; width: 220px; max-height: calc(100% - 80px); overflow: auto; padding: 6px; border: 1px solid #47718c; border-radius: 12px; background: #0c1729fa; box-shadow: 0 12px 35px #0009; }
+.workflow-node-menu p { padding: 6px 10px; font-size: 11px; color: #8da7c3; overflow-wrap: anywhere; }
+.workflow-node-menu button { display: block; width: 100%; text-align: left; padding: 9px 10px; border-radius: 6px; font-size: 12px; }
+.workflow-node-menu button:last-child { color: #fda4af; }
+.workflow-node-menu button:disabled { opacity: .4; }
+@media (max-width: 850px) {
+  .studio-compose-first .studio-header { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .studio-compose-first .studio-header h1 { font-size: 15px; }
+  .studio-compose-first .studio-scope { width: auto; flex: 1; flex-wrap: wrap; gap: 6px; }
+  .studio-compose-first .studio-scope select { padding: 5px; }
+  .studio-compose-first .studio-scope button { font-size: 10px; padding: 5px; }
+  .studio-compose-first .studio-metadata { flex-wrap: nowrap; }
+  .studio-compose-first .studio-metadata > div { flex: 1; }
+  .studio-compose-first .studio-save-state { font-size: 9px; }
+  .studio-compose-first .studio-actions { flex-wrap: wrap; }
+  .studio-compose-first .studio-node-palette { grid-template-columns: minmax(0, 1fr); }
+}
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .studio-compose-first .workflow-canvas-controls { opacity: 1; transition: none; }
+}

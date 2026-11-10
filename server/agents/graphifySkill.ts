@@ -3,7 +3,7 @@ import type { SessionConfig } from '@github/copilot-sdk';
 import { z } from 'zod';
 
 export const GRAPHIFY_SKILL_NAME = 'ticket-graphify';
-export const BUNDLED_SKILLS_DIRECTORY = fileURLToPath(new URL('../../.github/skills', import.meta.url));
+export const BUNDLED_SKILLS_DIRECTORY = fileURLToPath(new URL('../skills', import.meta.url));
 export const GRAPHIFY_SKILL_DIRECTORY = BUNDLED_SKILLS_DIRECTORY;
 export const GRAPHIFY_SKILL_INSTRUCTION =
   'Before working on this ticket, use the skill tool to load the ticket-graphify skill and follow its workflow for the current phase.';

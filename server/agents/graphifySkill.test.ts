@@ -7,6 +7,7 @@ import { CopilotClient } from '@github/copilot-sdk';
 import { GRAPHIFY_SKILL_DIRECTORY, GRAPHIFY_SKILL_INSTRUCTION, GRAPHIFY_SKILL_NAME, graphifySkillConfiguration } from './graphifySkill';
 
 test('the bundled skill is discoverable and covers drafting and all ticket phases', async () => {
+  assert.equal(path.basename(path.dirname(GRAPHIFY_SKILL_DIRECTORY)), 'server');
   const skill = await readFile(path.join(GRAPHIFY_SKILL_DIRECTORY, GRAPHIFY_SKILL_NAME, 'SKILL.md'), 'utf8');
   assert.match(skill, /^---\nname: ticket-graphify\ndescription: ".+"\n---\n/);
   for (const phase of ['Draft', 'Plan', 'Execute', 'Review']) assert.ok(skill.includes(`**${phase}:**`));

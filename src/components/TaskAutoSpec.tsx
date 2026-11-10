@@ -2,6 +2,7 @@ import { useId } from 'react';
 import { ListChecks, Loader2, Sparkles } from 'lucide-react';
 import type { TaskAutoSpec } from '../data/useTaskAutoSpec';
 import { MarkdownPreview } from './MarkdownPreview';
+import { TicketProposalQuality } from './TicketProposalQuality';
 
 /** Progress of a running generation; it sits outside the fieldset the generation disables so Cancel stays clickable. */
 export function TaskAutoSpecStatus({ spec }: { spec: Pick<TaskAutoSpec, 'generating' | 'cancel'> }) {
@@ -43,7 +44,7 @@ export function TaskAutoSpecButton({ spec, disabled, onGenerate }: {
 }
 
 /** Outcome of the last generation: a dismissible notice and the code impact analysis to review before saving. */
-export function TaskAutoSpecResult({ spec }: { spec: Pick<TaskAutoSpec, 'feedback' | 'impactAnalysis' | 'dismissFeedback'> }) {
+export function TaskAutoSpecResult({ spec }: { spec: Pick<TaskAutoSpec, 'feedback' | 'impactAnalysis' | 'quality' | 'dismissFeedback'> }) {
   return (
     <>
       {spec.feedback && (
@@ -62,6 +63,10 @@ export function TaskAutoSpecResult({ spec }: { spec: Pick<TaskAutoSpec, 'feedbac
         <summary className="cursor-pointer text-xs font-semibold text-indigo-300">Code impact analysis</summary>
         <div className="mt-3 max-h-80 overflow-auto"><MarkdownPreview source={spec.impactAnalysis} /></div>
       </details>}
+      {spec.quality && <div className="space-y-1">
+        <p className="text-xs text-slate-400">Checks for the last generated proposal, before your edits.</p>
+        <TicketProposalQuality report={spec.quality} />
+      </div>}
     </>
   );
 }

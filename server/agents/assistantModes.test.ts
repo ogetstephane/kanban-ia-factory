@@ -44,4 +44,8 @@ test('output parsing enforces the requested mode', () => {
   for (const raw of [undefined, ' ', 'not JSON', '{"kind":"plan","plan":""}', '{"kind":"proposal"}']) {
     assert.throws(() => parseAssistantOutput(raw, proposalSchema, { mode: 'auto' }, 'wiki proposal'), { status: 502 });
   }
+  assert.throws(() => parseAssistantOutput(
+    '{"kind":"clarification","reason":"Missing scope","questions":["Who uses it?"]}',
+    proposalSchema, { mode: 'auto' }, 'wiki proposal',
+  ), { status: 502, message: /clarification questions/ });
 });

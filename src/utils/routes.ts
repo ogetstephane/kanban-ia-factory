@@ -1,7 +1,7 @@
 import type { KanbanStatus } from '../../shared/types/kanban';
 import type { SessionActionFocus } from '../../shared/types/agent';
 
-export const VIEW_MODES = ['cockpit', 'board', 'analytics', 'sessions', 'delivery-history', 'activity', 'wiki', 'releases', 'git', 'code-graph', 'diagrams'] as const;
+export const VIEW_MODES = ['cockpit', 'board', 'analytics', 'sessions', 'delivery-history', 'activity', 'wiki', 'releases', 'git', 'code-graph', 'diagrams', 'workflows'] as const;
 export type ViewMode = typeof VIEW_MODES[number];
 
 export function isViewMode(value: string | undefined): value is ViewMode {

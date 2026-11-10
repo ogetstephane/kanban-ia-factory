@@ -128,6 +128,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`px-3 py-1 rounded-lg font-medium cursor-pointer whitespace-nowrap ${viewMode === 'code-graph' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Code graph</button>}
             <button onClick={() => onViewModeChange('diagrams')} aria-label="Switch to Archify diagrams view"
               className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${viewMode === 'diagrams' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Diagrams</button>
+            <button onClick={() => onViewModeChange('workflows')} aria-label="Switch to agent workflow editor"
+              className={`px-3 py-1 rounded-lg font-medium cursor-pointer ${viewMode === 'workflows' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>Workflows</button>
             <button
               onClick={() => onViewModeChange('analytics')}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-lg font-medium transition-all cursor-pointer ${
@@ -183,6 +185,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'code-graph' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Code graph</button>}
             <button onClick={() => onViewModeChange('diagrams')}
               className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'diagrams' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Diagrams</button>
+            <button onClick={() => onViewModeChange('workflows')}
+              className={`shrink-0 px-3 py-1.5 rounded-lg ${viewMode === 'workflows' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}>Workflows</button>
             <button
               onClick={() => onViewModeChange('analytics')}
               className={`shrink-0 px-3 py-1.5 rounded-lg font-medium text-center transition-all cursor-pointer ${

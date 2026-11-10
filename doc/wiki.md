@@ -64,7 +64,7 @@ A plan appears in **Copilot page plan**. It can be edited, then used with
 with the same prompt, draft and attachments, and Copilot returns the proposal without planning
 again. Both modes are Copilot SDK custom agents (`kanban-auto-assistant`,
 `kanban-plan-assistant`) that preload the bundled
-[`assistant-planning`](../.github/skills/assistant-planning/SKILL.md) skill.
+[`assistant-planning`](../server/skills/assistant-planning/SKILL.md) skill.
 
 Copilot receives the current unsaved Markdown draft, page path, prompt and attachments.
 Review the proposed content and change summary, then **Apply to editor** or

@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live test-agent-skills test-agent-graphify lint check \
+.PHONY: help install env setup dev storybook build-storybook test-storybook build start preview test test-agent-live test-agent-skills test-agent-graphify test-analysis-native test-analysis-claude-native test-analysis-claude-prepare test-analysis-live lint check \
 	playwright-install test-e2e test-ui test-report db-generate db-migrate db-dev db-studio db-reset clean archify archify-install archify-doctor
 
 NPM ?= npm
@@ -69,6 +69,18 @@ test-agent-skills: ## Test native Copilot skill loading without a model request 
 
 test-agent-graphify: ## Compare three real Copilot planning pairs with/without Graphify (uses AI quota)
 	$(call vite_run,test:agent:graphify)
+
+test-analysis-native: ## Probe real analysis tools inside bubblewrap, without network or AI quota (Linux)
+	$(call vite_run,test:analysis:native)
+
+test-analysis-claude-native: ## Probe real Claude runtime inside bubblewrap, without external network or AI quota (Linux)
+	$(call vite_run,test:analysis:claude-native)
+
+test-analysis-claude-prepare: ## Rehearse Claude analysis and active-stream cancellation offline; paid execution stays blocked
+	$(call vite_run,test:analysis:claude-prepare)
+
+test-analysis-live: ## Opt-in live analysis cancellation in bubblewrap (Linux, gh authentication, AI quota)
+	$(call vite_run,test:analysis:live)
 
 lint: ## Type-check the project
 	$(NPM) run lint

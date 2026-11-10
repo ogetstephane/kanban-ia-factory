@@ -19,6 +19,7 @@ import type { ContextFile } from '../../shared/types/contextFile';
 import TaskAgentSelect from './TaskAgentSelect';
 import { useTaskAutoSpec } from '../data/useTaskAutoSpec';
 import { TaskAutoSpecButton, TaskAutoSpecPlan, TaskAutoSpecResult, TaskAutoSpecStatus } from './TaskAutoSpec';
+import { TicketClarification } from './TicketClarification';
 import { AssistantModeToggle } from './AssistantModeToggle';
 
 const TaskAgentSession = lazy(() => import('./TaskAgentSession'));
@@ -77,6 +78,11 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const autoSpec = useTaskAutoSpec({
     setDescription, setAcceptanceCriteria, setSubtasks, setSuggestedWorkflow, setStoryPoints, setTagsInput,
   });
+
+  useEffect(() => {
+    autoSpec.discardClarification();
+  }, [title, description, priority, featureId, agentProvider, agentModel, acceptanceCriteria,
+    subtasks, suggestedWorkflow, tagsInput, contextFiles, autoSpec.mode]);
 
   useEffect(() => {
     autoSpec.reset();
@@ -162,7 +168,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       currentDescription: description,
       featureTitle: features.find((f) => f.id === featureId)?.title,
       priority,
-      agentModel: agentModel || undefined,
+      agentModel: agentProvider === 'copilot' ? agentModel || undefined : undefined,
       acceptanceCriteria,
       subtasks: subtasks.map((subtask) => subtask.text),
       suggestedWorkflow,
@@ -251,7 +257,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
               </label>
               <div className="flex items-center gap-2">
                 <AssistantModeToggle mode={autoSpec.mode} onChange={autoSpec.setMode} disabled={autoSpec.generating} />
-                <TaskAutoSpecButton spec={autoSpec} disabled={upload.pending || !title.trim()} onGenerate={() => generateSpec()} />
+                <TaskAutoSpecButton spec={autoSpec} disabled={upload.pending || !title.trim() || !!autoSpec.clarification} onGenerate={() => generateSpec()} />
               </div>
             </div>
             <input
@@ -266,6 +272,9 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
 
           <TaskAutoSpecResult spec={autoSpec} />
+          {autoSpec.clarification && <TicketClarification clarification={autoSpec.clarification} answers={autoSpec.answers}
+            onChange={autoSpec.editAnswer} onGenerate={() => generateSpec()} onDiscard={autoSpec.discardClarification}
+            disabled={upload.pending || autoSpec.generating || !title.trim()} />}
           <TaskAutoSpecPlan spec={autoSpec} disabled={upload.pending || !title.trim()}
             onApprove={() => generateSpec(autoSpec.plan?.plan)} />
 

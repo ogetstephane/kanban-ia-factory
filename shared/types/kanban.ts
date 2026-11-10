@@ -1,4 +1,5 @@
 import type { ContextFile } from './contextFile';
+import type { AgentProviderId } from './agentProvider';
 
 export type KanbanStatus = 'Backlog' | 'To Do' | 'In Progress' | 'Review' | 'Done';
 
@@ -63,7 +64,7 @@ export interface Task {
   suggestedWorkflow?: string;
   blockedReason?: string;
   contextFiles?: ContextFile[];
-  agentProvider?: 'copilot';
+  agentProvider?: AgentProviderId;
   agentModel?: string;
   order: number;
   createdAt: string;

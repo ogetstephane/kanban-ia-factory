@@ -12,6 +12,58 @@ model Board {
   revision Int    @default(0)
 }
 
+model WorkflowConfiguration {
+  scope             String @id
+  revision          Int @default(0)
+  draft             Json
+  selectedVersionId String?
+  versions          WorkflowConfigurationVersion[]
+}
+
+model WorkflowConfigurationVersion {
+  id            String @id
+  scope         String
+  configuration WorkflowConfiguration @relation(fields: [scope], references: [scope], onDelete: Cascade)
+  number        Int
+  document      Json
+  createdAt     DateTime @default(now())
+
+  @@unique([scope, number])
+}
+
+model WorkflowTestRun {
+  id        String @id
+  scope     String
+  status    String
+  revision  Int @default(0)
+  snapshot  Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([scope, createdAt])
+}
+
+model AnalysisExecution {
+  id           String @id
+  status       String @default("prepared")
+  prepared     Json?
+  result       Json?
+  nextSequence Int    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  events       AnalysisExecutionEvent[]
+}
+
+model AnalysisExecutionEvent {
+  executionId String
+  execution   AnalysisExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  sequence    Int
+  occurredAt  String
+  payload     Json
+
+  @@id([executionId, sequence])
+}
+
 model ActivityEvent {
   id          String @id
   projectId   String?

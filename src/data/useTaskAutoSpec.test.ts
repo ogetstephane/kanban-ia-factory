@@ -44,4 +44,7 @@ test('a generated specification fills the task form and leaves fields it does no
   delete applied.tagsInput;
   applyTaskSpec({ ...result, suggestedTags: [] }, fields);
   assert.equal('tagsInput' in applied, false);
+
+  applyTaskSpec({ ...result, openQuestions: ['Should existing sessions be revoked?'] }, fields);
+  assert.equal(applied.description, `${result.description}\n\n## Open decisions\n\n- Should existing sessions be revoked?`);
 });

@@ -19,6 +19,10 @@ import { DocsService } from './wiki/docsService';
 import type { WikiGenerator } from './wiki/wikiAssistant';
 import type { TaskGenerator } from './agents/taskAssistant';
 import { createTaskAssistantRouter } from './routes/taskAssistant';
+import { createWorkflowEditorRouter } from './routes/workflowEditor';
+import { WorkflowEditorStore } from './db/workflowEditorStore';
+import { WorkflowTestService, type WorkflowTestAgentExecutor } from './agents/workflowTestService';
+import { createWorkflowTestRouter } from './routes/workflowTests';
 
 /** Everything the API needs from its environment; `server.ts` provides the production implementations. */
 export interface AppDependencies {
@@ -31,6 +35,7 @@ export interface AppDependencies {
   wikiAssistant?: WikiGenerator;
   /** The task drafting endpoint answers 503 when omitted. */
   taskAssistant?: TaskGenerator;
+  workflowTestAgent?: WorkflowTestAgentExecutor;
 }
 
 export interface KanbanApp {
@@ -38,6 +43,7 @@ export interface KanbanApp {
   /** Background services are returned stopped: the caller owns their start/stop lifecycle. */
   sessions: SessionService;
   releases: ReleaseService;
+  workflowTests: WorkflowTestService;
 }
 
 /**
@@ -45,11 +51,14 @@ export interface KanbanApp {
  * nor starts background work, so tests can compose it with their own database and agent.
  */
 export function createApp({
-  db, repositories, agentProvider, codeGraph, archifyDir, wikiAssistant, taskAssistant,
+  db, repositories, agentProvider, codeGraph, archifyDir, wikiAssistant, taskAssistant, workflowTestAgent,
 }: AppDependencies): KanbanApp {
   const app = express();
   app.use(express.json({ limit: '5mb' }));
   const entities = new EntityStore(db, agentProvider.id);
+  app.use('/api/board', createWorkflowEditorRouter(new WorkflowEditorStore(db)));
+  const workflowTests = new WorkflowTestService(db, workflowTestAgent);
+  app.use('/api/board', createWorkflowTestRouter(workflowTests));
   app.use('/api/board', createBoardRouter(new BoardStore(db), entities, repositories.workspaces));
   const sessions = new SessionService(db, repositories, agentProvider);
   app.use('/api/board', createAgentRouter(sessions));
@@ -79,7 +88,7 @@ export function createApp({
     res.status(404).json({ error: `Unknown API route: ${req.method} ${req.originalUrl}` });
   });
 
-  return { app, sessions, releases };
+  return { app, sessions, releases, workflowTests };
 }
 
 function registerCopilotRoutes(app: Express) {

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 import { taskSchema, projectSchema, featureSchema } from './board';
+import { agentProviderSchema } from './agentProvider';
 
 export const agentOptionsSchema = z.object({
   providers: z.array(z.object({
-    id: z.literal('copilot'), name: z.string(),
+    id: agentProviderSchema, name: z.string(),
+    available: z.boolean().default(true), experimental: z.boolean().default(false), issue: z.string().nullable().default(null),
     defaultModel: z.string().nullable(),
     models: z.array(z.object({ id: z.string(), name: z.string() })),
   })),
@@ -27,6 +29,14 @@ export type AgentQuestionInput = z.infer<typeof agentQuestionInputSchema>;
 export const agentQuestionSchema = agentQuestionInputSchema.extend({
   id: z.string(), answer: z.string().nullable(), createdAt: z.string(), answeredAt: z.string().nullable(),
 });
+export const AGENT_CHECK_SCRIPTS = [
+  'test', 'lint', 'phpunit', 'phpstan', 'rector-check', 'rector-fix',
+  'symfony:about', 'symfony:debug-router', 'symfony:lint-container', 'symfony:lint-yaml', 'symfony:lint-twig',
+] as const;
+export type AgentCheckScript = typeof AGENT_CHECK_SCRIPTS[number];
+export const SYMFONY_CONSOLE_CHECKS = [
+  'symfony:about', 'symfony:debug-router', 'symfony:lint-container', 'symfony:lint-yaml', 'symfony:lint-twig',
+] as const;
 export const agentStatusSchema = z.enum(['queued', 'planning', 'awaiting_input', 'awaiting_approval', 'execution_queued', 'executing', 'completed', 'failed', 'cancelling', 'cancelled', 'delivering']);
 export const deliverySchema = z.object({
   id: z.string(), attempt: z.number(), status: z.enum(['committing', 'committed', 'merging', 'delivered', 'failed']),
@@ -86,7 +96,7 @@ export const publicationSchema = z.object({
   branch: z.string(), status: z.string(), commitHash: z.string(), error: z.string(),
 });
 export const checkResultSchema = z.object({
-  id: z.string(), attempt: z.number(), script: z.enum(['test', 'lint']),
+  id: z.string(), attempt: z.number(), script: z.enum(AGENT_CHECK_SCRIPTS),
   passed: z.boolean(), output: z.string(), createdAt: z.string(),
 });
 export const agentRuntimeEventSchema = z.object({

@@ -3,6 +3,11 @@ import type { Subtask } from '../../shared/types/kanban';
 import type { AssistantMode, AssistantPlan } from '../../shared/types/assistantMode';
 import type { TaskDraftInput, TaskDraftSpecification } from '../../shared/types/taskDraft';
 import { boardApi } from './boardApi';
+import { assessTicketProposal, type TicketProposalQuality } from '../../shared/utils/ticketProposalQuality';
+import {
+  clarificationContext, ticketClarificationAnswersSchema,
+  type TicketClarification, type TicketClarificationAnswer,
+} from '../../shared/types/ticketClarification';
 
 /** Setters of the task form fields that a generated specification fills in. */
 export interface TaskSpecFields {
@@ -16,7 +21,12 @@ export interface TaskSpecFields {
 
 /** Copies a generated specification into the form; fields the proposal leaves empty keep what the user typed. */
 export function applyTaskSpec(data: TaskDraftSpecification, fields: TaskSpecFields) {
-  if (data.description) fields.setDescription(data.description);
+  if (data.description) fields.setDescription([
+    data.description,
+    ...(data.openQuestions?.length ? [
+      `## Open decisions\n\n${data.openQuestions.map((question) => `- ${question}`).join('\n')}`,
+    ] : []),
+  ].join('\n\n'));
   if (Array.isArray(data.acceptanceCriteria) && data.acceptanceCriteria.length > 0) {
     fields.setAcceptanceCriteria(data.acceptanceCriteria);
   }
@@ -36,7 +46,7 @@ export function applyTaskSpec(data: TaskDraftSpecification, fields: TaskSpecFiel
   }
 }
 
-export type TaskSpecRequest = Omit<TaskDraftInput, 'mode' | 'approvedPlan'>;
+export type TaskSpecRequest = Omit<TaskDraftInput, 'mode' | 'approvedPlan' | 'clarificationAnswers'>;
 
 /**
  * Copilot Auto-Spec of a task form: one cancellable generation at a time, applied to the form when it succeeds.
@@ -47,8 +57,12 @@ export function useTaskAutoSpec(fields: TaskSpecFields) {
   const [generating, setGenerating] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [impactAnalysis, setImpactAnalysis] = useState('');
+  const [quality, setQuality] = useState<TicketProposalQuality | null>(null);
   const [mode, setMode] = useState<AssistantMode>('auto');
   const [plan, setPlan] = useState<AssistantPlan | null>(null);
+  const [clarification, setClarification] = useState<TicketClarification | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [confirmedAnswers, setConfirmedAnswers] = useState<TicketClarificationAnswer[]>([]);
   const activeGeneration = useRef<AbortController | null>(null);
 
   useEffect(() => () => {
@@ -71,15 +85,29 @@ export function useTaskAutoSpec(fields: TaskSpecFields) {
     setGenerating(true);
     setFeedback(null);
     setImpactAnalysis('');
+    setQuality(null);
     const controller = new AbortController();
     activeGeneration.current = controller;
 
     try {
+      const submittedAnswers = clarification
+        ? ticketClarificationAnswersSchema.parse(clarification.questions.map((question, index) => ({ question, answer: answers[index] ?? '' })))
+        : confirmedAnswers;
       const data = await boardApi.assistTask(projectId, {
         ...input, mode, ...(approvedPlan?.trim() ? { approvedPlan: approvedPlan.trim() } : {}),
+        ...(submittedAnswers.length ? { clarificationAnswers: submittedAnswers } : {}),
       }, controller.signal);
       if (controller.signal.aborted) return;
 
+      if (data.kind === 'clarification') {
+        setPlan(null);
+        setClarification(data);
+        setAnswers(data.questions.map(() => ''));
+        return;
+      }
+      setConfirmedAnswers(submittedAnswers);
+      setClarification(null);
+      setAnswers([]);
       if (data.kind === 'plan') {
         setPlan({ plan: data.plan, reason: data.reason });
         setFeedback(mode === 'plan'
@@ -88,8 +116,11 @@ export function useTaskAutoSpec(fields: TaskSpecFields) {
         return;
       }
       setPlan(null);
-      applyTaskSpec(data, fields);
+      applyTaskSpec({
+        ...data, description: [data.description, clarificationContext(submittedAnswers)].filter(Boolean).join('\n\n'),
+      }, fields);
       setImpactAnalysis(data.impactAnalysis);
+      setQuality(assessTicketProposal(data));
       setFeedback(data.graphAvailable
         ? 'Copilot generated the specification. Review the code impact analysis before saving.'
         : 'Copilot generated the specification without Graphify. Review the impact analysis for limitations before saving.');
@@ -110,12 +141,22 @@ export function useTaskAutoSpec(fields: TaskSpecFields) {
   const reset = () => {
     cancel();
     setImpactAnalysis('');
+    setQuality(null);
     setFeedback(null);
     setPlan(null);
+    discardClarification();
+  };
+
+  const discardClarification = () => {
+    setClarification(null);
+    setAnswers([]);
+    setConfirmedAnswers([]);
   };
 
   return {
-    generating, feedback, impactAnalysis, mode, plan, generate, cancel, reset, setMode,
+    generating, feedback, impactAnalysis, quality, mode, plan, generate, cancel, reset, setMode,
+    clarification, answers, discardClarification,
+    editAnswer: (index: number, answer: string) => setAnswers((current) => current.map((value, i) => i === index ? answer : value)),
     editPlan: (text: string) => setPlan((current) => current && { ...current, plan: text }),
     discardPlan: () => setPlan(null),
     dismissFeedback: () => setFeedback(null),

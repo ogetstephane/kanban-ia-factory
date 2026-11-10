@@ -5,8 +5,10 @@ import { taskDraftInputSchema, taskDraftResultSchema } from '../../shared/types/
 import { boardApi } from '../../src/data/boardApi';
 import { CodeGraph } from './codeGraph';
 import { GRAPHIFY_SKILL_DIRECTORY, GRAPHIFY_SKILL_INSTRUCTION } from './graphifySkill';
-import { TaskAssistant, taskDraftMessage } from './taskAssistant';
+import { TaskAssistant, taskDraftMessage, TICKET_AUTHORING_SKILLS } from './taskAssistant';
 import { ASSISTANT_PLANNING_SKILL, AUTO_ASSISTANT_AGENT, PLAN_ASSISTANT_AGENT } from './assistantModes';
+import { readFile } from 'node:fs/promises';
+import { parse as parseYaml } from 'yaml';
 
 const input = taskDraftInputSchema.parse({
   title: 'Add export', currentDescription: 'Keep the existing format', priority: 'High',
@@ -24,6 +26,53 @@ const proposal = {
   suggestedTags: ['export'], impactAnalysis: 'Inspect src/export.ts; graph limitations are noted.',
 };
 
+test('ticket authoring skills are discoverable and technology-neutral', async () => {
+  for (const name of TICKET_AUTHORING_SKILLS) {
+    const text = await readFile(new URL(`../skills/${name}/SKILL.md`, import.meta.url), 'utf8');
+    const frontmatter = text.match(/^---\n([\s\S]*?)\n---/);
+    assert.ok(frontmatter);
+    const metadata = parseYaml(frontmatter[1]);
+    assert.equal(metadata.name, name);
+    assert.ok(metadata.description.length > 30);
+    assert.doesNotMatch(text, /Symfony|PHPUnit|PHPStan/);
+  }
+});
+
+test('feature breakdown applies the authoring skills, returns validated dependencies and keeps read-only permissions', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  const draft = { summary: 'Two slices', impactAnalysis: 'Unverified without a repository', openQuestions: ['Confirm format'],
+    tasks: [{ ...proposal, id: 'first', priority: 'Medium', dependsOn: [] },
+      { ...proposal, id: 'second', priority: 'Low', dependsOn: ['first'] }] };
+  let content = JSON.stringify(draft);
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async (_config: SessionConfig) => ({
+    sendAndWait: async (message: MessageOptions) => {
+      assert.equal(JSON.parse(message.prompt).purpose, 'breakdown');
+      return { data: { content } };
+    },
+  }));
+  const assistant = new TaskAssistant();
+  const request = { input, project, signal: new AbortController().signal };
+  const result = await assistant.generateBreakdown(request);
+  assert.deepEqual(result, { kind: 'proposal', ...draft, graphAvailable: false });
+  const configuration = create.mock.calls[0].arguments[0];
+  assert.deepEqual(configuration.availableTools, ['skill']);
+  assert.match(configuration.systemMessage?.content ?? '', /ticket-decomposition/);
+  const hook = configuration.hooks?.onPreToolUse;
+  assert.ok(hook);
+  // The host rejects unrelated skills even though discovery uses a shared directory.
+  assert.equal((await hook({
+    toolName: 'skill', toolArgs: { skill: 'untrusted' }, timestamp: new Date(),
+    sessionId: 'fixture', workingDirectory: '/fixture',
+  }, { sessionId: 'fixture' }))?.permissionDecision, 'deny');
+  content = JSON.stringify({ ...draft, tasks: [{ ...draft.tasks[0], dependsOn: ['missing'] }] });
+  await assert.rejects(assistant.generateBreakdown(request), { status: 502 });
+  content = JSON.stringify({ kind: 'plan', plan: 'Confirm scope, then draft slices.', reason: 'Product decision' });
+  assert.equal((await assistant.generateBreakdown(request)).kind, 'plan');
+  await assert.rejects(assistant.generateBreakdown({ ...request, input: { ...input, approvedPlan: 'Confirmed' } }), { status: 502 });
+});
+
 test('task drafting sends the unsaved requirements and attachments, not a graph or skill body', () => {
   const message = taskDraftMessage({ input, project });
   const prompt = JSON.parse(message.prompt);
@@ -36,6 +85,39 @@ test('task drafting sends the unsaved requirements and attachments, not a graph 
   assert.deepEqual(message.attachments, [{ type: 'blob', data: 'AP8K', mimeType: 'application/pdf', displayName: 'design.pdf' }]);
   assert.equal(prompt.codeGraph, undefined);
   assert.doesNotMatch(message.prompt, /## Workflow/);
+});
+
+test('ticket authoring clarifies in Auto, uses submitted answers and preserves plan contracts without further question rounds', async (t) => {
+  t.mock.method(CopilotClient.prototype, 'start', async () => {});
+  const stop = t.mock.method(CopilotClient.prototype, 'stop', async () => []);
+  t.mock.method(CopilotClient.prototype, 'getAuthStatus', async () => ({ isAuthenticated: true }));
+  let content = JSON.stringify({ kind: 'clarification', reason: 'Missing output format', questions: ['Which format?'] });
+  const send = t.mock.fn(async (_message: MessageOptions) => ({ data: { content } }));
+  const create = t.mock.method(CopilotClient.prototype, 'createSession', async (_config: SessionConfig) => ({ sendAndWait: send }));
+  const assistant = new TaskAssistant();
+  const request = { input, project, signal: new AbortController().signal };
+  for (const generate of [assistant.generate.bind(assistant), assistant.generateBreakdown.bind(assistant)]) {
+    assert.deepEqual(await generate(request), {
+      kind: 'clarification', reason: 'Missing output format', questions: ['Which format?'], graphAvailable: false,
+    });
+    await assert.rejects(generate({ ...request, input: { ...input, mode: 'plan' } }), { status: 502 });
+    await assert.rejects(generate({ ...request, input: { ...input, approvedPlan: 'Use CSV' } }), { status: 502 });
+    await assert.rejects(generate({ ...request, input: {
+      ...input, clarificationAnswers: [{ question: 'Which format?', answer: 'CSV' }],
+    } }), { status: 502, message: /more clarification/ });
+  }
+  content = JSON.stringify(proposal);
+  const answers = [{ question: 'Which format?', answer: 'CSV' }];
+  const result = await assistant.generate({ ...request, input: { ...input, clarificationAnswers: answers } });
+  assert.equal(result.kind, 'proposal');
+  const prompt = JSON.parse(send.mock.calls.at(-1)!.arguments[0].prompt);
+  assert.deepEqual(prompt.task.clarificationAnswers, answers);
+  assert.equal(prompt.approvedPlan, undefined);
+  assert.deepEqual(create.mock.calls[0].arguments[0].availableTools, ['skill']);
+  assert.match(create.mock.calls[0].arguments[0].systemMessage?.content ?? '', /structured clarification/);
+  content = JSON.stringify({ kind: 'clarification', reason: 'Missing format', questions: [] });
+  await assert.rejects(assistant.generate(request), { status: 502, message: /invalid clarification/ });
+  assert.equal(stop.mock.callCount(), send.mock.callCount());
 });
 
 test('task drafting uses the native skill, the selected model and read-only project tools', async (t) => {
@@ -59,7 +141,8 @@ test('task drafting uses the native skill, the selected model and read-only proj
   assert.deepEqual(result, { kind: 'proposal', ...proposal, graphAvailable: true });
   assert.equal(configuration?.agent, AUTO_ASSISTANT_AGENT);
   assert.deepEqual(configuration?.customAgents?.map((agent) => [agent.name, agent.skills, agent.infer]), [
-    [AUTO_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL], false], [PLAN_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL], false],
+    [AUTO_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL, ...TICKET_AUTHORING_SKILLS], false],
+    [PLAN_ASSISTANT_AGENT, [ASSISTANT_PLANNING_SKILL, ...TICKET_AUTHORING_SKILLS], false],
   ]);
   assert.equal(JSON.parse(send.mock.calls[0].arguments[0].prompt).mode, 'auto');
   assert.deepEqual(prepare.mock.calls[0].arguments, ['/project-clone', signal]);

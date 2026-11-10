@@ -5,6 +5,7 @@
 | [Getting started](getting-started.md) | Prerequisites, first-time setup, environment variables |
 | [Commands](commands.md) | Every `make` target and its npm equivalent |
 | [Architecture](architecture.md) | Lazy-loaded board, data hooks, atomic entity persistence |
+| [AI orchestrator](ai-orchestrator.md) | Proposed provider-neutral contracts, resolution, lifecycle, security and MVP |
 | [Cockpit](cockpit.md) | Cross-project action inbox, release watch and project pulse |
 | [Activity history](activity-history.md) | Chronological ticket, feature, release, project and Copilot lifecycle changes |
 | [Wiki](wiki.md) | Markdown editor for the project's documentation folder, committed and pushed on save |

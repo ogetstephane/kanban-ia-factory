@@ -33,12 +33,14 @@ export async function replanTicket(tx: Prisma.TransactionClient, row: AgentSessi
   await recordActivity(tx, {
     projectId: context.task.projectId, projectName: context.project?.name,
     entityType: 'task', entityId: context.task.id, entityTitle: context.task.title,
-    action: 'session_replanned', summary: `Copilot started attempt ${row.attempt + 1}`,
-    actor: 'Copilot', changes: [{ field: 'Attempt', before: String(row.attempt), after: String(row.attempt + 1) }],
+    action: 'session_replanned', summary: `${context.task.agentProvider === 'claude-code' ? 'Claude Code' : 'Copilot'} started attempt ${row.attempt + 1}`,
+    actor: context.task.agentProvider === 'claude-code' ? 'System' : 'Copilot',
+    changes: [{ field: 'Attempt', before: String(row.attempt), after: String(row.attempt + 1) }],
   });
 }
 
 export async function enqueueTicket(tx: Prisma.TransactionClient, context: AgentContext, provider: string, autoExecute = false) {
+  provider = context.task.agentProvider ?? provider;
   const existing = await tx.agentSession.findUnique({ where: { taskId: context.task.id } });
   if (existing) {
     await replanTicket(tx, existing, context, 'The ticket was returned to In Progress. Inspect existing changes before continuing.', autoExecute);
@@ -57,7 +59,8 @@ export async function enqueueTicket(tx: Prisma.TransactionClient, context: Agent
   await recordActivity(tx, {
     projectId: context.task.projectId, projectName: context.project?.name,
     entityType: 'task', entityId: context.task.id, entityTitle: context.task.title,
-    action: 'session_started', summary: 'Copilot session queued', actor: 'Copilot',
+    action: 'session_started', summary: `${provider === 'claude-code' ? 'Claude Code' : 'Copilot'} session queued`,
+    actor: provider === 'claude-code' ? 'System' : 'Copilot',
     changes: [{ field: 'Session status', before: null, after: session.status }],
   });
 }

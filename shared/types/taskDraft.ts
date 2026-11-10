@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { taskSchema } from './board';
 import { assistantModeInputShape, assistantPlanSchema } from './assistantMode';
 import { contextFilesSchema } from './contextFile';
+import { ticketClarificationAnswersSchema, ticketClarificationSchema } from './ticketClarification';
 
 export const taskDraftInputSchema = z.object({
   title: z.string().trim().min(1).max(1000),
@@ -14,6 +15,7 @@ export const taskDraftInputSchema = z.object({
   suggestedWorkflow: z.string().max(10_000).default(''),
   tags: z.array(z.string().max(200)).max(100).default([]),
   contextFiles: contextFilesSchema.default([]),
+  clarificationAnswers: ticketClarificationAnswersSchema.optional(),
   ...assistantModeInputShape,
 });
 
@@ -26,12 +28,14 @@ export const taskDraftProposalSchema = z.object({
   estimatedStoryPoints: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5), z.literal(8)]),
   suggestedTags: z.array(z.string().trim().min(1).max(200)).max(100),
   impactAnalysis: z.string().trim().min(1).max(20_000),
+  openQuestions: z.array(z.string().trim().min(1).max(2000)).max(30).optional(),
 });
 
 /** Auto-Spec returns either the specification or, when a plan is needed or requested, a plan to confirm. */
 export const taskDraftResultSchema = z.discriminatedUnion('kind', [
   taskDraftProposalSchema.extend({ kind: z.literal('proposal'), graphAvailable: z.boolean() }),
   assistantPlanSchema.extend({ kind: z.literal('plan'), graphAvailable: z.boolean() }),
+  ticketClarificationSchema.extend({ graphAvailable: z.boolean() }),
 ]);
 export type TaskDraftInput = z.infer<typeof taskDraftInputSchema>;
 export type TaskDraftResult = z.infer<typeof taskDraftResultSchema>;

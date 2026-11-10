@@ -122,7 +122,7 @@ test('API errors are surfaced with status and message', async () => {
 
 test('agent options load the provider model catalogue and surface failures', async () => {
   const options = { providers: [{
-    id: 'copilot', name: 'GitHub Copilot', defaultModel: null,
+    id: 'copilot', name: 'GitHub Copilot', defaultModel: null, available: true, experimental: false, issue: null,
     models: [{ id: 'model-a', name: 'Model A' }],
   }] };
   boardPayload = options;

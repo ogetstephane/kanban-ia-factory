@@ -2,6 +2,81 @@
 
 ## Starting a session
 
+### Visual workflow configuration
+
+Open **Workflows** to design a provider-neutral agent graph for ticket authoring,
+ticket processing, wiki or releases. These configurations are global by function,
+not per-project overrides. Drag nodes (or use arrow keys), connect steps, and edit
+agents, prompts, skills and lifecycle hooks in the definition library. Initial
+skills are editable copies from `server/skills/`; editing a copy does not change
+the bundled Markdown files. The initial graph is a design template, not an export
+of the production runtime.
+
+The studio opens in immersive fullscreen with nothing selected: only the workflow,
+an **Add element** button at the top right and a compact **Workflow menu** are shown.
+The workflow menu contains scope, save, publish, version and test controls.
+**Add element** opens the node palette or **Manage definitions** for agents, prompts,
+skills and hooks. Click a node (or right-click, Enter or Space) for its action menu:
+configure, duplicate, connect or delete. A duplicate shares its original definition
+and is connected from the original; changes to that definition affect both steps.
+Connection mode waits for a target click and rejects duplicate edges and cycles.
+**Configure node** opens the inspector; **Edit linked prompt** opens its prompt
+in the same inspector. Expand **Connections** to manage edges.
+Click empty canvas space or press Escape to clear selection and close overlays
+without losing edits or test inputs. A second Escape from the clean canvas or
+**Exit fullscreen** in the workflow menu restores application navigation.
+**Enter fullscreen** returns to the immersive studio. This is an application layout,
+not browser fullscreen.
+Drag the canvas background to pan, use the zoom buttons or **Fit nodes**, and use
+**Reset view** to return to 100%. Canvas navigation never changes saved positions.
+On narrow screens the panels remain scrollable overlays. Canvas controls appear on
+hover or keyboard focus (always visible on touch devices). Test results open over
+the canvas without resizing the composition.
+
+Save a validated draft, then publish an immutable numbered version. **Select as
+default** restores an earlier published selection without overwriting the current
+draft. **Copy version to draft** allows editing an old version before publishing
+a new one. Revision conflicts preserve local edits and require an explicit reload;
+save before navigating away.
+
+Publishing does not change current production ticket/authoring/wiki/release
+execution or grant tool permissions. Script hooks are inactive text, always marked
+as requiring approval. The launch snapshot preview is read-only. Production runtime
+dispatch and an authorized script runner remain separate integration work. At integration,
+each launch must persist its selected immutable version: restoring a previous
+default must affect future launches only, never running sessions.
+
+#### Running a preview test
+
+Select a published version, then open **Test & results** (or the bottom
+**Test console & results** dock). Collapsing the dock retains mock edits and
+continues monitoring the current test; it does not cancel the run.
+
+1. Supply a JSON object with every prompt variable (for example `request`).
+2. Select **Mock** or **Real** independently for each agent step.
+3. For each mock, enter the exact JSON object it should return, or select a
+   simulated error and enter its message. Optionally add a delay of up to 30 seconds.
+4. Real steps currently support Copilot only and require explicit authorization
+   for each launch, with possible AI charges. Claude/Codex are not silently replaced.
+5. Start the test, inspect each step's inputs/outputs and errors, and explicitly
+   approve any preview gate. Cancel a delayed/running test when needed.
+
+Tests use the published snapshot, not unsaved draft edits. Nodes run sequentially
+in dependency order, with direct predecessor outputs passed as `upstream`; joins
+wait for every predecessor. Script hooks are skipped, production writes are
+unavailable, and real agents have no tools or repository access. Validate hooks
+check JSON structure/size only, not semantic quality. Hook event metadata does not
+change its graph position. No ticket is saved by a test run.
+
+Recent runs preserve their input and per-node mock settings; inspect one and use
+**Reuse test inputs and mocks** when the same version is selected. Real-call consent
+must be renewed. A restart never replays an interrupted inference; waiting approval
+gates can still be continued. Test inputs and outputs are persisted: do not enter secrets.
+
+See the [studio API](api.md#workflow-studio-configuration-and-preview-tests).
+
+### Current ticket lifecycle
+
 Moving a ticket from **To Do** to **In Progress** automatically queues an AI session, whether
 the change comes from drag-and-drop, a card control, the task editor, or the API.
 The session is inserted in the **same database transaction** as the status change. Reordering
@@ -24,26 +99,170 @@ the entire board. The agent reads relevant repository files on demand.
 ### Choosing the ticket agent and model
 
 The new/edit ticket form includes **Ticket agent**, with **Agent provider** and
-**Model** selectors. GitHub Copilot is currently the only integrated ticket provider;
-the model list is loaded from the server user's authenticated Copilot SDK catalogue,
-excluding models disabled by policy.
+**Model** selectors. The ticket orchestrator routes planning, execution and advisory
+review to the provider captured with the session: GitHub Copilot by default, or
+experimental Claude Code when explicitly enabled. There is no cross-provider fallback.
+Copilot models come from the authenticated SDK catalogue, excluding policy-disabled models.
+Each provider reports its own catalogue availability and errors; a failing catalogue
+does not hide the other providers. Disabled providers cannot be selected for new tickets.
 
 The selection is saved with the ticket and snapshotted when a session is queued or
-replanned. The same model is used for planning, execution and advisory AI review.
+replanned. The same provider and explicit model selection are used for planning,
+execution and advisory AI review.
 An explicit ticket model overrides `COPILOT_MODEL`; leaving the selection at
 **Server default** uses that environment setting, or Copilot's default if unset.
 Existing tickets continue using the default until a model is selected.
-If `COPILOT_MODEL` is not in the account's catalogue, the form marks the server
+For Claude, an explicit ticket model or `KANBAN_CLAUDE_MODEL` is required; the
+Copilot default is never reused. If a configured default is not in its catalogue, the form marks the server
 default as unavailable. A run whose model Copilot rejects fails with a message naming
 whether the ticket selection or `COPILOT_MODEL` must be changed.
+An empty model selection resolves the runtime's server default at each phase;
+changing that default across server restarts can affect paused sessions. Select an
+explicit model to keep it pinned across phases. Runtime resolution does not replace
+the saved ticket selection or turn a server-default error into a ticket-selection error.
 
 Active/queued sessions still prevent ticket edits. To change an existing run's model,
 stop the session, save the ticket's new model, then regenerate its plan. Changes do not
 alter the model recorded in previous attempts. A saved model missing from the current
 catalogue is retained and labelled **saved selection**, rather than silently replaced.
 Catalogue failures are shown with **Retry models**; they do not erase a saved choice.
-The built-in Auto-Spec helper continues to use its deterministic draft independently
-of ticket agent settings.
+Auto-Spec remains a separate Copilot assistant. When Claude is selected for the
+ticket, Auto-Spec uses the Copilot server default rather than forwarding a Claude
+model ID to Copilot. Wiki generation is also unchanged.
+
+### Experimental Claude ticket runtime
+
+The application replaces its single-provider dispatch with
+[`TicketOrchestrator`](../server/agents/ticketOrchestrator.ts). The durable queue,
+attempts, questions, approval gates, review tokens, local delivery and publication
+remain owned by `SessionService`, not by either SDK. Shared
+[`ticketSession`](../server/agents/ticketSession.ts) definitions own phase-specific
+instructions, tools, adaptive approval/write exclusion and check recording.
+Copilot adapts these tools directly; Claude exposes them through the in-process MCP
+broker. The analysis-only Core adapters are **not** repurposed for ticket writes.
+Arbitrary canonical definition loading and generic Core workflows are not enabled
+for tickets by this migration.
+
+Claude is disabled by default. To opt in on the server:
+
+```sh
+KANBAN_EXPERIMENTAL_CLAUDE_TICKETS=true
+KANBAN_CLAUDE_MODEL=<resolved-model-id>
+```
+
+Provide `KANBAN_CLAUDE_API_KEY` through the server's environment/secret mechanism;
+do not commit it. The default model is optional if every Claude ticket selects one.
+The adapter never inherits the host environment, reads ambient Claude login, or
+uses `ANTHROPIC_API_KEY` automatically. Without both activation and the dedicated
+key, options report Claude as unavailable and stored Claude jobs fail explicitly.
+Switching a model or runtime requires a stopped session and a new attempt.
+Disabling the flag takes effect after a server restart; interrupted jobs retain
+the normal inspect-before-retry behavior.
+
+**Enabling this runtime authorizes potentially billable ticket requests.** It is
+experimental, not production-qualified, and cannot guarantee a strict billing cap.
+Do not enable it under a zero-dollar requirement. Tests use simulated runtimes or
+isolated synthetic endpoints and do not authorize any live call.
+The initial limits are 40 native turns and one hour per phase, not a financial
+guarantee. There is no automatic retry or provider fallback.
+
+Claude starts in an ephemeral directory rather than the ticket worktree and
+accesses the latter only through host `WorkspaceTools`. Planning/review have no
+write/check tools; review cannot ask questions. Adaptive approval blocks subsequent
+writes and checks. Only the supplied SDK MCP tools are accepted; native shell,
+native file tools, delegation, ambient settings, native skills/plugins and session
+resumption are disabled or rejected. The bundled ticket-graphify skill is injected
+once, while Copilot retains its existing native skill loading.
+Hooks and MCP metadata are checked before releasing input; `system/init` verifies
+model, runtime, directory, tools and empty skill/plugin inventories. It is an
+observation, not proof it preceded inference. Host managed settings and actual
+write-capable confinement still require native qualification.
+Check scripts execute repository code on the host as they do for Copilot; a
+worktree and SDK permissions are not an OS sandbox.
+
+Streaming text, session IDs, tool activity and terminal telemetry are persisted
+without recording the API key. Callback/storage failures cannot be swallowed into
+a successful result. Native forbidden-tool attempts are persistent failures.
+Cancellation reaches the SDK; cleanup waits for actual child exit. Unconfirmed
+shutdown fails and retains diagnostic state. Live-model cancellation and billing
+cessation remain unverified. Usage/cost are not normalized for Claude and are
+shown as unreported, never as zero or Copilot premium multiplier units.
+
+### Creating tickets before processing them
+
+Ticket authoring is separate from ticket execution. **Copilot Auto-Spec** improves
+one draft. **Copilot Breakdown** (or a feature's Split button) proposes delivery
+slices for a new or existing feature using the project-scoped assistant endpoint.
+Both use the existing Auto/Plan custom agents, now preloading these reusable,
+technology-neutral skills from the provider-neutral `server/skills/` directory:
+
+- [`ticket-framing`](../server/skills/ticket-framing/SKILL.md): intent, scope,
+  assumptions and open decisions.
+- [`ticket-writing`](../server/skills/ticket-writing/SKILL.md): actionable
+  specification, measurable criteria, verification and related documentation.
+- [`ticket-decomposition`](../server/skills/ticket-decomposition/SKILL.md):
+  independently testable slices and explicit prerequisites.
+- [`ticket-quality`](../server/skills/ticket-quality/SKILL.md): coverage,
+  duplication, evidence and dependency self-check before returning a proposal.
+
+The quality self-check is not an independent reviewer execution or proof of
+correctness. The server validates the output schema and prerequisite graph.
+Graphify and source reads remain read-only; unavailable context is reported.
+Authoring currently uses Copilot, independently of the runtime chosen to process
+the resulting tickets. No additional inference session per skill is introduced.
+
+A breakdown returns up to 20 draft tickets. If the assistant returns a plan,
+review/edit it and use **Generate tickets from plan**. Review each specification,
+acceptance criteria, impacts and unresolved decisions, select the tickets and
+adjust priorities. All selected prerequisites must remain selected.
+
+In Auto mode, a vague need can first return **Clarify the need before drafting**,
+with up to five questions and the reason they matter. Answer each question, then
+choose **Generate from answers**. Typing answers does not launch a request.
+Submitting starts another AI request using the same project and draft, not an
+implementation session. Do not include secrets. Clear requests can still be
+drafted directly without unnecessary questions.
+
+Answers are editable and unsaved. Cancelling generation or a request failure
+keeps them for retry; discarding questions, changing the need, switching mode or
+closing the editor clears them. There is one clarification round: after answers,
+remaining uncertainty is reported in the proposal rather than another question
+round. A returned plan can still be reviewed and approved, keeping the answers.
+Explicit Plan mode and approved-plan behavior take precedence over clarification.
+The host appends the submitted questions/answers under **Clarifications** in the
+generated ticket descriptions so manual save retains the decisions even if the
+model omits them. Nothing is persisted merely by answering.
+
+**Ticket proposal checks** displays **Ready for human review** when the shared
+structural checks find no issue, or **Needs clarification** with field-specific
+issues. Checks cover required content, valid prerequisites, repeated text in
+criteria/subtasks or ticket titles/descriptions, and explicitly declared open
+decisions. They do not establish completeness, measurable outcomes, source
+verification or absence of semantic duplicates. Missing Graphify alone does not
+change this status: source limitations remain visible in the impact analysis.
+
+Auto-Spec's report describes the last generated proposal, before manual edits;
+regeneration/reset clears it. Breakdown checks are recomputed for the current
+selection, including excluded prerequisites. Single-ticket open decisions are
+copied into the editable description; breakdown decisions are preserved on save.
+Warnings do not block saving a draft and never approve execution.
+
+The [offline regression scenarios](../shared/utils/ticketProposalQuality.test.ts)
+cover a vague need with declared decisions, a bug, a bounded feature and a linked
+breakdown, plus invalid content, duplicate text, and exact count/size boundaries.
+They evaluate supplied proposals, not model generation quality. Browser tests
+mock generation; no paid AI calls are required.
+
+Nothing is saved until **Add Selected Tasks to Board**. This creates the selected
+tickets atomically under one feature; save failures keep the proposal open.
+Choose a Backlog/To Do feature or create a new To Do feature, so authoring does
+not start execution. Generation can be cancelled; changing the need discards
+stale proposals. Closing the dialog discards unsaved proposals.
+
+Per-ticket impact, prerequisite titles and open decisions are retained in the
+saved descriptions. Dependencies are planning references, **not automatic
+execution blockers**. Processing continues through the existing ticket workflow;
+multi-agent implementation/TDD orchestration is a later increment.
 
 ### Uploading task context
 
@@ -62,8 +281,8 @@ prompt; binary files are sent through Copilot SDK blob attachments for planning,
 execution and automated review. Interpretation depends on the selected model/runtime:
 an unreadable or unsupported attachment must be reported explicitly. Attachments are
 reference data, not instructions granting extra permissions. Do not upload secrets or
-files you are not allowed to send to Copilot. Files are not supplied to the built-in
-deterministic Auto-Spec helper.
+files you are not allowed to send to the selected provider. Experimental Claude tickets
+reject binary attachments explicitly before creating a runtime; supply UTF-8 text instead.
 
 ## Planning, questions and approval
 
@@ -475,7 +694,7 @@ When [Graphify](https://github.com/safishamsi/graphify) is installed, every plan
 execution and automated-review phase starts by mapping the ticket worktree into a code
 knowledge graph ([codeGraph.ts](../server/agents/codeGraph.ts)). The agent receives:
 
-- the on-demand [`ticket-graphify` skill](../.github/skills/ticket-graphify/SKILL.md),
+- the on-demand [`ticket-graphify` skill](../server/skills/ticket-graphify/SKILL.md),
   discovered through the SDK's `skillDirectories` and activated with the native
   `skill` tool. Its body requires task understanding, graph queries, source
   verification, an impact report before edits, tests and a final comparison of

@@ -9,6 +9,7 @@ const meta = {
     isOpen: true,
     onClose: () => {},
     features: [feature],
+    projectId: feature.projectId ?? 'story-project',
     initialFeatureId: feature.id,
     onApplyBreakdown: () => {},
   },

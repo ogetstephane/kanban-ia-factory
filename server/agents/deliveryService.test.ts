@@ -11,13 +11,14 @@ import { featureSchema, taskSchema } from '../../shared/types/board';
 import { deliveryPreviewSchema, publicationRequestSchema, type DeliveryRequest } from '../../shared/types/agent';
 import { EntityStore } from '../db/entityStore';
 import { RepositoryService } from '../git/repositoryService';
-import { createSourceRepository } from '../git/testRepository';
+import { createSourceRepository, TEST_GIT_CONFIG } from '../git/testRepository';
 import { createAgentRouter } from '../routes/agents';
 import { SessionService } from './sessionService';
 import { requiredTicketDocumentationPath } from './ticketDocumentation';
 import { ReleaseService } from '../releases/releaseService';
 
-const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: 'pipe' }).trim();
+const git = (cwd: string, ...args: string[]) => execFileSync('git', [...TEST_GIT_CONFIG, ...args],
+  { cwd, encoding: 'utf8', stdio: 'pipe', timeout: 30_000 }).trim();
 type Preview = Awaited<ReturnType<SessionService['delivery']['preview']>>;
 const request = (preview: Preview, acknowledgeChecks = true): DeliveryRequest => ({
   sessionId: preview.sessionId, updatedAt: preview.updatedAt, targetHead: preview.targetHead,

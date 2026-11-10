@@ -30,14 +30,19 @@ test('Auto-Spec status offers cancellation only while a generation runs', () => 
 
 test('Auto-Spec result shows the notice and the rendered code impact analysis once available', () => {
   assert.equal(renderToStaticMarkup(createElement(TaskAutoSpecResult, {
-    spec: { feedback: null, impactAnalysis: '', dismissFeedback: noop },
+    spec: { feedback: null, impactAnalysis: '', quality: null, dismissFeedback: noop },
   })), '');
   const html = renderToStaticMarkup(createElement(TaskAutoSpecResult, {
-    spec: { feedback: 'Copilot generated the specification.', impactAnalysis: 'Touches **server/routes/board.ts**', dismissFeedback: noop },
+    spec: { feedback: 'Copilot generated the specification.', impactAnalysis: 'Touches **server/routes/board.ts**', quality: null, dismissFeedback: noop },
   }));
   assert.match(html, /Copilot generated the specification\./);
   assert.match(html, /Code impact analysis/);
   assert.match(html, /<strong[^>]*>server\/routes\/board\.ts<\/strong>/);
+  const report = renderToStaticMarkup(createElement(TaskAutoSpecResult, {
+    spec: { feedback: null, impactAnalysis: '', quality: { status: 'ready-for-review', issues: [] }, dismissFeedback: noop },
+  }));
+  assert.match(report, /Ready for human review/);
+  assert.match(report, /last generated proposal, before your edits/);
 });
 
 test('Auto-Spec plan is editable, explains why it is needed and can be applied or discarded', () => {

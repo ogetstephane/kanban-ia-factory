@@ -19,6 +19,7 @@ import { requiredTicketDocumentationPath } from './ticketDocumentation';
 import { agentWorkflowsSchema } from '../../shared/types/workflow';
 import { RuntimeTelemetry } from './runtimeTelemetry';
 import { attemptSnapshotSchema } from '../../shared/types/agent';
+import { TicketOrchestrator } from './ticketOrchestrator';
 
 let directory: string;
 let db: PrismaClient;
@@ -111,7 +112,11 @@ before(async () => {
     repositoryUrl: cloned.url, repositoryBranch: cloned.branch, repositoryCommit: cloned.commit,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   });
-  sessions = new SessionService(db, repositories, provider);
+  sessions = new SessionService(db, repositories, new TicketOrchestrator([
+    { id: 'copilot', name: 'GitHub Copilot', provider, defaultModel: process.env.COPILOT_MODEL || null },
+    { id: 'claude-code', name: 'Claude Code', experimental: true, defaultModel: 'claude-fixture',
+      provider: { ...provider, id: 'claude-code' } },
+  ]));
   const app = express();
   app.use(express.json());
   app.use('/api/board', createAgentRouter(sessions));
@@ -200,6 +205,43 @@ test('agent options expose integrated providers and their model catalogue over H
   assert.deepEqual(body.providers[0].models, [{ id: 'fixture-model', name: 'Fixture model' }]);
   assert.equal(body.providers[0].id, 'copilot');
   assert.equal(body.providers[0].defaultModel, process.env.COPILOT_MODEL || null);
+  assert.equal(body.providers[1].id, 'claude-code');
+  assert.equal(body.providers[1].experimental, true);
+});
+
+test('selected Claude runtime survives queueing, human approval, execution, review and retry', async () => {
+  const now = new Date().toISOString();
+  const task = await entities.createTask(taskSchema.parse({
+    id: 'claude-ticket-pipeline', projectId: 'project-agent', title: 'Claude pipeline',
+    description: 'Offline simulated ticket runtime', status: 'To Do', priority: 'Medium', tags: [],
+    acceptanceCriteria: ['Result exists'], subtasks: [], order: 0, storyPoints: 1,
+    createdAt: now, updatedAt: now, agentProvider: 'claude-code', agentModel: 'claude-ticket-model',
+  }));
+  await entities.moveTask(task.id, { revision: task.revision!, status: 'In Progress' });
+  assert.equal((await sessions.get(task.id))?.provider, 'claude-code');
+  await sessions.tick();
+  const plan = (await sessions.get(task.id))!;
+  assert.equal(plan.status, 'awaiting_approval');
+  assert.equal(calls.at(-1)?.context.task.agentProvider, 'claude-code');
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'claude-ticket-model');
+  await sessions.approve(task.id, plan.id, plan.updatedAt);
+  await sessions.tick();
+  const completed = (await sessions.get(task.id))!;
+  assert.equal(completed.status, 'completed', completed.error);
+  assert.equal(completed.provider, 'claude-code');
+  assert.equal(calls.at(-1)?.phase, 'execute');
+  const review = await sessions.review(task.id);
+  const report = await sessions.aiReview(task.id, review.token);
+  assert.ok(report.report);
+  assert.equal(calls.at(-1)?.phase, 'review');
+  assert.equal(calls.at(-1)?.context.task.agentModel, 'claude-ticket-model');
+  await sessions.retry(task.id, completed.id, 'Refine the implementation');
+  const retried = (await sessions.get(task.id))!;
+  assert.equal(retried.provider, 'claude-code');
+  assert.equal(retried.attempt, 2);
+  await sessions.tick();
+  assert.equal((await sessions.get(task.id))?.status, 'awaiting_approval');
+  assert.equal(calls.at(-1)?.context.task.agentProvider, 'claude-code');
 });
 
 test('ticket-selected models reach planning, execution and review and can change on a new attempt', async () => {

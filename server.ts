@@ -6,10 +6,13 @@ import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import { RepositoryService } from './server/git/repositoryService';
 import { CopilotProvider } from './server/agents/copilotProvider';
+import { ClaudeTicketProvider } from './server/agents/claudeTicketProvider';
+import { TicketOrchestrator } from './server/agents/ticketOrchestrator';
 import { CodeGraph } from './server/agents/codeGraph';
 import { WikiAssistant } from './server/wiki/wikiAssistant';
 import { TaskAssistant } from './server/agents/taskAssistant';
 import { createApp } from './server/app';
+import { WorkflowTestCopilot } from './server/agents/workflowTestCopilot';
 
 dotenv.config();
 
@@ -25,15 +28,32 @@ const repositories = new RepositoryService(path.resolve(process.env.WORKSPACES_D
   localRoots: localRepositoryRoots,
 });
 const codeGraph = CodeGraph.fromEnv();
+const claudeTicketsEnabled = process.env.KANBAN_EXPERIMENTAL_CLAUDE_TICKETS === 'true';
+const claudeKeyConfigured = !!process.env.KANBAN_CLAUDE_API_KEY?.trim();
+const ticketOrchestrator = new TicketOrchestrator([
+  { id: 'copilot', name: 'GitHub Copilot', provider: new CopilotProvider(codeGraph),
+    defaultModel: process.env.COPILOT_MODEL || null },
+  { id: 'claude-code', name: 'Claude Code', experimental: true,
+    defaultModel: process.env.KANBAN_CLAUDE_MODEL || null,
+    ...(claudeTicketsEnabled && claudeKeyConfigured ? {
+      provider: new ClaudeTicketProvider({ enabled: true, apiKey: process.env.KANBAN_CLAUDE_API_KEY }, codeGraph),
+    } : {
+      issue: !claudeTicketsEnabled
+        ? 'Experimental Claude tickets are disabled. Set KANBAN_EXPERIMENTAL_CLAUDE_TICKETS=true only after accepting the experimental runtime and AI charges.'
+        : 'KANBAN_CLAUDE_API_KEY is required. Ambient Claude credentials are not used.',
+    }),
+  },
+]);
 
-const { app, sessions, releases } = createApp({
+const { app, sessions, releases, workflowTests } = createApp({
   db,
   repositories,
-  agentProvider: new CopilotProvider(codeGraph),
+  agentProvider: ticketOrchestrator,
   codeGraph,
   archifyDir: path.resolve(process.env.ARCHIFY_DIR || 'doc/archify'),
   wikiAssistant: new WikiAssistant(),
   taskAssistant: new TaskAssistant(codeGraph),
+  workflowTestAgent: new WorkflowTestCopilot(),
 });
 
 // Vite Middleware for development, or static build for production
@@ -65,6 +85,7 @@ async function startServer() {
     listener.listen(PORT);
   });
   try {
+    await workflowTests.start();
     await releases.recover();
     await sessions.start();
   } catch (error) {
@@ -79,6 +100,7 @@ async function startServer() {
     listener.close();
     await sessions.stop();
     await releases.stop();
+    await workflowTests.stop();
     await db.$disconnect();
     process.exit(0);
   };
